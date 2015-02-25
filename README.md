@@ -9,7 +9,7 @@ Install gradle http://gradle.org/installation
     cd kafka
     ./gradlew jar
     wget https://archive.apache.org/dist/kafka/0.8.1.1/kafka_2.9.2-0.8.1.1.tgz
-    MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so java -jar kafka-mesos-sandbox-0.1.jar scheduler
+    MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so java -jar kafka-0.2.jar scheduler
 
 This is an *ALPHA* version. More features will be continued to be added until we cut a stable beta build to release candidate against.
 
