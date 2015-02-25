@@ -1,6 +1,7 @@
 apply plugin: 'scala'
 
 version = '0.1'
+jar.archiveName = "kafka-mesos-${version}.jar"
 
 repositories {
     mavenCentral()
