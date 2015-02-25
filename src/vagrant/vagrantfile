@@ -16,11 +16,11 @@
 # vi: set ft=ruby :
 
 SLAVES=1
-PREFIX=192.89.6
-# APT_CACHE=SLAVES + ".101"
+NET_PREFIX="192.168.3."
+# APT_CACHE="192.168.1.101"
 
-NODES={"master" => PREFIX + ".5"}
-(0..SLAVES-1).each do |i| NODES["slave#{i}"] = PREFIX + (6 + i).to_s end
+NODES={"master" => NET_PREFIX + "5"}
+(0..SLAVES-1).each do |i| NODES["slave#{i}"] = NET_PREFIX + (6 + i).to_s end
 
 if (defined? APT_CACHE) then NODES["apt-cache"] = APT_CACHE end
 

@@ -26,7 +26,6 @@ import java.util.Collections
 import java.io.{IOException, FileWriter, File}
 
 class Cluster {
-  private val assignments: util.Map[String, String] = new util.concurrent.ConcurrentHashMap[String, String]()
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
 
   def getBrokers:util.List[Broker] = Collections.unmodifiableList(brokers)
@@ -41,19 +40,7 @@ class Cluster {
 
   def removeBroker(broker: Broker): Unit = brokers.remove(broker)
 
-  def getAssignments: util.Map[String, String] = Collections.unmodifiableMap(assignments)
-
-  def getAssignment(brokerId: String): String = assignments.get(brokerId)
-
-  def setAssignment(brokerId: String, host: String): String = {
-    if (host == null) assignments.remove(brokerId)
-    else assignments.put(brokerId, host)
-  }
-
   def fromJson(root: Map[String, Object]): Unit = {
-    if (root.contains("assignments"))
-      assignments.putAll(root("assignments").asInstanceOf[Map[String, String]])
-
     if (root.contains("brokers"))
       for (brokerNode <- root("brokers").asInstanceOf[List[Map[String, Object]]]) {
         val broker: Broker = new Broker()
@@ -64,12 +51,6 @@ class Cluster {
 
   def toJson: JSONObject = {
     val obj = new mutable.LinkedHashMap[String, Object]()
-
-    if (!assignments.isEmpty) {
-      val assignmentsNode = new mutable.LinkedHashMap[String, String]
-      for ((id, host) <- assignments) assignmentsNode.put(id, host)
-      obj("assignments") = new JSONObject(assignments.toMap)
-    }
 
     if (!brokers.isEmpty) {
       val brokerNodes = new ListBuffer[JSONObject]()
@@ -88,7 +69,6 @@ class Cluster {
     val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
     if (node == null) throw new IOException("Failed to parse json")
 
-    assignments.clear()
     brokers.clear()
     fromJson(node)
 

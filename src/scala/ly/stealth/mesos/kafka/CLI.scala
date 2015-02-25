@@ -213,10 +213,6 @@ object CLI {
   }
 
   private def printCluster(cluster: Cluster): Unit = {
-    printLine("assignments:", 1)
-    for ((brokerId, host) <- cluster.getAssignments)
-      printLine(brokerId + " - " + host, 2)
-
     printLine("brokers:", 1)
     for (broker <- cluster.getBrokers) {
       printBroker(broker, 2)

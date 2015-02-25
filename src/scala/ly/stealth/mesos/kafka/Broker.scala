@@ -22,6 +22,7 @@ import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.Offer
+import java.util.regex.Pattern
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -36,6 +37,20 @@ class Broker(_id: String = "0") {
 
   def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
   def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
+
+  def effectiveOptionMap: util.Map[String, String] = {
+    val result = optionMap
+
+    for ((k, v) <- result) {
+      var nv = v
+      nv = nv.replace("$id", id)
+      if (host != null) nv = nv.replace("$host", host)
+
+      result.put(k, nv)
+    }
+
+    result
+  }
 
   @volatile var task: Broker.Task = null
 
@@ -88,7 +103,7 @@ class Broker(_id: String = "0") {
   }
 
   def canAccept(offer: Offer): Boolean = {
-    if (host != null && offer.getHostname != host) return false
+    if (host != null && !Broker.matches(host, offer.getHostname)) return false
 
     for (resource <- offer.getResourcesList) {
       resource.getName match {
@@ -109,7 +124,7 @@ class Broker(_id: String = "0") {
 
     for ((name, value) <- attributeMap) {
       if (!offerAttributes.containsKey(name)) return false
-      if (offerAttributes.get(name) != value) return false
+      if (!Broker.matches(value, offerAttributes.get(name))) return false
     }
 
     true
@@ -129,6 +144,33 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
+  def taskId(broker: Broker):String = {
+    "Broker-" + broker.id
+  }
+
+  def brokerId(taskId: String): String = {
+    val parts: Array[String] = taskId.split("-")
+    if (parts.length != 2) throw new IllegalArgumentException(taskId)
+    parts(1)
+  }
+
+  def matches(wildcard: String, value: String): Boolean = {
+    var regex: String = "^"
+    var token: String = ""
+    for (c <- wildcard.toCharArray) {
+      if (c == '*' || c == '?') {
+        regex += Pattern.quote(token)
+        token = ""
+        regex += (if (c == '*') ".*" else ".")
+      } else
+        token += c
+    }
+    if (token != "") regex += Pattern.quote(token)
+    regex += "$"
+
+    value.matches(regex)
+  }
+
   def parseMap(s: String, entrySep: String, valueSep: String): util.LinkedHashMap[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
     if (s == null) return result

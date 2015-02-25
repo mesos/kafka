@@ -28,10 +28,11 @@ install_mesos() {
         ln -s /lib/init/upstart-job /etc/init.d/mesos-master
         service mesos-master start
     else
-        ln -s /lib/init/upstart-job /etc/init.d/mesos-slave
         apt-get -qy remove zookeeper
-        service mesos-slave start
     fi
+
+    ln -s /lib/init/upstart-job /etc/init.d/mesos-slave
+    service mesos-slave start
 }
 
 if [[ $1 != "master" && $1 != "slave" ]]; then

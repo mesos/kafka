@@ -54,16 +54,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build()
   }
 
-  private def taskId(broker: Broker):String = {
-    "Broker-" + broker.id
-  }
-
-  private def brokerId(taskId: String): String = {
-    val parts: Array[String] = taskId.split("-")
-    if (parts.length != 2) throw new IllegalArgumentException(taskId)
-    parts(1)
-  }
-
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
     logger.info("[registered] framework:" + MesosStr.id(id.getValue) + " master:" + MesosStr.master(master))
     this.driver = driver
@@ -85,7 +75,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
     logger.info("[statusUpdate] " + MesosStr.taskStatus(status))
-    val broker = cluster.getBroker(brokerId(status.getTaskId.getValue))
+    val broker = cluster.getBroker(Broker.brokerId(status.getTaskId.getValue))
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
@@ -132,11 +122,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       var accepted = false
 
       for (broker <- cluster.getBrokers) {
-        val assignedHost = cluster.getAssignment(broker.id)
-        val assignable = assignedHost == null || assignedHost == offer.getHostname
         val acceptable = broker.started && broker.canAccept(offer) && !accepted
-        
-        if (broker.task == null && assignable && acceptable) {
+        if (broker.task == null && acceptable) {
           accepted = true
           launchTask(broker, offer)
         }
@@ -147,7 +134,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     for (id <- taskIds) {
-      val broker = cluster.getBroker(brokerId(id))
+      val broker = cluster.getBroker(Broker.brokerId(id))
       if (broker == null || !broker.started) {
         logger.info("Killing task " + id)
         driver.killTask(TaskID.newBuilder.setValue(id).build)
@@ -156,16 +143,13 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def launchTask(broker: Broker, offer: Offer): Unit = {
-    val id = taskId(broker)
+    val id = Broker.taskId(broker)
     val port = findBrokerPort(offer)
-    val logDirs = "./tmp/data"
 
-    logger.info("logs.dir=" + logDirs)
     val props: Map[String, String] = Map(
       "broker.id" -> broker.id,
       "port" -> ("" + port),
-      "zookeeper.connect" -> Config.zkUrl,
-      "log.dirs" -> logDirs
+      "zookeeper.connect" -> Config.zkUrl
     )
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
@@ -188,11 +172,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
     broker.task = new Broker.Task(id, offer.getHostname, port)
     taskIds.add(id)
 
-    if (cluster.getAssignment(broker.id) == null) {
-      cluster.setAssignment(broker.id, offer.getHostname)
-      cluster.save()
-    }
-
     logger.info("Launching task " + id + " by offer " + MesosStr.id(offer.getId.getValue) + "\n" + MesosStr.task(task))
   }
 
@@ -212,7 +191,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def taskData(broker: Broker, props: Map[String, String]): ByteString = {
     val p: Properties = new Properties()
-    for ((k, v) <- broker.optionMap) p.setProperty(k, v)
+    for ((k, v) <- broker.effectiveOptionMap) p.setProperty(k, v)
     for ((k, v) <- props) p.setProperty(k, v)
 
     val buffer: StringWriter = new StringWriter()
