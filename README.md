@@ -10,6 +10,7 @@ Table of content:
 
 [Typical Operations](#typical-operations)    
 * [Changing the location of data stored](#changing-the-location-of-data-stored)    
+* [Flushing scheduler state](#flusing-scheduler-state)    
 
 [Navigating the CLI](#navigating-the-cli)    
 * [Adding brokers to the cluster](#adding-brokers-to-the-cluster)    
@@ -124,6 +125,14 @@ broker:
 Broker 0 started
 ```
 
+Flushing scheduler state
+-------------------------
+
+Currently state is held in a local json file where the scheduler runs. This will eventually be a plugable interface so you can store it some place else also for HA.
+
+    rm -f scheduler.json
+
+    
 Navigating the CLI
 ==================
 
