@@ -91,13 +91,13 @@ cluster:
 Great!!! Now lets produce and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
 
 ```
-echo "test"|kafkacat -P -b "192.0.3.6:31000" -t testTopic -p 0
+echo "test"|kafkacat -P -b "172.16.25.62:31000" -t testTopic -p 0
 ```
 
 And lets read it back.
 
 ```
-kafkacat -C -b "192.0.3.6:31000" -t testTopic -p 0 -e
+kafkacat -C -b "172.16.25.62:31000" -t testTopic -p 0 -e
 test
 ```
 
@@ -257,7 +257,7 @@ Project Goals
 
 * rolling restarts (for things like configuration changes).
 
-* scaling the cluster up and down with automatic, programatic and manual options.
+* scaling the cluster up and down with automatic, programmatic and manual options.
 
 * smart partition assignmnet via constraints visa vi roles, resources and attributes.
 
