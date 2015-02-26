@@ -107,7 +107,7 @@ This is an alpha version. We are in progress building out new features like auto
 Typical Operations
 ===================
 
-Changing the location of data stored 
+Changing the location of data stored
 -------------------------------------
 
 ```
