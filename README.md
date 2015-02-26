@@ -71,7 +71,7 @@ java -jar kafka-mesos-*.jar start 0
 Broker 0 started
 ```
 
-Now, we don't how to start the broker know where it is lets lets find out.
+Now, we don't know where the broker is and we need that for producers and consumers to connect to the cluster.
 
 ```
 java -jar kafka-mesos-*.jar status
@@ -88,7 +88,7 @@ cluster:
       endpoint: 172.16.25.62:31000
 ```
 
-Great!!! Now lets producer and consume from it. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
+Great!!! Now lets producer and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
 
 ```
 echo "test"|kafkacat -P -b "192.0.3.6:31000" -t testTopic -p 0
