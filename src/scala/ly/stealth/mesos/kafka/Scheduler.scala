@@ -149,7 +149,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val props: Map[String, String] = Map(
       "broker.id" -> broker.id,
       "port" -> ("" + port),
-      "zookeeper.connect" -> Config.zkUrl
+      "zookeeper.connect" -> Config.zkUrl,
+      "log.dirs" -> "./tmp/ephemeral"
     )
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
