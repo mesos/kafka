@@ -88,20 +88,20 @@ cluster:
       endpoint: 172.16.25.62:31000
 ```
 
-Great!!! Now lets producer and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
+Great!!! Now lets produce and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
 
 ```
 echo "test"|kafkacat -P -b "192.0.3.6:31000" -t testTopic -p 0
 ```
 
-And lets read it back
+And lets read it back.
 
 ```
 kafkacat -C -b "192.0.3.6:31000" -t testTopic -p 0 -e
 test
 ```
 
-This is an alpha version. We are in progress building out new features like auto scailing instances for growing/shrinking the cluster, multiple brokers with smart maintenance and failure scenarios built in and more. Currently the log.dirs for kafka is in the sandbox but you can update that with --options log.dirs=/mnt/array2/N where N is the broker number and then stop, start.
+This is an alpha version.    
 
 Typical Operations
 ===================
@@ -257,9 +257,8 @@ Project Goals
 
 * rolling restarts (for things like configuration changes).
 
-* scaling up/down utilizing new re-balance decommission.
+* scaling the cluster up and down with automatic, programatic and manual options.
 
 * smart partition assignmnet via constraints visa vi roles, resources and attributes.
 
-* broker survivorbility with slave and/or task related maintenances (i.e. like restarting a server a broker is on
 
