@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/mesosphere/kafka.svg?branch=master)](https://travis-ci.org/mesosphere/kafka)
-
 Kafka Mesos Framework
 ======================
 
