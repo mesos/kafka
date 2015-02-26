@@ -3,3 +3,4 @@ project/*
 .gradle
 *.jar
 todo.txt
+*.tgz

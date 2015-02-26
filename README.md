@@ -9,12 +9,18 @@ Table of content:
 
 [Instalation](#installation)    
 [Starting and using 1 broker](#starting-and-using-1-broker)    
-[Adding brokers to the cluster](#adding-brokers-to-the-cluster)    
-[Updating broker configurations](#updating-the-broker-configurations)    
-[Starting brokers](#starting-brokers-in-the-cluster-)
-[Stopping brokers](#stopping-brokers-in-the-cluster)    
-[Removing brokers](#removing-brokers-from-the-cluster)
-[Project Goals](#project-goals)
+
+[Typical Operations](#typical-operations)    
+* [Changing the location of data stored](#changing-the-location-of-data-stored)    
+
+[Navigating the CLI](#navigating-the-cli)    
+* [Adding brokers to the cluster](#adding-brokers-to-the-cluster)    
+* [Updating broker configurations](#updating-the-broker-configurations)    
+* [Starting brokers](#starting-brokers-in-the-cluster-)    
+* [Stopping brokers](#stopping-brokers-in-the-cluster)    
+* [Removing brokers](#removing-brokers-from-the-cluster)    
+
+[Project Goals](#project-goals)    
 
 Installation
 -------------
@@ -97,6 +103,28 @@ test
 ```
 
 This is an alpha version. We are in progress building out new features like auto scailing instances for growing/shrinking the cluster, multiple brokers with smart maintenance and failure scenarios built in and more. Currently the log.dirs for kafka is in the sandbox but you can update that with --options log.dirs=/mnt/array2/N where N is the broker number and then stop, start.
+
+Typical Operations
+===================
+
+Changing the location of data stored 
+-------------------------------------
+
+```
+#java -jar kafka-mesos-*.jar stop 0
+Broker 0 stopped
+# java -jar kafka-mesos-*.jar update 0 --options log.dirs=/mnt/array1/broker0
+Broker updated
+
+broker:
+  id: 0
+  started: false
+  resources: cpus:1.00, mem:128
+  options: log.dirs=/mnt/array1/broker0
+
+# java -jar kafka-mesos-*.jar start 0
+Broker 0 started
+```
 
 Navigating the CLI
 ==================
