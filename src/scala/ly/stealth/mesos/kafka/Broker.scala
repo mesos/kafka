@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import java.util
 import scala.collection.JavaConversions._
@@ -23,6 +23,7 @@ import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.Offer
 import java.util.regex.Pattern
+import java.util.UUID
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -35,8 +36,8 @@ class Broker(_id: String = "0") {
   var attributes: String = null
   var options: String = null
 
-  def taskId: String = "broker-" + id
-  def executorId: String = "broker-" + id
+  def taskId: String = "broker-" + id + "-" + UUID.randomUUID()
+  def executorId: String = "broker-" + id + "-" + UUID.randomUUID()
 
   def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
   def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
@@ -149,7 +150,7 @@ class Broker(_id: String = "0") {
 object Broker {
   def idFromTaskId(taskId: String): String = {
     val parts: Array[String] = taskId.split("-")
-    if (parts.length != 2) throw new IllegalArgumentException(taskId)
+    if (parts.length < 2) throw new IllegalArgumentException(taskId)
     parts(1)
   }
 

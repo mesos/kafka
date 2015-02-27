@@ -39,6 +39,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def executor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jarName
+    cmd += " -Xmx" + broker.mem + "m"
+
     if (Config.debug) cmd += " -Ddebug"
     cmd += " ly.stealth.mesos.kafka.Executor"
 
@@ -52,6 +54,32 @@ object Scheduler extends org.apache.mesos.Scheduler {
       )
       .setName("BrokerExecutor")
       .build()
+  }
+
+  private def task(broker: Broker, offer: Offer): TaskInfo = {
+    val port = findBrokerPort(offer)
+    
+    val props: Map[String, String] = Map(
+      "broker.id" -> broker.id,
+      "port" -> ("" + port),
+      "zookeeper.connect" -> Config.zkUrl
+    )
+
+    val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
+      .setName("BrokerTask")
+      .setTaskId(TaskID.newBuilder.setValue(broker.taskId).build)
+      .setSlaveId(offer.getSlaveId)
+      .setData(taskData(broker, props))
+      .setExecutor(executor(broker))
+
+    taskBuilder
+      .addResources(Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.cpus)))
+      .addResources(Resource.newBuilder.setName("mem").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.mem)))
+      .addResources(Resource.newBuilder.setName("ports").setType(Value.Type.RANGES).setRanges(
+      Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(port).setEnd(port)))
+      )
+
+    taskBuilder.build
   }
 
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
@@ -143,36 +171,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def launchTask(broker: Broker, offer: Offer): Unit = {
-    val id = broker.taskId
-    val port = findBrokerPort(offer)
+    val task_ = task(broker, offer)
+    val id = task_.getTaskId.getValue
 
-    val props: Map[String, String] = Map(
-      "broker.id" -> broker.id,
-      "port" -> ("" + port),
-      "zookeeper.connect" -> Config.zkUrl
-    )
-
-    val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
-      .setName("BrokerTask")
-      .setTaskId(TaskID.newBuilder.setValue(id).build)
-      .setSlaveId(offer.getSlaveId)
-      .setData(taskData(broker, props))
-      .setExecutor(executor(broker))
-
-    taskBuilder
-      .addResources(Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.cpus)))
-      .addResources(Resource.newBuilder.setName("mem").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.mem)))
-      .addResources(Resource.newBuilder.setName("ports").setType(Value.Type.RANGES).setRanges(
-      Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(port).setEnd(port)))
-      )
-
-    val task = taskBuilder.build
-
-    driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task))
-    broker.task = new Broker.Task(id, offer.getHostname, port)
+    driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
+    broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer))
     taskIds.add(id)
 
-    logger.info("Launching task " + id + " by offer " + MesosStr.id(offer.getId.getValue) + "\n" + MesosStr.task(task))
+    logger.info("Launching task " + id + " by offer " + MesosStr.id(offer.getId.getValue) + "\n" + MesosStr.task(task_))
   }
 
   private def findBrokerPort(offer: Offer): Int = {
