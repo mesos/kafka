@@ -288,6 +288,6 @@ object CLI {
 
   private def die(error: String): Unit = {
     System.err.println("Error: " + error)
-    //System.exit(1)
+    System.exit(1)
   }
 }

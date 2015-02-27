@@ -119,5 +119,5 @@ class Cluster {
 }
 
 object Cluster {
-  val stateFile: File = new File("scheduler.json")
+  val stateFile: File = new File("kafka-mesos.json")
 }
