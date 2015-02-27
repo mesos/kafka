@@ -37,20 +37,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def getCluster: Cluster = cluster
 
-  private def executor: ExecutorInfo = {
+  private def executor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jarName
     if (Config.debug) cmd += " -Ddebug"
     cmd += " ly.stealth.mesos.kafka.Executor"
 
     ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder.setValue("kafka"))
+      .setExecutorId(ExecutorID.newBuilder.setValue(broker.executorId))
       .setCommand(
         CommandInfo.newBuilder
           .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jarName))
           .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/kafka/" + HttpServer.kafkaDistName))
           .setValue(cmd)
       )
-      .setName("KafkaExecutor")
+      .setName("BrokerExecutor")
       .build()
   }
 
@@ -75,7 +75,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
     logger.info("[statusUpdate] " + MesosStr.taskStatus(status))
-    val broker = cluster.getBroker(Broker.brokerId(status.getTaskId.getValue))
+    val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
@@ -134,7 +134,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     for (id <- taskIds) {
-      val broker = cluster.getBroker(Broker.brokerId(id))
+      val broker = cluster.getBroker(Broker.idFromTaskId(id))
       if (broker == null || !broker.started) {
         logger.info("Killing task " + id)
         driver.killTask(TaskID.newBuilder.setValue(id).build)
@@ -143,7 +143,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def launchTask(broker: Broker, offer: Offer): Unit = {
-    val id = Broker.taskId(broker)
+    val id = broker.taskId
     val port = findBrokerPort(offer)
 
     val props: Map[String, String] = Map(
@@ -153,11 +153,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
     )
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
-      .setName(id)
+      .setName("BrokerTask")
       .setTaskId(TaskID.newBuilder.setValue(id).build)
       .setSlaveId(offer.getSlaveId)
       .setData(taskData(broker, props))
-      .setExecutor(executor)
+      .setExecutor(executor(broker))
 
     taskBuilder
       .addResources(Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.cpus)))
@@ -195,7 +195,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     for ((k, v) <- props) p.setProperty(k, v)
 
     if (!p.containsKey("log.dirs"))
-      p.setProperty("log.dirs", "log/" + broker.id)
+      p.setProperty("log.dirs", "kafka-logs")
 
     val buffer: StringWriter = new StringWriter()
     p.store(buffer, "")

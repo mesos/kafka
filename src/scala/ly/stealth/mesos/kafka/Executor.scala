@@ -21,19 +21,12 @@ import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 import org.apache.mesos.Protos._
 import java.io._
 import java.util
-import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import org.apache.log4j._
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
-  val kafkaServers: util.List[KafkaServer] = new util.ArrayList[KafkaServer]()
-
-  def getKafkaServer(id: String): KafkaServer = {
-    for (server <- kafkaServers)
-      if (server.id == id) return server
-    null
-  }
+  @volatile var server: KafkaServer = null
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo): Unit = {
     logger.info("[registered] framework:" + MesosStr.framework(framework) + " slave:" + MesosStr.slave(slave))
@@ -52,7 +45,7 @@ object Executor extends org.apache.mesos.Executor {
 
     new Thread {
       override def run() {
-        setName("KafkaServer-" + task.getTaskId.getValue)
+        setName("KafkaServer")
         runKafkaServer(driver, task)
       }
     }.start()
@@ -60,7 +53,6 @@ object Executor extends org.apache.mesos.Executor {
 
   def killTask(driver: ExecutorDriver, id: TaskID): Unit = {
     logger.info("[killTask] " + id.getValue)
-    val server: KafkaServer = getKafkaServer(id.getValue)
     if (server != null) server.stop()
   }
 
@@ -70,7 +62,7 @@ object Executor extends org.apache.mesos.Executor {
 
   def shutdown(driver: ExecutorDriver): Unit = {
     logger.info("[shutdown]")
-    for (server <- kafkaServers) server.stop()
+    if (server != null) server.stop()
   }
 
   def error(driver: ExecutorDriver, message: String): Unit = {
@@ -78,11 +70,9 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   private def runKafkaServer(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    var server: KafkaServer = null
     try {
       server = new KafkaServer(task.getTaskId.getValue, props(task))
       server.start()
-      kafkaServers.add(server)
 
       var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
       driver.sendStatusUpdate(status)
@@ -95,7 +85,10 @@ object Executor extends org.apache.mesos.Executor {
         logger.warn("", t)
         sendTaskFailed(driver, task, t)
     } finally {
-      if (server != null) kafkaServers.remove(server)
+      if (server != null) {
+        server.stop()
+        server = null
+      }
     }
   }
 

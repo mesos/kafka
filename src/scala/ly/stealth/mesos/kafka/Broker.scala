@@ -35,6 +35,9 @@ class Broker(_id: String = "0") {
   var attributes: String = null
   var options: String = null
 
+  def taskId: String = "broker-" + id
+  def executorId: String = "broker-" + id
+
   def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
   def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
 
@@ -144,11 +147,7 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
-  def taskId(broker: Broker):String = {
-    "Broker-" + broker.id
-  }
-
-  def brokerId(taskId: String): String = {
+  def idFromTaskId(taskId: String): String = {
     val parts: Array[String] = taskId.split("-")
     if (parts.length != 2) throw new IllegalArgumentException(taskId)
     parts(1)
