@@ -6,11 +6,11 @@ Vagrantfile creates mesos cluster with following nodes:
 Master provides web ui listening on http://master:5050
 Both master and slave nodes runs mesos slave daemons.
 
-For general mesos overview please refer to
-http://mesos.apache.org/documentation/latest/mesos-architecture/
-
 Host's public key is copied to `authorized_hosts`,
 so direct access like `ssh vagrant@master|slaveX` should work.
+
+For general mesos overview please refer to
+http://mesos.apache.org/documentation/latest/mesos-architecture/
 
 ## Node Names
 During first run vagrantfile creates `hosts` file which
