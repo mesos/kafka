@@ -21,8 +21,6 @@ import java.io.{FileInputStream, File}
 import java.util.Properties
 
 object Config {
-  val usage: String = "Usage: Scheduler {<scheduler.properties>}"
-
   var debug: Boolean = false
   var mesosUser: String = null
 
@@ -42,8 +40,8 @@ object Config {
   load()
 
   private def load(): Unit = {
-    val configPath = System.getProperty("scheduler.config")
-    val file = new File(if (configPath != null) configPath else "scheduler.properties")
+    val configPath = System.getProperty("config")
+    val file = new File(if (configPath != null) configPath else "kafka-mesos.properties")
     if (!file.exists()) throw new IllegalStateException("File " + file + " not found")
 
     val props: Properties = new Properties()

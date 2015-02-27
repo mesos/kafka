@@ -1,6 +1,9 @@
 out/*
 project/*
 .gradle
-*.jar
+*.iml
 todo.txt
-*.tgz
+
+kafka-mesos*.json
+kafka-mesos*.jar
+kafka*.tgz
