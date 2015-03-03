@@ -132,9 +132,27 @@ Starting 3 brokers
 
 ```
 #./kafka-mesos.sh add 0..2 --heap 1024 --mem 2048
+Brokers added
+
+brokers:
+  id: 0
+  started: false
+  resources: cpus:1.00, mem:2048, heap:1024
+
+  id: 1
+  started: false
+  resources: cpus:1.00, mem:2048, heap:1024
+
+  id: 2
+  started: false
+  resources: cpus:1.00, mem:2048, heap:1024
+
 #./kafka-mesos.sh start 0
+Broker 0 started
 #./kafka-mesos.sh start 1
+Broker 1 started
 #./kafka-mesos.sh start 2
+Broker 2 started
 ```
 
 Flushing scheduler state
