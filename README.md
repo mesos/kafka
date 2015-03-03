@@ -10,7 +10,9 @@ Table of content:
 
 [Typical Operations](#typical-operations)    
 * [Changing the location of data stored](#changing-the-location-of-data-stored)    
-* [Flushing scheduler state](#flusing-scheduler-state)    
+* [Starting 3 brokers](#starting-3-brokers)    
+* [Flushing scheduler state](#flusing-scheduler-state)
+
 
 [Navigating the CLI](#navigating-the-cli)    
 * [Adding brokers to the cluster](#adding-brokers-to-the-cluster)    
@@ -125,6 +127,16 @@ broker:
 Broker 0 started
 ```
 
+Starting 3 brokers
+-------------------------
+
+```
+./kafka-mesos.sh add 0..2 --heap 1024 --mem 2048
+./kafka-mesos.sh start 0
+./kafka-mesos.sh start 1
+./kafka-mesos.sh start 2
+```
+
 Flushing scheduler state
 -------------------------
 
@@ -133,7 +145,7 @@ This will eventually be a plugable interface so you can store it some place else
 
     # rm -f kafka-mesos.json
 
-    
+
 Navigating the CLI
 ==================
 
