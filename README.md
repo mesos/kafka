@@ -131,10 +131,10 @@ Starting 3 brokers
 -------------------------
 
 ```
-./kafka-mesos.sh add 0..2 --heap 1024 --mem 2048
-./kafka-mesos.sh start 0
-./kafka-mesos.sh start 1
-./kafka-mesos.sh start 2
+#./kafka-mesos.sh add 0..2 --heap 1024 --mem 2048
+#./kafka-mesos.sh start 0
+#./kafka-mesos.sh start 1
+#./kafka-mesos.sh start 2
 ```
 
 Flushing scheduler state
