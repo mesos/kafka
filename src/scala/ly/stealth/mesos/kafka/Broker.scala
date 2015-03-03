@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import java.util
 import scala.collection.JavaConversions._
@@ -23,6 +23,7 @@ import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.Offer
 import java.util.regex.Pattern
+import java.util.UUID
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -31,12 +32,13 @@ class Broker(_id: String = "0") {
   var host: String = null
   var cpus: Double = 1
   var mem: Long = 128
+  var heap: Long = 128
 
   var attributes: String = null
   var options: String = null
 
-  def taskId: String = "broker-" + id
-  def executorId: String = "broker-" + id
+  def taskId: String = "broker-" + id + "-" + UUID.randomUUID()
+  def executorId: String = "broker-" + id + "-" + UUID.randomUUID()
 
   def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
   def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
@@ -65,6 +67,7 @@ class Broker(_id: String = "0") {
     broker.host = host
     broker.cpus = cpus
     broker.mem = mem
+    broker.heap = heap
 
     broker.attributes = attributes
     broker.options = options
@@ -78,6 +81,7 @@ class Broker(_id: String = "0") {
     if (node.contains("host")) host = node("host").asInstanceOf[String]
     cpus = node("cpus").asInstanceOf[Number].doubleValue()
     mem = node("mem").asInstanceOf[Number].longValue()
+    heap = node("heap").asInstanceOf[Number].longValue()
 
     if (node.contains("attributes")) attributes = node("attributes").asInstanceOf[String]
     if (node.contains("options")) options = node("options").asInstanceOf[String]
@@ -96,6 +100,7 @@ class Broker(_id: String = "0") {
     if (host != null) obj("host") = host
     obj("cpus") = cpus
     obj("mem") = mem
+    obj("heap") = heap
 
     if (attributes != null) obj("attributes") = attributes
     if (options != null) obj("options") = options
@@ -112,6 +117,7 @@ class Broker(_id: String = "0") {
       resource.getName match {
         case "cpus" => if (resource.getScalar.getValue < cpus) return false
         case "mem" => if (resource.getScalar.getValue < mem) return false
+        case "heap" => if (resource.getScalar.getValue < heap) return false
         case _ => // ignore
       }
     }
@@ -149,7 +155,7 @@ class Broker(_id: String = "0") {
 object Broker {
   def idFromTaskId(taskId: String): String = {
     val parts: Array[String] = taskId.split("-")
-    if (parts.length != 2) throw new IllegalArgumentException(taskId)
+    if (parts.length < 2) throw new IllegalArgumentException(taskId)
     parts(1)
   }
 

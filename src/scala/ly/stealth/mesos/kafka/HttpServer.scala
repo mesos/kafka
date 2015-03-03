@@ -147,6 +147,11 @@ object HttpServer {
         try { mem = java.lang.Long.valueOf(request.getParameter("mem")) }
         catch { case e: NumberFormatException => errors.add("Invalid mem") }
 
+      var heap: java.lang.Long = null
+      if (request.getParameter("heap") != null)
+        try { heap = java.lang.Long.valueOf(request.getParameter("heap")) }
+        catch { case e: NumberFormatException => errors.add("Invalid heap") }
+
       val options: String = request.getParameter("options")
       if (options != null)
         try { Broker.parseMap(request.getParameter("options"), ";", "=") }
@@ -184,6 +189,7 @@ object HttpServer {
         if (host != null) broker.host = if (host != "") host else null
         if (cpus != null) broker.cpus = cpus
         if (mem != null) broker.mem = mem
+        if (heap != null) broker.heap = heap
         if (options != null) broker.options = if (options != "") options else null
         if (attributes != null) broker.attributes = if (attributes != "") attributes else null
 

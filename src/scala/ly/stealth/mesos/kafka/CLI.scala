@@ -95,6 +95,7 @@ object CLI {
     parser.accepts("host", "slave hostname").withRequiredArg()
     parser.accepts("cpus", "cpu amount").withRequiredArg().ofType(classOf[java.lang.Double])
     parser.accepts("mem", "mem amount").withRequiredArg().ofType(classOf[java.lang.Long])
+    parser.accepts("heap", "heap amount").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("options", "kafka options (a=1;b=2)").withRequiredArg()
     parser.accepts("attributes", "slave attributes (rack:1;role:master)").withRequiredArg()
 
@@ -120,6 +121,7 @@ object CLI {
     val host = options.valueOf("host").asInstanceOf[String]
     val cpus = options.valueOf("cpus").asInstanceOf[java.lang.Double]
     val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
+    val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
     val options_ = options.valueOf("options").asInstanceOf[String]
     val attributes = options.valueOf("attributes").asInstanceOf[String]
 
@@ -128,6 +130,7 @@ object CLI {
     if (host != null) params.put("host", host)
     if (cpus != null) params.put("cpus", "" + cpus)
     if (mem != null) params.put("mem", "" + mem)
+    if (heap != null) params.put("heap", "" + heap)
     if (options_ != null) params.put("options", options_)
     if (attributes != null) params.put("attributes", attributes)
 
@@ -225,7 +228,7 @@ object CLI {
     printLine("started: " + broker.started, indent)
 
     if (broker.host != null) printLine("host: " + broker.host, indent)
-    printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem, indent)
+    printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
 
     if (broker.attributes != null) printLine("attributes: " + broker.attributes, indent)
     if (broker.options != null) printLine("options: " + broker.options, indent)
