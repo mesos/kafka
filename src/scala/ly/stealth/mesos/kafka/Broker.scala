@@ -32,6 +32,7 @@ class Broker(_id: String = "0") {
   var host: String = null
   var cpus: Double = 1
   var mem: Long = 128
+  var heap: Long = 128
 
   var attributes: String = null
   var options: String = null
@@ -66,6 +67,7 @@ class Broker(_id: String = "0") {
     broker.host = host
     broker.cpus = cpus
     broker.mem = mem
+    broker.heap = heap
 
     broker.attributes = attributes
     broker.options = options
@@ -79,6 +81,7 @@ class Broker(_id: String = "0") {
     if (node.contains("host")) host = node("host").asInstanceOf[String]
     cpus = node("cpus").asInstanceOf[Number].doubleValue()
     mem = node("mem").asInstanceOf[Number].longValue()
+    heap = node("heap").asInstanceOf[Number].longValue()
 
     if (node.contains("attributes")) attributes = node("attributes").asInstanceOf[String]
     if (node.contains("options")) options = node("options").asInstanceOf[String]
@@ -97,6 +100,7 @@ class Broker(_id: String = "0") {
     if (host != null) obj("host") = host
     obj("cpus") = cpus
     obj("mem") = mem
+    obj("heap") = heap
 
     if (attributes != null) obj("attributes") = attributes
     if (options != null) obj("options") = options
@@ -113,6 +117,7 @@ class Broker(_id: String = "0") {
       resource.getName match {
         case "cpus" => if (resource.getScalar.getValue < cpus) return false
         case "mem" => if (resource.getScalar.getValue < mem) return false
+        case "heap" => if (resource.getScalar.getValue < heap) return false
         case _ => // ignore
       }
     }
