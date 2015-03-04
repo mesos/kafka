@@ -276,7 +276,10 @@ object HttpServer {
         brokers.add(broker)
       }
 
-      brokers.foreach(_.started = start)
+      for (broker <- brokers) {
+        broker.started = start
+        broker.failover.resetFailures()
+      }
       cluster.save()
 
       def waitForBrokers(): Boolean = {

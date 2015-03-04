@@ -206,15 +206,35 @@ object Broker {
     var maxDelay: Period = new Period("60s")
     var maxTries: Integer = null
 
+    var failures: Int = 0
     var failureTime: Date = null
 
+    def currentDelay: Period = {
+      if (failures == 0) return new Period("0ms")
+
+      val multiplier = 1 << (failures - 1)
+      val d = delay.toMs * multiplier
+
+      if (d > maxDelay.toMs) maxDelay else new Period(delay.getValue * multiplier + delay.getUnit)
+    }
+
     def delayExpires: Date = {
-      if (failureTime == null) return new Date(0)
-      new Date(failureTime.getTime + delay.toMs)
+      if (failures == 0) return new Date(0)
+      new Date(failureTime.getTime + currentDelay.toMs)
     }
 
     def isWaitingDelay: Boolean = delayExpires.getTime > System.currentTimeMillis()
 
+    def registerFailure(): Unit = {
+      failures += 1
+      failureTime = new Date()
+    }
+
+    def resetFailures(): Unit = {
+      failures = 0
+      failureTime = null
+    }
+    
     def copy: Failover = {
       val failover = new Failover()
 
@@ -222,6 +242,7 @@ object Broker {
       failover.maxDelay = maxDelay
       failover.maxTries = maxTries
 
+      failover.failures = failures
       failover.failureTime = failureTime
       failover
     }
@@ -231,6 +252,7 @@ object Broker {
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
       
+      if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
       if (node.contains("failureTime")) failureTime = new Date(node("failureTime").asInstanceOf[Number].longValue())
     }
 
@@ -241,7 +263,9 @@ object Broker {
       obj("maxDelay") = "" + maxDelay
       if (maxTries != null) obj("maxTries") = maxTries
 
+      if (failures != 0) obj("failures") = failures
       if (failureTime != null) obj("failureTime") = failureTime.getTime
+      
       new JSONObject(obj.toMap)
     }
   }

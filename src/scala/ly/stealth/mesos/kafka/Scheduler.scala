@@ -22,7 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.{Date, Properties}
+import java.util.Properties
 import java.io.StringWriter
 import scala.collection.JavaConversions._
 
@@ -143,7 +143,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (broker == null) return
 
     if (broker.task != null) broker.task.running = true
-    broker.failover.failureTime = null
+    broker.failover.resetFailures()
   }
 
   private def onBrokerStopped(broker: Broker, status: TaskStatus): Unit = {
@@ -153,8 +153,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
     broker.task = null
 
     if (status.getState != TaskState.TASK_FINISHED) {
-      broker.failover.failureTime = new Date()
-      logger.info("Broker " + broker.id + " failed to start, waiting " + broker.failover.delay + ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires))
+      broker.failover.registerFailure()
+      logger.info("Broker " + broker.id + " failed to start, waiting " + broker.failover.currentDelay + ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires))
     }
   }
 

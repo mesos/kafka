@@ -227,7 +227,7 @@ object CLI {
 
     if (success) printLine(s"$brokers $ids $startStopped")
     else if (timeout == 0) printLine(s"$brokers $ids scheduled to $startStop")
-    else die(s"$brokers $ids scheduled to $startStop. Timeout limit exceeded")
+    else die(s"$brokers $ids scheduled to $startStop. Timeout")
   }
 
   private def printCluster(cluster: Cluster): Unit = {
