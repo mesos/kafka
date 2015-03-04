@@ -24,6 +24,7 @@ import scala.collection
 import org.apache.mesos.Protos.Offer
 import java.util.regex.Pattern
 import java.util.UUID
+import ly.stealth.mesos.kafka.Broker.Failover
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -36,6 +37,8 @@ class Broker(_id: String = "0") {
 
   var attributes: String = null
   var options: String = null
+
+  var failover: Failover = new Failover()
 
   def taskId: String = "broker-" + id + "-" + UUID.randomUUID()
   def executorId: String = "broker-" + id + "-" + UUID.randomUUID()
@@ -71,6 +74,10 @@ class Broker(_id: String = "0") {
 
     broker.attributes = attributes
     broker.options = options
+
+    broker.failover = failover.copy
+    if (task != null) broker.task = task.copy
+
     broker
   }
 
@@ -85,6 +92,9 @@ class Broker(_id: String = "0") {
 
     if (node.contains("attributes")) attributes = node("attributes").asInstanceOf[String]
     if (node.contains("options")) options = node("options").asInstanceOf[String]
+
+    failover = new Broker.Failover()
+    failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
     if (node.contains("task")) {
       task = new Broker.Task()
@@ -105,6 +115,7 @@ class Broker(_id: String = "0") {
     if (attributes != null) obj("attributes") = attributes
     if (options != null) obj("options") = options
 
+    obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson
 
     new JSONObject(obj.toMap)
@@ -190,6 +201,38 @@ object Broker {
     result
   }
 
+  class Failover {
+    var delay: Period = new Period("10s")
+    var maxDelay: Period = new Period("60s")
+    var maxTries: Integer = null
+
+    def copy: Failover = {
+      val failover = new Failover()
+
+      failover.delay = delay
+      failover.maxDelay = maxDelay
+      failover.maxTries = maxTries
+
+      failover
+    }
+
+    def fromJson(node: Map[String, Object]): Unit = {
+      delay = new Period(node("delay").asInstanceOf[String])
+      maxDelay = new Period(node("maxDelay").asInstanceOf[String])
+      if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
+    }
+
+    def toJson: JSONObject = {
+      val obj = new collection.mutable.LinkedHashMap[String, Any]()
+
+      obj("delay") = "" + delay
+      obj("maxDelay") = "" + maxDelay
+      if (maxTries != null) obj("maxTries") = maxTries
+
+      new JSONObject(obj.toMap)
+    }
+  }
+
   class Task(_id: String = null, _host: String = null, _port: Int = -1) {
     var id: String = _id
     @volatile var running: Boolean = false
@@ -197,6 +240,17 @@ object Broker {
     var port: Int = _port
 
     def endpoint: String = host + ":" + port
+
+    def copy: Task = {
+      val task = new Task()
+
+      task.id = id
+      task.running = running
+      task.host = host
+      task.port = port
+
+      task
+    }
 
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]

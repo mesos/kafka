@@ -152,6 +152,7 @@ object HttpServer {
         try { heap = java.lang.Long.valueOf(request.getParameter("heap")) }
         catch { case e: NumberFormatException => errors.add("Invalid heap") }
 
+
       val options: String = request.getParameter("options")
       if (options != null)
         try { Broker.parseMap(request.getParameter("options"), ";", "=") }
@@ -161,6 +162,23 @@ object HttpServer {
       if (attributes != null)
         try { Broker.parseMap(request.getParameter("attributes"), ";", ":") }
         catch { case e: IllegalArgumentException => errors.add("Invalid attributes") }
+
+
+      var failoverDelay: Period = null
+      if (request.getParameter("failoverDelay") != null)
+        try { failoverDelay = new Period(request.getParameter("failoverDelay")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid failoverDelay") }
+
+      var failoverMaxDelay: Period = null
+      if (request.getParameter("failoverMaxDelay") != null)
+        try { failoverMaxDelay = new Period(request.getParameter("failoverMaxDelay")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid failoverMaxDelay") }
+
+      val failoverMaxTries: String = request.getParameter("failoverMaxTries")
+      if (failoverMaxTries != null && failoverMaxTries != "")
+        try { Integer.valueOf(failoverMaxTries) }
+        catch { case e: NumberFormatException => errors.add("Invalid failoverMaxTries") }
+
 
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
@@ -190,8 +208,13 @@ object HttpServer {
         if (cpus != null) broker.cpus = cpus
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
+
         if (options != null) broker.options = if (options != "") options else null
         if (attributes != null) broker.attributes = if (attributes != "") attributes else null
+
+        if (failoverDelay != null) broker.failover.delay = failoverDelay
+        if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay
+        if (failoverMaxTries != null) broker.failover.maxTries = if (failoverMaxTries != "") Integer.valueOf(failoverMaxTries) else null
 
         if (add) cluster.addBroker(broker)
       }
