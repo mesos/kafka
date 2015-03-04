@@ -151,10 +151,24 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (broker == null) return
 
     broker.task = null
+    val failed = status.getState != TaskState.TASK_FINISHED
 
-    if (status.getState != TaskState.TASK_FINISHED) {
+    if (failed) {
       broker.failover.registerFailure()
-      logger.info("Broker " + broker.id + " failed to start, waiting " + broker.failover.currentDelay + ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires))
+
+      var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
+      if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
+
+      if (!broker.failover.isMaxTriesExceed) {
+        msg += ", waiting " + broker.failover.currentDelay
+        msg += ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires)
+      } else {
+        broker.started = false
+        msg += ", failures limit exceeded"
+        msg += ", stopping broker"
+      }
+
+      logger.info(msg)
     }
   }
 
