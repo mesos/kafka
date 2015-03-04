@@ -23,7 +23,7 @@ import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.Offer
 import java.util.regex.Pattern
-import java.util.UUID
+import java.util.{Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
 
 class Broker(_id: String = "0") {
@@ -121,7 +121,7 @@ class Broker(_id: String = "0") {
     new JSONObject(obj.toMap)
   }
 
-  def canAccept(offer: Offer): Boolean = {
+  def matches(offer: Offer): Boolean = {
     if (host != null && !Broker.matches(host, offer.getHostname)) return false
 
     for (resource <- offer.getResourcesList) {
@@ -206,6 +206,15 @@ object Broker {
     var maxDelay: Period = new Period("60s")
     var maxTries: Integer = null
 
+    var failureTime: Date = null
+
+    def delayExpires: Date = {
+      if (failureTime == null) return new Date(0)
+      new Date(failureTime.getTime + delay.toMs)
+    }
+
+    def isWaitingDelay: Boolean = delayExpires.getTime > System.currentTimeMillis()
+
     def copy: Failover = {
       val failover = new Failover()
 
@@ -213,6 +222,7 @@ object Broker {
       failover.maxDelay = maxDelay
       failover.maxTries = maxTries
 
+      failover.failureTime = failureTime
       failover
     }
 
@@ -220,6 +230,8 @@ object Broker {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
+      
+      if (node.contains("failureTime")) failureTime = new Date(node("failureTime").asInstanceOf[Number].longValue())
     }
 
     def toJson: JSONObject = {
@@ -229,6 +241,7 @@ object Broker {
       obj("maxDelay") = "" + maxDelay
       if (maxTries != null) obj("maxTries") = maxTries
 
+      if (failureTime != null) obj("failureTime") = failureTime.getTime
       new JSONObject(obj.toMap)
     }
   }

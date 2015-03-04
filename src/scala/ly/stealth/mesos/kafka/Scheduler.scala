@@ -22,7 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.Properties
+import java.util.{Date, Properties}
 import java.io.StringWriter
 import scala.collection.JavaConversions._
 
@@ -107,13 +107,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
-        if (broker != null && broker.task != null)
-          broker.task.running = true
+        onBrokerStarted(broker, status)
       case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
            TaskState.TASK_FAILED | TaskState.TASK_KILLED |
            TaskState.TASK_ERROR =>
-        taskIds.remove(status.getTaskId.getValue)
-        if (broker != null) broker.task = null
+        onBrokerStopped(broker, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
     
@@ -141,6 +139,25 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("[error] " + message)
   }
 
+  private def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
+    if (broker == null) return
+
+    if (broker.task != null) broker.task.running = true
+    broker.failover.failureTime = null
+  }
+
+  private def onBrokerStopped(broker: Broker, status: TaskStatus): Unit = {
+    taskIds.remove(status.getTaskId.getValue)
+    if (broker == null) return
+
+    broker.task = null
+
+    if (status.getState != TaskState.TASK_FINISHED) {
+      broker.failover.failureTime = new Date()
+      logger.info("Broker " + broker.id + " failed to start, waiting " + broker.failover.delay + ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires))
+    }
+  }
+
   def syncClusterState(offers: util.List[Offer] = new util.ArrayList[Offer]()): Unit = {
     logger.debug("[syncClusterState]")
     cluster.save()
@@ -150,7 +167,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
       var accepted = false
 
       for (broker <- cluster.getBrokers) {
-        val acceptable = broker.started && broker.canAccept(offer) && !accepted
+        val acceptable = !accepted && broker.started &&
+          broker.matches(offer) && !broker.failover.isWaitingDelay
+
         if (broker.task == null && acceptable) {
           accepted = true
           launchTask(broker, offer)
