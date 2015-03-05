@@ -241,6 +241,7 @@ object CLI {
   private def printBroker(broker: Broker, indent: Int): Unit = {
     printLine("id: " + broker.id, indent)
     printLine("started: " + broker.started, indent)
+    printLine("state: " + broker.state, indent)
 
     if (broker.host != null) printLine("host: " + broker.host, indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)

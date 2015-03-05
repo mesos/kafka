@@ -161,6 +161,32 @@ class Broker(_id: String = "0") {
 
     stateMatches
   }
+
+  def state: String = {
+    if (started) {
+      if (task != null && task.running) return "started"
+
+      if (failover.isWaitingDelay) {
+        var s = "failed " + failover.failures
+        if (failover.maxTries != null) s += "/" + failover.maxTries
+        s += " " + MesosStr.dateTime(failover.failureTime)
+        s += ", next start " + MesosStr.dateTime(failover.delayExpires)
+        return s
+      }
+
+      if (failover.failures > 0) {
+        var s = "starting " + (failover.failures + 1)
+        if (failover.maxTries != null) s += "/" + failover.maxTries
+        s += ", failed " + MesosStr.dateTime(failover.failureTime)
+        return s
+      }
+
+      return "starting"
+    }
+
+    if (task != null) return "stopping"
+    "stopped"
+  }
 }
 
 object Broker {

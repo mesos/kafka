@@ -184,7 +184,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -234,7 +234,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -266,7 +266,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {

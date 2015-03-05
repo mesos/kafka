@@ -164,7 +164,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         msg += ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires)
       } else {
         broker.started = false
-        msg += ", failures limit exceeded"
+        msg += ", failure limit exceeded"
         msg += ", stopping broker"
       }
 
