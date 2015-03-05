@@ -163,7 +163,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         msg += ", waiting " + broker.failover.currentDelay
         msg += ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires)
       } else {
-        broker.started = false
+        broker.active = false
         msg += ", failure limit exceeded"
         msg += ", stopping broker"
       }
@@ -181,7 +181,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       var accepted = false
 
       for (broker <- cluster.getBrokers) {
-        val acceptable = !accepted && broker.started &&
+        val acceptable = !accepted && broker.active &&
           broker.matches(offer) && !broker.failover.isWaitingDelay
 
         if (broker.task == null && acceptable) {
@@ -196,7 +196,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     for (id <- taskIds) {
       val broker = cluster.getBroker(Broker.idFromTaskId(id))
-      if (broker == null || !broker.started) {
+      if (broker == null || !broker.active) {
         logger.info("Killing task " + id)
         driver.killTask(TaskID.newBuilder.setValue(id).build)
       }

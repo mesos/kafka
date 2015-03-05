@@ -28,7 +28,7 @@ import ly.stealth.mesos.kafka.Broker.Failover
 
 class Broker(_id: String = "0") {
   var id: String = _id
-  @volatile var started: Boolean = false
+  @volatile var active: Boolean = false
 
   var host: String = null
   var cpus: Double = 1
@@ -65,7 +65,7 @@ class Broker(_id: String = "0") {
   def copy(): Broker = {
     val broker: Broker = new Broker()
     broker.id = id
-    broker.started = started
+    broker.active = active
 
     broker.host = host
     broker.cpus = cpus
@@ -83,7 +83,7 @@ class Broker(_id: String = "0") {
 
   def fromJson(node: Map[String, Object]): Unit = {
     id = node("id").asInstanceOf[String]
-    started = node("started").asInstanceOf[Boolean]
+    active = node("active").asInstanceOf[Boolean]
 
     if (node.contains("host")) host = node("host").asInstanceOf[String]
     cpus = node("cpus").asInstanceOf[Number].doubleValue()
@@ -105,7 +105,7 @@ class Broker(_id: String = "0") {
   def toJson: JSONObject = {
     val obj = new collection.mutable.LinkedHashMap[String, Any]()
     obj("id") = id
-    obj("started") = started
+    obj("active") = active
 
     if (host != null) obj("host") = host
     obj("cpus") = cpus
@@ -163,7 +163,7 @@ class Broker(_id: String = "0") {
   }
 
   def state: String = {
-    if (started) {
+    if (active) {
       if (task != null && task.running) return "started"
 
       if (failover.isWaitingDelay) {

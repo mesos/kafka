@@ -196,7 +196,7 @@ object HttpServer {
           else broker = new Broker(id)
         else
           if (broker == null) errors.add(s"Broker $id not found")
-          else if (broker.started) errors.add(s"Broker $id is started")
+          else if (broker.active) errors.add(s"Broker $id is active")
 
         brokers.add(broker)
       }
@@ -240,7 +240,7 @@ object HttpServer {
       for (id <- ids) {
         val broker = Scheduler.getCluster.getBroker(id)
         if (broker == null) { response.sendError(400, s"broker $id not found"); return }
-        if (broker.started) { response.sendError(400, s"broker $id is started"); return }
+        if (broker.active) { response.sendError(400, s"broker $id is active"); return }
         brokers.add(broker)
       }
 
@@ -272,12 +272,12 @@ object HttpServer {
       for (id <- ids) {
         val broker = cluster.getBroker(id)
         if (broker == null) { response.sendError(400, "broker " + id + " not found"); return }
-        if (broker.started == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " started"); return }
+        if (broker.active == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " active"); return }
         brokers.add(broker)
       }
 
       for (broker <- brokers) {
-        broker.started = start
+        broker.active = start
         broker.failover.resetFailures()
       }
       cluster.save()

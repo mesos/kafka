@@ -240,7 +240,7 @@ object CLI {
 
   private def printBroker(broker: Broker, indent: Int): Unit = {
     printLine("id: " + broker.id, indent)
-    printLine("started: " + broker.started, indent)
+    printLine("active: " + broker.active, indent)
     printLine("state: " + broker.state, indent)
 
     if (broker.host != null) printLine("host: " + broker.host, indent)
