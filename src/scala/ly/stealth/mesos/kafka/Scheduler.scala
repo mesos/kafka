@@ -151,7 +151,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (broker == null) return
 
     broker.task = null
-    val failed = status.getState != TaskState.TASK_FINISHED
+    val failed = status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
 
     if (failed) {
       broker.failover.registerFailure()
@@ -165,7 +165,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       } else {
         broker.active = false
         msg += ", failure limit exceeded"
-        msg += ", stopping broker"
+        msg += ", deactivating broker"
       }
 
       logger.info(msg)

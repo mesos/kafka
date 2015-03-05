@@ -164,7 +164,7 @@ class Broker(_id: String = "0") {
 
   def state: String = {
     if (active) {
-      if (task != null && task.running) return "started"
+      if (task != null && task.running) return "running"
 
       if (failover.isWaitingDelay) {
         var s = "failed " + failover.failures
