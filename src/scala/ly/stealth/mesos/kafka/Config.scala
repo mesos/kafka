@@ -24,8 +24,8 @@ object Config {
   var debug: Boolean = false
   var mesosUser: String = null
 
-  var cMasterUrl: String = null
-  var cZkUrl: String = null
+  var mesosMaster: String = null
+  var kafkaZkConnect: String = null
 
   var masterHost: String =  null
   var masterPort: Int = 5050
@@ -36,8 +36,8 @@ object Config {
 
   var failoverTimeout: Int = 60
 
-  def masterUrl: String = (if (cMasterUrl != null) cMasterUrl else (masterHost + ":" + masterPort))
-  def zkUrl: String = (if (cZkUrl != null) cZkUrl else (masterHost + ":" + zkPort))
+  def masterUrl: String = (if (mesosMaster != null) mesosMaster else (masterHost + ":" + masterPort))
+  def zkUrl: String = (if (kafkaZkConnect != null) kafkaZkConnect else (masterHost + ":" + zkPort))
   def schedulerUrl: String = "http://" + schedulerHost + ":" + schedulerPort
 
   load()
@@ -56,8 +56,8 @@ object Config {
     debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
     mesosUser = props.getProperty("mesos.user")
 
-    cMasterUrl = props.getProperty("master.url")
-    cZkUrl = props.getProperty("zk.url")
+    mesosMaster = props.getProperty("mesos.master")
+    kafkaZkConnect = props.getProperty("kafka.zk.connect")
 
     masterHost = props.getProperty("master.host")
     if (props.getProperty("master.port") != null)
