@@ -93,7 +93,6 @@ class Broker(_id: String = "0") {
     if (node.contains("attributes")) attributes = node("attributes").asInstanceOf[String]
     if (node.contains("options")) options = node("options").asInstanceOf[String]
 
-    failover = new Broker.Failover()
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
     if (node.contains("task")) {
@@ -232,8 +231,8 @@ object Broker {
     var maxDelay: Period = new Period("60s")
     var maxTries: Integer = null
 
-    var failures: Int = 0
-    var failureTime: Date = null
+    @volatile var failures: Int = 0
+    @volatile var failureTime: Date = null
 
     def currentDelay: Period = {
       if (failures == 0) return new Period("0ms")
