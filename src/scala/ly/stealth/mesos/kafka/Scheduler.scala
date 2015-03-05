@@ -159,7 +159,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
       if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
 
-      if (!broker.failover.isMaxTriesExceed) {
+      if (!broker.failover.isMaxTriesExceeded) {
         msg += ", waiting " + broker.failover.currentDelay
         msg += ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires)
       } else {

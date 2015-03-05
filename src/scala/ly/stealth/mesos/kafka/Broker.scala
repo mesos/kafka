@@ -250,7 +250,7 @@ object Broker {
 
     def isWaitingDelay: Boolean = delayExpires.getTime > System.currentTimeMillis()
 
-    def isMaxTriesExceed: Boolean = {
+    def isMaxTriesExceeded: Boolean = {
       if (maxTries == null) return false
       failures >= maxTries
     }
