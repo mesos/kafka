@@ -60,8 +60,11 @@ object Config {
     cZkUrl = props.getProperty("zk.url")
 
     masterHost = props.getProperty("master.host")
-    masterPort = Integer.parseInt(props.getProperty("master.port"))
-    zkPort = Integer.parseInt(props.getProperty("master.zk.port"))
+    if (props.getProperty("master.port") != null)
+      masterPort = Integer.parseInt(props.getProperty("master.port"))
+
+    if (props.getProperty("master.zk.port") != null)
+      zkPort = Integer.parseInt(props.getProperty("master.zk.port"))
 
     schedulerHost = props.getProperty("scheduler.host")
     schedulerPort = Integer.parseInt(props.getProperty("scheduler.port"))
