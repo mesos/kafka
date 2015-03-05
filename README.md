@@ -49,8 +49,10 @@ Broker added
 
 broker:
   id: 0
-  started: false
-  resources: cpus:1.00, mem:128
+  active: false
+  state: stopped
+  resources: cpus:1.00, mem:128, heap:128
+  failover: delay:10s, maxDelay:60s
 ```
 
 You now have a cluster with 1 broker that is not started. 
@@ -62,9 +64,10 @@ Cluster status received
 cluster:
   brokers:
     id: 0
-    started: false
-    resources: cpus:1.00, mem:128
-
+    active: false
+    state: stopped
+    resources: cpus:1.00, mem:128, heap:128
+    failover: delay:10s, maxDelay:60s
 ```
 Now lets startup the broker.
 
@@ -82,12 +85,14 @@ Cluster status received
 cluster:
   brokers:
     id: 0
-    started: true
-    resources: cpus:1.00, mem:128
-    task: 
-      id: Broker-0
+    active: true
+    state: running
+    resources: cpus:1.00, mem:128, heap:128
+    failover: delay:10s, maxDelay:60s
+    task:
+      id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
       running: true
-      endpoint: 172.16.25.62:31000
+      endpoint: master:31000
 ```
 
 Great!!! Now lets produce and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
@@ -119,9 +124,11 @@ Broker updated
 
 broker:
   id: 0
-  started: false
-  resources: cpus:1.00, mem:128
+  active: false
+  state: stopped
+  resources: cpus:1.00, mem:128, heap:128
   options: log.dirs=/mnt/array1/broker0
+  failover: delay:10s, maxDelay:60s
 
 # ./kafka-mesos.sh start 0
 Broker 0 started
@@ -136,16 +143,22 @@ Brokers added
 
 brokers:
   id: 0
-  started: false
+  active: false
+  state: stopped
   resources: cpus:1.00, mem:2048, heap:1024
+  failover: delay:10s, maxDelay:60s
 
   id: 1
-  started: false
+  active: false
+  state: stopped
   resources: cpus:1.00, mem:2048, heap:1024
+  failover: delay:10s, maxDelay:60s
 
   id: 2
-  started: false
+  active: false
+  state: stopped
   resources: cpus:1.00, mem:2048, heap:1024
+  failover: delay:10s, maxDelay:60s
 
 #./kafka-mesos.sh start 0
 Broker 0 started
@@ -182,20 +195,23 @@ Expression examples:
   0,1..2 - brokers 0,1,2
   "*"    - any broker
 
-Option           Description                          
-------           -----------                          
---attributes     slave attributes (rack:1;role:master)
---cpus <Double>  cpu amount                           
---host           slave hostname                       
---mem <Long>     mem amount                           
---options        kafka options (a=1;b=2) 
+Option              Description
+------              -----------
+--attributes        slave attributes (rack:1;role:master)
+--cpus <Double>     cpu amount
+--failoverDelay     failover delay (10s, 5m, 3h)
+--failoverMaxDelay  max failover delay. See failoverDelay.
+--failoverMaxTries  max failover tries
+--heap <Long>       heap amount
+--host              slave hostname
+--mem <Long>        mem amount
+--options           kafka options (a=1;b=2)
 ```
 
 Updating the broker configurations
 -----------------------------------
 
 ```
-# ./kafka-mesos.sh help update
 Update broker
 Usage: update <broker-id-expression>
 
@@ -206,18 +222,22 @@ Expression examples:
   0,1..2 - brokers 0,1,2
   "*"    - any broker
 
-Option           Description                          
-------           -----------                          
---attributes     slave attributes (rack:1;role:master)
---cpus <Double>  cpu amount                           
---host           slave hostname                       
---mem <Long>     mem amount                           
---options        kafka options (a=1;b=2)              
+Option              Description
+------              -----------
+--attributes        slave attributes (rack:1;role:master)
+--cpus <Double>     cpu amount
+--failoverDelay     failover delay (10s, 5m, 3h)
+--failoverMaxDelay  max failover delay. See failoverDelay.
+--failoverMaxTries  max failover tries
+--heap <Long>       heap amount
+--host              slave hostname
+--mem <Long>        mem amount
+--options           kafka options (a=1;b=2)
 
 Note: use "" arg to unset the option
 ```
 
-Starting brokers in the cluster 
+Starting brokers in the cluster
 -------------------------------
 
 ```
