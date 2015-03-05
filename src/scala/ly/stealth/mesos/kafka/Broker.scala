@@ -40,9 +40,6 @@ class Broker(_id: String = "0") {
 
   var failover: Failover = new Failover()
 
-  def taskId: String = "broker-" + id + "-" + UUID.randomUUID()
-  def executorId: String = "broker-" + id + "-" + UUID.randomUUID()
-
   def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
   def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
 
@@ -189,6 +186,9 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
+  def nextTaskId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
+  def nextExecutorId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
+  
   def idFromTaskId(taskId: String): String = {
     val parts: Array[String] = taskId.split("-")
     if (parts.length < 2) throw new IllegalArgumentException(taskId)

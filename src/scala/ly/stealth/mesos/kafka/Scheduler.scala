@@ -45,7 +45,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cmd += " ly.stealth.mesos.kafka.Executor"
 
     ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder.setValue(broker.executorId))
+      .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
       .setCommand(
         CommandInfo.newBuilder
           .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jarName))
@@ -67,7 +67,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
       .setName("BrokerTask")
-      .setTaskId(TaskID.newBuilder.setValue(broker.taskId).build)
+      .setTaskId(TaskID.newBuilder.setValue(Broker.nextTaskId(broker)).build)
       .setSlaveId(offer.getSlaveId)
       .setData(taskData(broker, props))
       .setExecutor(executor(broker))
