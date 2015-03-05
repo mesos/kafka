@@ -24,17 +24,20 @@ object Config {
   var debug: Boolean = false
   var mesosUser: String = null
 
+  var cMasterUrl: String = null
+  var cZkUrl: String = null
+
   var masterHost: String =  null
   var masterPort: Int = 5050
   var zkPort: Int = 2181
-  
+
   var schedulerHost: String = null
   var schedulerPort: Int = 7000
 
   var failoverTimeout: Int = 60
 
-  def masterUrl: String = masterHost + ":" + masterPort
-  def zkUrl: String = masterHost + ":" + zkPort
+  def masterUrl: String = (if (cMasterUrl != null) cMasterUrl else (masterHost + ":" + masterPort))
+  def zkUrl: String = (if (cZkUrl != null) cZkUrl else (masterHost + ":" + zkPort))
   def schedulerUrl: String = "http://" + schedulerHost + ":" + schedulerPort
 
   load()
@@ -46,21 +49,23 @@ object Config {
 
     val props: Properties = new Properties()
     val stream: FileInputStream = new FileInputStream(file)
-    
+
     props.load(stream)
     stream.close()
-    
+
     debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
     mesosUser = props.getProperty("mesos.user")
+
+    cMasterUrl = props.getProperty("master.url")
+    cZkUrl = props.getProperty("zk.url")
 
     masterHost = props.getProperty("master.host")
     masterPort = Integer.parseInt(props.getProperty("master.port"))
     zkPort = Integer.parseInt(props.getProperty("master.zk.port"))
-    
+
     schedulerHost = props.getProperty("scheduler.host")
     schedulerPort = Integer.parseInt(props.getProperty("scheduler.port"))
-    
+
     failoverTimeout = Integer.parseInt(props.getProperty("failoverTimeout"))
   }
 }
-
