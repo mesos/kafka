@@ -15,28 +15,23 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import java.io.{FileInputStream, File}
 import java.util.Properties
+import java.net.URI
 
 object Config {
   var debug: Boolean = false
   var mesosUser: String = null
 
-  var masterHost: String =  null
-  var masterPort: Int = 5050
-  var zkPort: Int = 2181
-  
-  var schedulerHost: String = null
-  var schedulerPort: Int = 7000
+  var masterConnect: String = null
+  var kafkaZkConnect: String = null
+  var schedulerUrl: String = null
 
   var failoverTimeout: Int = 60
 
-  def masterUrl: String = masterHost + ":" + masterPort
-  def zkUrl: String = masterHost + ":" + zkPort
-  def schedulerUrl: String = "http://" + schedulerHost + ":" + schedulerPort
-
+  def schedulerPort: Int = new URI(schedulerUrl).getPort
   load()
 
   private def load(): Unit = {
@@ -46,21 +41,17 @@ object Config {
 
     val props: Properties = new Properties()
     val stream: FileInputStream = new FileInputStream(file)
-    
+
     props.load(stream)
     stream.close()
-    
+
     debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
     mesosUser = props.getProperty("mesos.user")
 
-    masterHost = props.getProperty("master.host")
-    masterPort = Integer.parseInt(props.getProperty("master.port"))
-    zkPort = Integer.parseInt(props.getProperty("master.zk.port"))
-    
-    schedulerHost = props.getProperty("scheduler.host")
-    schedulerPort = Integer.parseInt(props.getProperty("scheduler.port"))
-    
+    masterConnect = props.getProperty("master.connect")
+    kafkaZkConnect = props.getProperty("kafka.zk.connect")
+    schedulerUrl = props.getProperty("scheduler.url")
+
     failoverTimeout = Integer.parseInt(props.getProperty("failoverTimeout"))
   }
 }
-
