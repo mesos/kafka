@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import org.apache.log4j._
 import org.apache.mesos.Protos._
@@ -58,11 +58,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def task(broker: Broker, offer: Offer): TaskInfo = {
     val port = findBrokerPort(offer)
-    
+
     val props: Map[String, String] = Map(
       "broker.id" -> broker.id,
       "port" -> ("" + port),
-      "zookeeper.connect" -> Config.zkUrl
+      "zookeeper.connect" -> Config.kafkaZkConnect
     )
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
@@ -114,7 +114,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         onBrokerStopped(broker, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
-    
+
     syncClusterState()
   }
 
@@ -252,7 +252,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setFailoverTimeout(Config.failoverTimeout)
     frameworkBuilder.setCheckpoint(true)
 
-    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.masterUrl)
+    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.masterConnect)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() = {
