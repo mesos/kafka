@@ -1,6 +1,6 @@
 apply plugin: 'scala'
 
-version = '0.4'
+version = '0.5'
 
 jar.archiveName = "kafka-mesos-${version}.jar"
 

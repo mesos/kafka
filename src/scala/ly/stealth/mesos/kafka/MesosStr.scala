@@ -21,8 +21,14 @@ import org.apache.mesos.Protos._
 import java.util
 import org.apache.mesos.Protos
 import scala.collection.JavaConversions._
+ import java.util.Date
+ import java.text.SimpleDateFormat
 
-object MesosStr {
+ object MesosStr {
+  def dateTime(date: Date): String = {
+    new SimpleDateFormat("yyyy-MM-dd hh:mm:ssX").format(date)
+  }
+
   def framework(framework: FrameworkInfo): String = {
     var s = ""
 

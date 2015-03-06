@@ -45,7 +45,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cmd += " ly.stealth.mesos.kafka.Executor"
 
     ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder.setValue(broker.executorId))
+      .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
       .setCommand(
         CommandInfo.newBuilder
           .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jarName))
@@ -67,7 +67,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
       .setName("BrokerTask")
-      .setTaskId(TaskID.newBuilder.setValue(broker.taskId).build)
+      .setTaskId(TaskID.newBuilder.setValue(Broker.nextTaskId(broker)).build)
       .setSlaveId(offer.getSlaveId)
       .setData(taskData(broker, props))
       .setExecutor(executor(broker))
@@ -107,13 +107,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
-        if (broker != null && broker.task != null)
-          broker.task.running = true
+        onBrokerStarted(broker, status)
       case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
            TaskState.TASK_FAILED | TaskState.TASK_KILLED |
            TaskState.TASK_ERROR =>
-        taskIds.remove(status.getTaskId.getValue)
-        if (broker != null) broker.task = null
+        onBrokerStopped(broker, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
     
@@ -141,6 +139,39 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("[error] " + message)
   }
 
+  private def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
+    if (broker == null) return
+
+    if (broker.task != null) broker.task.running = true
+    broker.failover.resetFailures()
+  }
+
+  private def onBrokerStopped(broker: Broker, status: TaskStatus): Unit = {
+    taskIds.remove(status.getTaskId.getValue)
+    if (broker == null) return
+
+    broker.task = null
+    val failed = status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
+
+    if (failed) {
+      broker.failover.registerFailure()
+
+      var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
+      if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
+
+      if (!broker.failover.isMaxTriesExceeded) {
+        msg += ", waiting " + broker.failover.currentDelay
+        msg += ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires)
+      } else {
+        broker.active = false
+        msg += ", failure limit exceeded"
+        msg += ", deactivating broker"
+      }
+
+      logger.info(msg)
+    }
+  }
+
   def syncClusterState(offers: util.List[Offer] = new util.ArrayList[Offer]()): Unit = {
     logger.debug("[syncClusterState]")
     cluster.save()
@@ -150,7 +181,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
       var accepted = false
 
       for (broker <- cluster.getBrokers) {
-        val acceptable = broker.started && broker.canAccept(offer) && !accepted
+        val acceptable = !accepted && broker.active &&
+          broker.matches(offer) && !broker.failover.isWaitingDelay
+
         if (broker.task == null && acceptable) {
           accepted = true
           launchTask(broker, offer)
@@ -163,7 +196,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     for (id <- taskIds) {
       val broker = cluster.getBroker(Broker.idFromTaskId(id))
-      if (broker == null || !broker.started) {
+      if (broker == null || !broker.active) {
         logger.info("Killing task " + id)
         driver.killTask(TaskID.newBuilder.setValue(id).build)
       }

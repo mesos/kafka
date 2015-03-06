@@ -152,6 +152,7 @@ object HttpServer {
         try { heap = java.lang.Long.valueOf(request.getParameter("heap")) }
         catch { case e: NumberFormatException => errors.add("Invalid heap") }
 
+
       val options: String = request.getParameter("options")
       if (options != null)
         try { Broker.parseMap(request.getParameter("options"), ";", "=") }
@@ -162,11 +163,28 @@ object HttpServer {
         try { Broker.parseMap(request.getParameter("attributes"), ";", ":") }
         catch { case e: IllegalArgumentException => errors.add("Invalid attributes") }
 
+
+      var failoverDelay: Period = null
+      if (request.getParameter("failoverDelay") != null)
+        try { failoverDelay = new Period(request.getParameter("failoverDelay")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid failoverDelay") }
+
+      var failoverMaxDelay: Period = null
+      if (request.getParameter("failoverMaxDelay") != null)
+        try { failoverMaxDelay = new Period(request.getParameter("failoverMaxDelay")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid failoverMaxDelay") }
+
+      val failoverMaxTries: String = request.getParameter("failoverMaxTries")
+      if (failoverMaxTries != null && failoverMaxTries != "")
+        try { Integer.valueOf(failoverMaxTries) }
+        catch { case e: NumberFormatException => errors.add("Invalid failoverMaxTries") }
+
+
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -178,7 +196,7 @@ object HttpServer {
           else broker = new Broker(id)
         else
           if (broker == null) errors.add(s"Broker $id not found")
-          else if (broker.started) errors.add(s"Broker $id is started")
+          else if (broker.active) errors.add(s"Broker $id is active")
 
         brokers.add(broker)
       }
@@ -190,8 +208,13 @@ object HttpServer {
         if (cpus != null) broker.cpus = cpus
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
+
         if (options != null) broker.options = if (options != "") options else null
         if (attributes != null) broker.attributes = if (attributes != "") attributes else null
+
+        if (failoverDelay != null) broker.failover.delay = failoverDelay
+        if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay
+        if (failoverMaxTries != null) broker.failover.maxTries = if (failoverMaxTries != "") Integer.valueOf(failoverMaxTries) else null
 
         if (add) cluster.addBroker(broker)
       }
@@ -211,13 +234,13 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
         val broker = Scheduler.getCluster.getBroker(id)
         if (broker == null) { response.sendError(400, s"broker $id not found"); return }
-        if (broker.started) { response.sendError(400, s"broker $id is started"); return }
+        if (broker.active) { response.sendError(400, s"broker $id is active"); return }
         brokers.add(broker)
       }
 
@@ -243,17 +266,20 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
         val broker = cluster.getBroker(id)
         if (broker == null) { response.sendError(400, "broker " + id + " not found"); return }
-        if (broker.started == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " started"); return }
+        if (broker.active == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " active"); return }
         brokers.add(broker)
       }
 
-      brokers.foreach(_.started = start)
+      for (broker <- brokers) {
+        broker.active = start
+        broker.failover.resetFailures()
+      }
       cluster.save()
 
       def waitForBrokers(): Boolean = {

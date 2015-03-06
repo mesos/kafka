@@ -96,8 +96,13 @@ object CLI {
     parser.accepts("cpus", "cpu amount").withRequiredArg().ofType(classOf[java.lang.Double])
     parser.accepts("mem", "mem amount").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount").withRequiredArg().ofType(classOf[java.lang.Long])
+
     parser.accepts("options", "kafka options (a=1;b=2)").withRequiredArg()
     parser.accepts("attributes", "slave attributes (rack:1;role:master)").withRequiredArg()
+
+    parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failoverMaxTries", "max failover tries").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       val command = if (add) "add" else "update"
@@ -122,8 +127,13 @@ object CLI {
     val cpus = options.valueOf("cpus").asInstanceOf[java.lang.Double]
     val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
     val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
+
     val options_ = options.valueOf("options").asInstanceOf[String]
     val attributes = options.valueOf("attributes").asInstanceOf[String]
+
+    val failoverDelay = options.valueOf("failoverDelay").asInstanceOf[String]
+    val failoverMaxDelay = options.valueOf("failoverMaxDelay").asInstanceOf[String]
+    val failoverMaxTries = options.valueOf("failoverMaxTries").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]
     params.put("id", id)
@@ -131,8 +141,13 @@ object CLI {
     if (cpus != null) params.put("cpus", "" + cpus)
     if (mem != null) params.put("mem", "" + mem)
     if (heap != null) params.put("heap", "" + heap)
+
     if (options_ != null) params.put("options", options_)
     if (attributes != null) params.put("attributes", attributes)
+
+    if (failoverDelay != null) params.put("failoverDelay", failoverDelay)
+    if (failoverMaxDelay != null) params.put("failoverMaxDelay", failoverMaxDelay)
+    if (failoverMaxTries != null) params.put("failoverMaxTries", failoverMaxTries)
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + (if (add) "add" else "update"), params) }
@@ -212,7 +227,7 @@ object CLI {
 
     if (success) printLine(s"$brokers $ids $startStopped")
     else if (timeout == 0) printLine(s"$brokers $ids scheduled to $startStop")
-    else die(s"$brokers $ids scheduled to $startStop. Timeout limit exceeded")
+    else die(s"$brokers $ids scheduled to $startStop. Timeout")
   }
 
   private def printCluster(cluster: Cluster): Unit = {
@@ -225,13 +240,20 @@ object CLI {
 
   private def printBroker(broker: Broker, indent: Int): Unit = {
     printLine("id: " + broker.id, indent)
-    printLine("started: " + broker.started, indent)
+    printLine("active: " + broker.active, indent)
+    printLine("state: " + broker.state, indent)
 
     if (broker.host != null) printLine("host: " + broker.host, indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
 
     if (broker.attributes != null) printLine("attributes: " + broker.attributes, indent)
     if (broker.options != null) printLine("options: " + broker.options, indent)
+
+    var failover = "failover:"
+    failover += " delay:" + broker.failover.delay
+    failover += ", maxDelay:" + broker.failover.maxDelay
+    if (broker.failover.maxTries != null) failover += ", maxTries:" + broker.failover.maxTries
+    printLine(failover, indent)
 
     val task = broker.task
     if (task != null) {
