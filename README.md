@@ -92,7 +92,7 @@ cluster:
     task:
       id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
       running: true
-      endpoint: master:31000
+      endpoint: 172.16.25.62:31000
 ```
 
 Great!!! Now lets produce and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
