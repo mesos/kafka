@@ -5,10 +5,10 @@ This is an *ALPHA* version. More features will be continued to be added until we
 
 Table of content:
 
-[Installation](#installation)
-[Configuration](#configuration)
-[Run the scheduler](#run-the-scheduler)
-[Starting and using 1 broker](#starting-and-using-1-broker)
+[Installation](#installation)    
+[Configuration](#configuration)    
+[Run the scheduler](#run-the-scheduler)    
+[Starting and using 1 broker](#starting-and-using-1-broker)    
 
 [Typical Operations](#typical-operations)
 * [Changing the location of data stored](#changing-the-location-of-data-stored)
