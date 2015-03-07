@@ -5,38 +5,54 @@ This is an *ALPHA* version. More features will be continued to be added until we
 
 Table of content:
 
-[Installation](#installation)    
-[Starting and using 1 broker](#starting-and-using-1-broker)    
+[Installation](#installation)
+[Configuration](#configuration)
+[Run the scheduler](#run-the-scheduler)
+[Starting and using 1 broker](#starting-and-using-1-broker)
 
-[Typical Operations](#typical-operations)    
-* [Changing the location of data stored](#changing-the-location-of-data-stored)    
-* [Starting 3 brokers](#starting-3-brokers)    
+[Typical Operations](#typical-operations)
+* [Changing the location of data stored](#changing-the-location-of-data-stored)
+* [Starting 3 brokers](#starting-3-brokers)
 * [Flushing scheduler state](#flusing-scheduler-state)
 
 
-[Navigating the CLI](#navigating-the-cli)    
-* [Adding brokers to the cluster](#adding-brokers-to-the-cluster)    
-* [Updating broker configurations](#updating-the-broker-configurations)    
-* [Starting brokers](#starting-brokers-in-the-cluster-)    
-* [Stopping brokers](#stopping-brokers-in-the-cluster)    
-* [Removing brokers](#removing-brokers-from-the-cluster)    
+[Navigating the CLI](#navigating-the-cli)
+* [Adding brokers to the cluster](#adding-brokers-to-the-cluster)
+* [Updating broker configurations](#updating-the-broker-configurations)
+* [Starting brokers](#starting-brokers-in-the-cluster-)
+* [Stopping brokers](#stopping-brokers-in-the-cluster)
+* [Removing brokers](#removing-brokers-from-the-cluster)
 
-[Project Goals](#project-goals)    
+[Project Goals](#project-goals)
 
 Installation
 -------------
 
 Install gradle http://gradle.org/installation
 
+Clone and build the project
+
     # git clone https://github.com/mesos/kafka
     # cd kafka
     # ./gradlew jar
     # wget https://archive.apache.org/dist/kafka/0.8.1.1/kafka_2.9.2-0.8.1.1.tgz
-    # MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so ./kafka-mesos.sh scheduler
 
-Now, in another terminal window (or startup the scheduler on marathon or such).
+Configuration
+-------------
+
+Edit `kafka-mesos.properties` and make the right settings for your environment.
+Before running `./kafka-mesos.sh`, set the location of libmesos:
 
     # export MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so
+
+Run the scheduler
+-----------------
+
+Start the Kafka scheduler using this command:
+
+    # MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so ./kafka-mesos.sh scheduler
+
+You can use Marathon to launch the scheduler process so it gets restarted if it crashes.
 
 Starting and using 1 broker
 ---------------------------
@@ -55,7 +71,7 @@ broker:
   failover: delay:10s, maxDelay:60s
 ```
 
-You now have a cluster with 1 broker that is not started. 
+You now have a cluster with 1 broker that is not started.
 
 ```
 # ./kafka-mesos.sh status
@@ -108,7 +124,7 @@ And lets read it back.
 test
 ```
 
-This is an alpha version.    
+This is an alpha version.
 
 Typical Operations
 ===================
@@ -252,10 +268,10 @@ Expression examples:
   0,1..2 - brokers 0,1,2
   "*"    - any broker
 
-Option               Description                           
-------               -----------                           
+Option               Description
+------               -----------
 --timeout <Integer>  timeout in seconds. 0 - for no timeout
-                       (default: 30) 
+                       (default: 30)
 ```
 
 Stopping brokers in the cluster
@@ -273,10 +289,10 @@ Expression examples:
   0,1..2 - brokers 0,1,2
   "*"    - any broker
 
-Option               Description                           
-------               -----------                           
+Option               Description
+------               -----------
 --timeout <Integer>  timeout in seconds. 0 - for no timeout
-                       (default: 30)   
+                       (default: 30)
 
 ```
 
@@ -311,5 +327,3 @@ Project Goals
 * scaling the cluster up and down with automatic, programmatic and manual options.
 
 * smart partition assignmnet via constraints visa vi roles, resources and attributes.
-
-
