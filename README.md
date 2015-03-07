@@ -3,8 +3,6 @@ Kafka Mesos Framework
 
 This is an *ALPHA* version. More features will be continued to be added until we cut a stable beta build to release candidate against.
 
-Table of content:
-
 [Installation](#installation)    
 [Configuration](#configuration)    
 [Run the scheduler](#run-the-scheduler)    
