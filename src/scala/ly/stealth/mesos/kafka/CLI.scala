@@ -80,7 +80,7 @@ object CLI {
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/status", Collections.emptyMap()) }
-    catch { case e: IOException => die(e.getMessage) }
+    catch { case e: IOException => die(e) }
     
     val cluster: Cluster = new Cluster()
     cluster.fromJson(json)
@@ -117,7 +117,7 @@ object CLI {
     try { options = parser.parse(args: _*) }
     catch {
       case e: OptionException =>
-        System.err.println("Error: " + e.getMessage)
+        System.err.println(e)
         System.out.println()
         parser.printHelpOn(System.out)
         System.exit(1)
@@ -151,7 +151,7 @@ object CLI {
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + (if (add) "add" else "update"), params) }
-    catch { case e: IOException => die(e.getMessage) }
+    catch { case e: IOException => die(e) }
     val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
     val addedUpdated = if (add) "added" else "updated"
@@ -177,7 +177,7 @@ object CLI {
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/remove", Collections.singletonMap("id", id)) }
-    catch { case e: IOException => die(e.getMessage) }
+    catch { case e: IOException => die(e) }
 
     val ids = json("ids").asInstanceOf[String]
     val brokers = "Broker" + (if (ids.contains(",")) "s" else "")
@@ -201,7 +201,7 @@ object CLI {
     try { options = parser.parse(args: _*) }
     catch {
       case e: OptionException =>
-        System.err.println("Error: " + e.getMessage)
+        System.err.println(e)
         System.out.println()
         parser.printHelpOn(System.out)
         System.exit(1)
@@ -216,7 +216,7 @@ object CLI {
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + command, params) }
-    catch { case e: IOException => die(e.getMessage) }
+    catch { case e: IOException => die(e) }
 
     val success = json("success").asInstanceOf[Boolean]
     val ids = json("ids").asInstanceOf[String]
@@ -311,8 +311,13 @@ object CLI {
     node
   }
 
-  private def die(error: String): Unit = {
-    System.err.println("Error: " + error)
+  private def die(e: Exception): Unit = {
+    System.err.println(e)
+    System.exit(1)
+  }
+
+  private def die(message: String): Unit = {
+    System.err.println("Error: " + message)
     System.exit(1)
   }
 }
