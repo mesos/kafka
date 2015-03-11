@@ -175,8 +175,8 @@ class Broker(_id: String = "0") {
     if (attributes != null) obj("attributes") = attributes
     if (options != null) obj("options") = options
 
-    obj("failover") = failover.toJson.obj
-    if (task != null) obj("task") = task.toJson.obj
+    obj("failover") = failover.toJson
+    if (task != null) obj("task") = task.toJson
 
     new JSONObject(obj.toMap)
   }

@@ -177,21 +177,9 @@ class BrokerTest {
     broker.task = new Task("1", "host", 9092)
 
     val read: Broker = new Broker()
-    read.fromJson(broker.toJson.obj.asInstanceOf[Map[String, Object]])
+    read.fromJson(Util.parseJson("" + broker.toJson))
 
-    assertEquals(broker.id, read.id)
-    assertEquals(broker.active, read.active)
-
-    assertEquals(broker.host, read.host)
-    assertEquals(broker.cpus, read.cpus, 0.001)
-    assertEquals(broker.mem, read.mem)
-    assertEquals(broker.heap, read.heap)
-
-    assertEquals(broker.attributes, read.attributes)
-    assertEquals(broker.options, read.options)
-
-    assertFailoverEquals(broker.failover, read.failover)
-    assertTaskEquals(broker.task, read.task)
+    BrokerTest.assertBrokerEquals(broker, read)
   }
 
   // static part
@@ -287,22 +275,9 @@ class BrokerTest {
     failover.registerFailure(new Date(0))
 
     val read: Failover = new Failover()
-    read.fromJson(failover.toJson.obj.asInstanceOf[Map[String, Object]])
+    read.fromJson(Util.parseJson("" + failover.toJson))
 
-    assertFailoverEquals(failover, read)
-  }
-
-  private def assertFailoverEquals(expected: Failover, actual: Failover) {
-    if (expected == actual) return
-    if (expected == null && actual != null) throw new AssertionError("actual != null")
-    if (expected != null && actual == null) throw new AssertionError("actual == null")
-
-    assertEquals(expected.delay, actual.delay)
-    assertEquals(expected.maxDelay, actual.maxDelay)
-    assertEquals(expected.maxTries, actual.maxTries)
-
-    assertEquals(expected.failures, actual.failures)
-    assertEquals(expected.failureTime, actual.failureTime)
+    BrokerTest.assertFailoverEquals(failover, read)
   }
 
   // Task
@@ -312,19 +287,55 @@ class BrokerTest {
     task.running = true
 
     val read: Task = new Task()
-    read.fromJson(task.toJson.obj.asInstanceOf[Map[String, Object]])
+    read.fromJson(Util.parseJson("" + task.toJson))
 
-    assertTaskEquals(task, read)
+    BrokerTest.assertTaskEquals(task, read)
   }
 
-  private def assertTaskEquals(expected: Task, actual: Task) {
-    if (expected == actual) return
-    if (expected == null && actual != null) throw new AssertionError("actual != null")
-    if (expected != null && actual == null) throw new AssertionError("actual == null")
+}
+
+object BrokerTest {
+  def assertBrokerEquals(expected: Broker, actual: Broker) {
+    checkNulls(expected, actual)
+
+    assertEquals(expected.id, actual.id)
+    assertEquals(expected.active, actual.active)
+
+    assertEquals(expected.host, actual.host)
+    assertEquals(expected.cpus, actual.cpus, 0.001)
+    assertEquals(expected.mem, actual.mem)
+    assertEquals(expected.heap, actual.heap)
+
+    assertEquals(expected.attributes, actual.attributes)
+    assertEquals(expected.options, actual.options)
+
+    assertFailoverEquals(expected.failover, actual.failover)
+    assertTaskEquals(expected.task, actual.task)
+  }
+
+  def assertFailoverEquals(expected: Failover, actual: Failover) {
+    checkNulls(expected, actual)
+
+    assertEquals(expected.delay, actual.delay)
+    assertEquals(expected.maxDelay, actual.maxDelay)
+    assertEquals(expected.maxTries, actual.maxTries)
+
+    assertEquals(expected.failures, actual.failures)
+    assertEquals(expected.failureTime, actual.failureTime)
+  }
+
+  def assertTaskEquals(expected: Task, actual: Task) {
+    checkNulls(expected, actual)
 
     assertEquals(expected.id, actual.id)
     assertEquals(expected.running, actual.running)
     assertEquals(expected.host, actual.host)
     assertEquals(expected.port, actual.port)
+  }
+
+  private def checkNulls(expected: Object, actual: Object) {
+    if (expected == actual) return
+    if (expected == null && actual != null) throw new AssertionError("actual != null")
+    if (expected != null && actual == null) throw new AssertionError("actual == null")
   }
 }

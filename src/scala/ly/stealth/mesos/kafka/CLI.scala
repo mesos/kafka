@@ -24,7 +24,6 @@ import java.io.IOException
 import java.util
 import scala.collection.JavaConversions._
 import java.util.Collections
-import scala.util.parsing.json.JSON
 
 object CLI {
   def main(args: Array[String]): Unit = {
@@ -305,8 +304,9 @@ object CLI {
 
     if (response.trim().isEmpty) return null
 
-    val node: Map[String, Object] = JSON.parseFull(response).getOrElse(null).asInstanceOf[Map[String, Object]]
-    if (node == null) throw new IOException("Failed to parse json response: " + response)
+    var node: Map[String, Object] = null
+    try { node = Util.parseJson(response)}
+    catch { case e: IllegalArgumentException => throw new IOException(e) }
 
     node
   }

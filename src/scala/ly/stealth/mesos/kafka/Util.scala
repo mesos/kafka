@@ -2,6 +2,7 @@ package ly.stealth.mesos.kafka
 
 import java.util.regex.Pattern
 import java.util
+import scala.util.parsing.json.JSON
 
 object Util {
   def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
@@ -16,6 +17,12 @@ object Util {
       }
 
     result
+  }
+
+  def parseJson(json: String): Map[String, Object] = {
+    val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
+    if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
+    node
   }
 
   class Period(s: String) {

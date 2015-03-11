@@ -18,12 +18,12 @@
  package ly.stealth.mesos.kafka
 
 import java.util
-import scala.util.parsing.json.{JSON, JSONArray, JSONObject}
+import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import java.util.Collections
-import java.io.{IOException, FileWriter, File}
+import java.io.{FileWriter, File}
 
 class Cluster {
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
@@ -36,38 +36,18 @@ class Cluster {
     null
   }
 
-  def addBroker(broker: Broker): Unit = brokers.add(broker)
+  def addBroker(broker: Broker): Broker = {
+    brokers.add(broker)
+    broker
+  }
 
   def removeBroker(broker: Broker): Unit = brokers.remove(broker)
-
-  def fromJson(root: Map[String, Object]): Unit = {
-    if (root.contains("brokers"))
-      for (brokerNode <- root("brokers").asInstanceOf[List[Map[String, Object]]]) {
-        val broker: Broker = new Broker()
-        broker.fromJson(brokerNode)
-        brokers.add(broker)
-      }
-  }
-
-  def toJson: JSONObject = {
-    val obj = new mutable.LinkedHashMap[String, Object]()
-
-    if (!brokers.isEmpty) {
-      val brokerNodes = new ListBuffer[JSONObject]()
-      for (broker <- brokers)
-        brokerNodes.add(broker.toJson)
-      obj("brokers") = new JSONArray(brokerNodes.toList)
-    }
-
-    new JSONObject(obj.toMap)
-  }
 
   def load(clearTasks: Boolean) {
     if (!Cluster.stateFile.exists()) return
 
     val json: String = scala.io.Source.fromFile(Cluster.stateFile).mkString
-    val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
-    if (node == null) throw new IOException("Failed to parse json")
+    val node: Map[String, Object] = Util.parseJson(json)
 
     brokers.clear()
     fromJson(node)
@@ -76,8 +56,16 @@ class Cluster {
       for (broker <- brokers) broker.task = null
   }
 
+  def save() {
+    val json = "" + toJson
+
+    val writer  = new FileWriter(Cluster.stateFile)
+    try { writer.write(json) }
+    finally { writer.close() }
+  }
+
   def expandIds(expr: String): util.List[String] = {
-    val ids = new util.ArrayList[String]()
+    val ids = new util.TreeSet[String]()
 
     for (_part <- expr.split(",")) {
       val part = _part.trim()
@@ -106,18 +94,33 @@ class Cluster {
       }
     }
 
-    ids
+    new util.ArrayList(ids)
   }
 
-  def save() {
-    val json = "" + toJson
+  def fromJson(root: Map[String, Object]): Unit = {
+    if (root.contains("brokers"))
+      for (brokerNode <- root("brokers").asInstanceOf[List[Map[String, Object]]]) {
+        val broker: Broker = new Broker()
+        broker.fromJson(brokerNode)
+        brokers.add(broker)
+      }
+  }
 
-    val writer  = new FileWriter(Cluster.stateFile)
-    try { writer.write(json) }
-    finally { writer.close() }
+  def toJson: JSONObject = {
+    val obj = new mutable.LinkedHashMap[String, Object]()
+
+    if (!brokers.isEmpty) {
+      val brokerNodes = new ListBuffer[JSONObject]()
+      for (broker <- brokers)
+        brokerNodes.add(broker.toJson)
+      obj("brokers") = new JSONArray(brokerNodes.toList)
+    }
+
+    new JSONObject(obj.toMap)
   }
 }
 
 object Cluster {
-  val stateFile: File = new File("kafka-mesos.json")
+  val DEFAULT_STATE_FILE: File = new File("kafka-mesos.json")
+  var stateFile: File = DEFAULT_STATE_FILE
 }
