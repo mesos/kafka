@@ -158,11 +158,11 @@ class Broker(_id: String = "0") {
     stateMatches
   }
 
-  def state: String = {
+  def state(now: Date): String = {
     if (active) {
       if (task != null && task.running) return "running"
 
-      if (failover.isWaitingDelay) {
+      if (failover.isWaitingDelay(now)) {
         var s = "failed " + failover.failures
         if (failover.maxTries != null) s += "/" + failover.maxTries
         s += " " + MesosStr.dateTime(failover.failureTime)
@@ -195,9 +195,9 @@ object Broker {
     parts(1)
   }
 
-  class Failover {
-    var delay: Period = new Period("10s")
-    var maxDelay: Period = new Period("60s")
+  class Failover(_delay: Period = new Period("10s"), _maxDelay: Period = new Period("60s")) {
+    var delay: Period = _delay
+    var maxDelay: Period = _maxDelay
     var maxTries: Integer = null
 
     @volatile var failures: Int = 0
@@ -217,16 +217,16 @@ object Broker {
       new Date(failureTime.getTime + currentDelay.ms)
     }
 
-    def isWaitingDelay: Boolean = delayExpires.getTime > System.currentTimeMillis()
+    def isWaitingDelay(now: Date): Boolean = delayExpires.getTime > now.getTime
 
     def isMaxTriesExceeded: Boolean = {
       if (maxTries == null) return false
       failures >= maxTries
     }
 
-    def registerFailure(): Unit = {
+    def registerFailure(now: Date): Unit = {
       failures += 1
-      failureTime = new Date()
+      failureTime = now
     }
 
     def resetFailures(): Unit = {

@@ -22,7 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.Properties
+import java.util.{Date, Properties}
 import java.io.StringWriter
 import scala.collection.JavaConversions._
 
@@ -154,7 +154,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val failed = status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
 
     if (failed) {
-      broker.failover.registerFailure()
+      broker.failover.registerFailure(new Date())
 
       var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
       if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
@@ -177,12 +177,13 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cluster.save()
     if (driver == null) return
 
+    val now = new Date()
     for (offer <- offers) {
       var accepted = false
 
       for (broker <- cluster.getBrokers) {
         val acceptable = !accepted && broker.active &&
-          broker.matches(offer) && !broker.failover.isWaitingDelay
+          broker.matches(offer) && !broker.failover.isWaitingDelay(now)
 
         if (broker.task == null && acceptable) {
           accepted = true
