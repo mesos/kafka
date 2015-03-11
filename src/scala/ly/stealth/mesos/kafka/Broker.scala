@@ -238,14 +238,14 @@ object Broker {
       if (failures == 0) return new Period("0ms")
 
       val multiplier = 1 << (failures - 1)
-      val d = delay.toMs * multiplier
+      val d = delay.ms * multiplier
 
-      if (d > maxDelay.toMs) maxDelay else new Period(delay.getValue * multiplier + delay.getUnit)
+      if (d > maxDelay.ms) maxDelay else new Period(delay.value * multiplier + delay.unit)
     }
 
     def delayExpires: Date = {
       if (failures == 0) return new Date(0)
-      new Date(failureTime.getTime + currentDelay.toMs)
+      new Date(failureTime.getTime + currentDelay.ms)
     }
 
     def isWaitingDelay: Boolean = delayExpires.getTime > System.currentTimeMillis()
