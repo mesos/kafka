@@ -1,10 +1,10 @@
 package ly.stealth.mesos.kafka
 
-import java.util.regex.{Matcher, Pattern}
+import java.util.regex.Pattern
 import java.util
 
 object Util {
-  def parseMap(s: String, entrySep: String, valueSep: String): util.LinkedHashMap[String, String] = {
+  def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
     if (s == null) return result
 

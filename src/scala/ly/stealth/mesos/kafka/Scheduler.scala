@@ -231,7 +231,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def taskData(broker: Broker, props: Map[String, String]): ByteString = {
     val p: Properties = new Properties()
-    for ((k, v) <- broker.effectiveOptionMap) p.setProperty(k, v)
+    for ((k, v) <- broker.optionMap) p.setProperty(k, v)
     for ((k, v) <- props) p.setProperty(k, v)
 
     if (!p.containsKey("log.dirs"))

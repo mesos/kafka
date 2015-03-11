@@ -4,9 +4,59 @@ import org.junit.Test
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
-import ly.stealth.mesos.kafka.Broker.Failover
+import ly.stealth.mesos.kafka.Broker.{Task, Failover}
 
 class BrokerTest {
+  @Test
+  def attributeMap {
+    val broker = new Broker()
+    broker.attributes = "a:1;b:2"
+    assertEquals(broker.attributeMap, Util.parseMap("a=1,b=2"))
+  }
+
+  @Test
+  def optionMap {
+    val broker = new Broker("id")
+    broker.host = "host"
+    broker.options = "a=$id;b=2;c=$host"
+    assertEquals(broker.optionMap, Util.parseMap("a=id,b=2,c=host"))
+  }
+
+  @Test
+  def toJson_fromJson {
+    val broker = new Broker("1")
+    broker.active = true
+
+    broker.host = "host"
+    broker.cpus = 0.5
+    broker.mem = 128
+    broker.heap = 128
+
+    broker.attributes = "a:1"
+    broker.options = "a=1"
+
+    broker.failover.registerFailure(new Date(0))
+    broker.task = new Task("1", "host", 9092)
+
+    val read: Broker = new Broker()
+    read.fromJson(broker.toJson.obj.asInstanceOf[Map[String, Object]])
+
+    assertEquals(broker.id, read.id)
+    assertEquals(broker.active, read.active)
+
+    assertEquals(broker.host, read.host)
+    assertEquals(broker.cpus, read.cpus, 0.001)
+    assertEquals(broker.mem, read.mem)
+    assertEquals(broker.heap, read.heap)
+
+    assertEquals(broker.attributes, read.attributes)
+    assertEquals(broker.options, read.options)
+
+    assertFailoverEquals(broker.failover, read.failover)
+    assertTaskEquals(broker.task, read.task)
+  }
+
+  // static part
   @Test
   def idFromTaskId {
     assertEquals("0", Broker.idFromTaskId(Broker.nextTaskId(new Broker("0"))))
@@ -101,11 +151,42 @@ class BrokerTest {
     val read: Failover = new Failover()
     read.fromJson(failover.toJson.obj.asInstanceOf[Map[String, Object]])
 
-    assertEquals(failover.delay, read.delay)
-    assertEquals(failover.maxDelay, read.maxDelay)
-    assertEquals(failover.maxTries, read.maxTries)
+    assertFailoverEquals(failover, read)
+  }
 
-    assertEquals(failover.failures, read.failures)
-    assertEquals(failover.failureTime, read.failureTime)
+  private def assertFailoverEquals(expected: Failover, actual: Failover) {
+    if (expected == actual) return
+    if (expected == null && actual != null) throw new AssertionError("actual != null")
+    if (expected != null && actual == null) throw new AssertionError("actual == null")
+
+    assertEquals(expected.delay, actual.delay)
+    assertEquals(expected.maxDelay, actual.maxDelay)
+    assertEquals(expected.maxTries, actual.maxTries)
+
+    assertEquals(expected.failures, actual.failures)
+    assertEquals(expected.failureTime, actual.failureTime)
+  }
+
+  // Task
+  @Test
+  def Task_toJson_fromJson {
+    val task = new Task("id", "host", 9092)
+    task.running = true
+
+    val read: Task = new Task()
+    read.fromJson(task.toJson.obj.asInstanceOf[Map[String, Object]])
+
+    assertTaskEquals(task, read)
+  }
+
+  private def assertTaskEquals(expected: Task, actual: Task) {
+    if (expected == actual) return
+    if (expected == null && actual != null) throw new AssertionError("actual != null")
+    if (expected != null && actual == null) throw new AssertionError("actual == null")
+
+    assertEquals(expected.id, actual.id)
+    assertEquals(expected.running, actual.running)
+    assertEquals(expected.host, actual.host)
+    assertEquals(expected.port, actual.port)
   }
 }

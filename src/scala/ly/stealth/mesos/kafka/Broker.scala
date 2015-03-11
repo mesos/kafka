@@ -41,10 +41,9 @@ class Broker(_id: String = "0") {
   var failover: Failover = new Failover()
 
   def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ";", ":")
-  def optionMap: util.Map[String, String] = Util.parseMap(options, ";", "=")
 
-  def effectiveOptionMap: util.Map[String, String] = {
-    val result = optionMap
+  def optionMap: util.Map[String, String] = {
+    val result = Util.parseMap(options, ";", "=")
 
     for ((k, v) <- result) {
       var nv = v
@@ -111,8 +110,8 @@ class Broker(_id: String = "0") {
     if (attributes != null) obj("attributes") = attributes
     if (options != null) obj("options") = options
 
-    obj("failover") = failover.toJson
-    if (task != null) obj("task") = task.toJson
+    obj("failover") = failover.toJson.obj
+    if (task != null) obj("task") = task.toJson.obj
 
     new JSONObject(obj.toMap)
   }
