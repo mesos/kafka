@@ -27,8 +27,9 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
+ import ly.stealth.mesos.kafka.Util.Period
 
-object HttpServer {
+ object HttpServer {
   val jarPath = findJar()
   def jarName = new File(jarPath).getName
 
@@ -155,12 +156,12 @@ object HttpServer {
 
       val options: String = request.getParameter("options")
       if (options != null)
-        try { Broker.parseMap(request.getParameter("options"), ";", "=") }
+        try { Util.parseMap(request.getParameter("options"), ";", "=") }
         catch { case e: IllegalArgumentException => errors.add("Invalid options") }
 
       val attributes: String = request.getParameter("attributes")
       if (attributes != null)
-        try { Broker.parseMap(request.getParameter("attributes"), ";", ":") }
+        try { Util.parseMap(request.getParameter("attributes"), ";", ":") }
         catch { case e: IllegalArgumentException => errors.add("Invalid attributes") }
 
 

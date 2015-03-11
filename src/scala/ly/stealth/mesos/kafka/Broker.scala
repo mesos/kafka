@@ -22,9 +22,9 @@ import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.Offer
-import java.util.regex.Pattern
 import java.util.{Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
+import ly.stealth.mesos.kafka.Util.{Wildcard, Period}
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -40,8 +40,8 @@ class Broker(_id: String = "0") {
 
   var failover: Failover = new Failover()
 
-  def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
-  def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
+  def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ";", ":")
+  def optionMap: util.Map[String, String] = Util.parseMap(options, ";", "=")
 
   def effectiveOptionMap: util.Map[String, String] = {
     val result = optionMap
@@ -118,7 +118,7 @@ class Broker(_id: String = "0") {
   }
 
   def matches(offer: Offer): Boolean = {
-    if (host != null && !Broker.matches(host, offer.getHostname)) return false
+    if (host != null && !new Wildcard(host).matches(offer.getHostname)) return false
 
     for (resource <- offer.getResourcesList) {
       resource.getName match {
@@ -140,7 +140,7 @@ class Broker(_id: String = "0") {
 
     for ((name, value) <- attributeMap) {
       if (!offerAttributes.containsKey(name)) return false
-      if (!Broker.matches(value, offerAttributes.get(name))) return false
+      if (!new Wildcard(value).matches(offerAttributes.get(name))) return false
     }
 
     true
@@ -193,37 +193,6 @@ object Broker {
     val parts: Array[String] = taskId.split("-")
     if (parts.length < 2) throw new IllegalArgumentException(taskId)
     parts(1)
-  }
-
-  def matches(wildcard: String, value: String): Boolean = {
-    var regex: String = "^"
-    var token: String = ""
-    for (c <- wildcard.toCharArray) {
-      if (c == '*' || c == '?') {
-        regex += Pattern.quote(token)
-        token = ""
-        regex += (if (c == '*') ".*" else ".")
-      } else
-        token += c
-    }
-    if (token != "") regex += Pattern.quote(token)
-    regex += "$"
-
-    value.matches(regex)
-  }
-
-  def parseMap(s: String, entrySep: String, valueSep: String): util.LinkedHashMap[String, String] = {
-    val result = new util.LinkedHashMap[String, String]()
-    if (s == null) return result
-
-    for (entry <- s.split(entrySep))
-      if (entry.trim() != "") {
-        val pair = entry.split(valueSep)
-        if (pair.length == 2) result.put(pair(0).trim(), pair(1).trim())
-        else throw new IllegalArgumentException(s)
-      }
-
-    result
   }
 
   class Failover {
