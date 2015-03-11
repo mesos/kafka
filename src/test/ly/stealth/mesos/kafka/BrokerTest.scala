@@ -3,8 +3,11 @@ package ly.stealth.mesos.kafka
 import org.junit.Test
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
-import java.util.Date
+import java.util.{UUID, Date}
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
+import org.apache.mesos.Protos._
+import org.apache.mesos.Protos.Value.{Text, Scalar}
+import scala.collection.JavaConversions._
 
 class BrokerTest {
   @Test
@@ -20,6 +23,141 @@ class BrokerTest {
     broker.host = "host"
     broker.options = "a=$id;b=2;c=$host"
     assertEquals(broker.optionMap, Util.parseMap("a=id,b=2,c=host"))
+  }
+
+  @Test
+  def matches {
+    def offer(host: String = "host", cpus: Double = 0, mem: Int = 0, attributes: String = null): Offer = {
+      val builder = Offer.newBuilder()
+        .setId(OfferID.newBuilder().setValue("" + UUID.randomUUID()))
+        .setFrameworkId(FrameworkID.newBuilder().setValue("" + UUID.randomUUID()))
+        .setSlaveId(SlaveID.newBuilder().setValue("" + UUID.randomUUID()))
+
+      builder.setHostname(host)
+
+      val cpusResource = Resource.newBuilder()
+        .setName("cpus")
+        .setType(Value.Type.SCALAR)
+        .setScalar(Scalar.newBuilder().setValue(cpus))
+        .build
+      builder.addResources(cpusResource)
+
+      val memResource = Resource.newBuilder()
+        .setName("mem")
+        .setType(Value.Type.SCALAR)
+        .setScalar(Scalar.newBuilder().setValue(0.0 + mem))
+        .build
+      builder.addResources(memResource)
+
+      if (attributes != null) {
+        val map = Util.parseMap(attributes, ";", ":")
+        for ((k, v) <- map) {
+          val attribute = Attribute.newBuilder()
+            .setType(Value.Type.TEXT)
+            .setName(k)
+            .setText(Text.newBuilder().setValue(v))
+            .build
+          builder.addAttributes(attribute)
+        }
+      }
+
+      builder.build()
+    }
+
+    val broker = new Broker()
+    broker.host = null
+    broker.cpus = 0
+    broker.mem = 0
+
+    // host
+    assertTrue(broker.matches(offer("master")))
+    assertTrue(broker.matches(offer("slave")))
+
+    broker.host = "master"
+    assertTrue(broker.matches(offer("master")))
+    assertFalse(broker.matches(offer("slave")))
+
+    broker.host = "master*"
+    assertTrue(broker.matches(offer("master")))
+    assertTrue(broker.matches(offer("master-2")))
+    assertFalse(broker.matches(offer("slave")))
+
+    broker.host = null
+
+    // cpus
+    broker.cpus = 0.5
+    assertTrue(broker.matches(offer(cpus = 0.5)))
+    assertFalse(broker.matches(offer(cpus = 0.49)))
+    broker.cpus = 0
+
+    // mem
+    broker.mem = 100
+    assertTrue(broker.matches(offer(mem = 100)))
+    assertFalse(broker.matches(offer(mem = 99)))
+    broker.mem = 0
+
+    // attributes
+    broker.attributes = "rack:1-*"
+    assertTrue(broker.matches(offer(attributes = "rack:1-1")))
+    assertTrue(broker.matches(offer(attributes = "rack:1-2")))
+    assertFalse(broker.matches(offer(attributes = "rack:2-1")))
+  }
+
+  @Test
+  def state {
+    val broker = new Broker()
+    assertEquals("stopped", broker.state())
+
+    broker.task = new Task()
+    assertEquals("stopping", broker.state())
+
+    broker.task = null
+    broker.active = true
+    assertEquals("starting", broker.state())
+
+    broker.task = new Task()
+    assertEquals("starting", broker.state())
+
+    broker.task.running = true
+    assertEquals("running", broker.state())
+
+    broker.task = null
+    broker.failover.delay = new Period("1s")
+    broker.failover.registerFailure(new Date(0))
+    var state = broker.state(new Date(0))
+    assertTrue(state, state.startsWith("failed 1"))
+
+    state = broker.state(new Date(1000))
+    assertTrue(state, state.startsWith("starting 2"))
+  }
+
+  @Test
+  def waitForState {
+    val broker = new Broker()
+
+    def scheduleStateSwitch(running: Boolean, delay: Long) {
+      new Thread() {
+        override def run() {
+          setName(classOf[BrokerTest].getSimpleName + "-scheduleState")
+          Thread.sleep(delay)
+
+          if (running) {
+            broker.task = new Task()
+            broker.task.running = running
+          } else
+            broker.task = null
+        }
+      }.start()
+    }
+
+    scheduleStateSwitch(running = true, 100)
+    assertTrue(broker.waitForState(running = true, 200))
+
+    scheduleStateSwitch(running = false, 100)
+    assertTrue(broker.waitForState(running = false, 200))
+
+    // timeout
+    assertFalse(broker.waitForState(running = true, 50))
   }
 
   @Test

@@ -23,7 +23,7 @@ import scala.io.Source
 import java.io.IOException
 import java.util
 import scala.collection.JavaConversions._
-import java.util.{Date, Collections}
+import java.util.Collections
 import scala.util.parsing.json.JSON
 
 object CLI {
@@ -241,7 +241,7 @@ object CLI {
   private def printBroker(broker: Broker, indent: Int): Unit = {
     printLine("id: " + broker.id, indent)
     printLine("active: " + broker.active, indent)
-    printLine("state: " + broker.state(new Date()), indent)
+    printLine("state: " + broker.state(), indent)
 
     if (broker.host != null) printLine("host: " + broker.host, indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
