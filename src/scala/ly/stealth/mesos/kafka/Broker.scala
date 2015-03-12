@@ -42,7 +42,7 @@ class Broker(_id: String = "0") {
 
   def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ";", ":")
 
-  def optionMap: util.Map[String, String] = {
+  def optionMap(overrides: util.Map[String, String] = null): util.Map[String, String] = {
     val result = Util.parseMap(options, ";", "=")
 
     for ((k, v) <- result) {
@@ -52,6 +52,11 @@ class Broker(_id: String = "0") {
 
       result.put(k, nv)
     }
+
+    if (overrides != null) result.putAll(overrides)
+
+    if (!result.containsKey("log.dirs"))
+      result.put("log.dirs", "kafka-logs")
 
     result
   }

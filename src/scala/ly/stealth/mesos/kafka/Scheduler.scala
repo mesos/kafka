@@ -59,17 +59,26 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private def task(broker: Broker, offer: Offer): TaskInfo = {
     val port = findBrokerPort(offer)
 
-    val props: Map[String, String] = Map(
-      "broker.id" -> broker.id,
-      "port" -> ("" + port),
-      "zookeeper.connect" -> Config.kafkaZkConnect
-    )
+    def taskData: ByteString = {
+      val overrides: Map[String, String] = Map(
+        "broker.id" -> broker.id,
+        "port" -> ("" + port),
+        "zookeeper.connect" -> Config.kafkaZkConnect
+      )
+
+      val p: Properties = new Properties()
+      p.putAll(broker.optionMap(overrides))
+
+      val buffer: StringWriter = new StringWriter()
+      p.store(buffer, "")
+      ByteString.copyFromUtf8("" + buffer)
+    }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
       .setName("BrokerTask")
       .setTaskId(TaskID.newBuilder.setValue(Broker.nextTaskId(broker)).build)
       .setSlaveId(offer.getSlaveId)
-      .setData(taskData(broker, props))
+      .setData(taskData)
       .setExecutor(executor(broker))
 
     taskBuilder
@@ -214,32 +223,19 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("Launching task " + id + " by offer " + MesosStr.id(offer.getId.getValue) + "\n" + MesosStr.task(task_))
   }
 
-  private def findBrokerPort(offer: Offer): Int = {
+  private[kafka] def findBrokerPort(offer: Offer): Int = {
     for (resource <- offer.getResourcesList) {
       if (resource.getName == "ports") {
         val ranges: util.List[Value.Range] = resource.getRanges.getRangeList
         val range = if (ranges.isEmpty) null else ranges.get(0)
 
-        if (range == null || !range.hasBegin) throw new IllegalStateException("Invalid port range in offer " + MesosStr.offer(offer))
+        assert(range.hasBegin)
+        if (range == null) throw new IllegalArgumentException("Invalid port range in offer " + MesosStr.offer(offer))
         return range.getBegin.toInt
       }
     }
 
-    throw new IllegalStateException("No port range in offer " + MesosStr.offer(offer))
-  }
-
-  private def taskData(broker: Broker, props: Map[String, String]): ByteString = {
-    val p: Properties = new Properties()
-    for ((k, v) <- broker.optionMap) p.setProperty(k, v)
-    for ((k, v) <- props) p.setProperty(k, v)
-
-    if (!p.containsKey("log.dirs"))
-      p.setProperty("log.dirs", "kafka-logs")
-
-    val buffer: StringWriter = new StringWriter()
-    p.store(buffer, "")
-
-    ByteString.copyFromUtf8("" + buffer)
+    throw new IllegalArgumentException("No port range in offer " + MesosStr.offer(offer))
   }
 
   def main(args: Array[String]) {

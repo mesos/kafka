@@ -2,12 +2,10 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
+import ly.stealth.mesos.kafka.Mesos._
 import ly.stealth.mesos.kafka.Util.Period
-import java.util.{UUID, Date}
+import java.util.Date
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
-import org.apache.mesos.Protos._
-import org.apache.mesos.Protos.Value.{Text, Scalar}
-import scala.collection.JavaConversions._
 
 class BrokerTest {
   @Test
@@ -20,67 +18,40 @@ class BrokerTest {
   @Test
   def optionMap {
     val broker = new Broker("id")
+
+    // $var substitution
     broker.host = "host"
     broker.options = "a=$id;b=2;c=$host"
-    assertEquals(broker.optionMap, Util.parseMap("a=id,b=2,c=host"))
+    assertEquals(broker.optionMap(), Util.parseMap("a=id,b=2,c=host,log.dirs=kafka-logs"))
+
+    // log.dirs override
+    broker.options = "log.dirs=logs"
+    assertEquals(broker.optionMap(), Util.parseMap("log.dirs=logs"))
+
+    // option override
+    broker.options = "a=1;log.dirs=logs"
+    assertEquals(broker.optionMap(Util.parseMap("a=2")), Util.parseMap("a=2,log.dirs=logs"))
   }
 
   @Test
   def matches {
-    def offer(host: String = "host", cpus: Double = 0, mem: Int = 0, attributes: String = null): Offer = {
-      val builder = Offer.newBuilder()
-        .setId(OfferID.newBuilder().setValue("" + UUID.randomUUID()))
-        .setFrameworkId(FrameworkID.newBuilder().setValue("" + UUID.randomUUID()))
-        .setSlaveId(SlaveID.newBuilder().setValue("" + UUID.randomUUID()))
-
-      builder.setHostname(host)
-
-      val cpusResource = Resource.newBuilder()
-        .setName("cpus")
-        .setType(Value.Type.SCALAR)
-        .setScalar(Scalar.newBuilder().setValue(cpus))
-        .build
-      builder.addResources(cpusResource)
-
-      val memResource = Resource.newBuilder()
-        .setName("mem")
-        .setType(Value.Type.SCALAR)
-        .setScalar(Scalar.newBuilder().setValue(0.0 + mem))
-        .build
-      builder.addResources(memResource)
-
-      if (attributes != null) {
-        val map = Util.parseMap(attributes, ";", ":")
-        for ((k, v) <- map) {
-          val attribute = Attribute.newBuilder()
-            .setType(Value.Type.TEXT)
-            .setName(k)
-            .setText(Text.newBuilder().setValue(v))
-            .build
-          builder.addAttributes(attribute)
-        }
-      }
-
-      builder.build()
-    }
-
     val broker = new Broker()
     broker.host = null
     broker.cpus = 0
     broker.mem = 0
 
     // host
-    assertTrue(broker.matches(offer("master")))
-    assertTrue(broker.matches(offer("slave")))
+    assertTrue(broker.matches(offer(host = "master")))
+    assertTrue(broker.matches(offer(host = "slave")))
 
     broker.host = "master"
-    assertTrue(broker.matches(offer("master")))
-    assertFalse(broker.matches(offer("slave")))
+    assertTrue(broker.matches(offer(host = "master")))
+    assertFalse(broker.matches(offer(host = "slave")))
 
     broker.host = "master*"
-    assertTrue(broker.matches(offer("master")))
-    assertTrue(broker.matches(offer("master-2")))
-    assertFalse(broker.matches(offer("slave")))
+    assertTrue(broker.matches(offer(host = "master")))
+    assertTrue(broker.matches(offer(host = "master-2")))
+    assertFalse(broker.matches(offer(host = "slave")))
 
     broker.host = null
 
