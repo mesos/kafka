@@ -103,7 +103,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
     logger.info("[resourceOffers]\n" + MesosStr.offers(offers))
-    syncClusterState(offers)
+    syncBrokers(offers)
   }
 
   def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
@@ -123,8 +123,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
         onBrokerStopped(broker, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
-
-    syncClusterState()
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
@@ -148,6 +146,33 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("[error] " + message)
   }
 
+  private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
+    def startBroker(offer: Offer): Boolean = {
+      for (broker <- cluster.getBrokers) {
+        if (broker.shouldStart(offer)) {
+          launchTask(broker, offer)
+          return true
+        }
+      }
+
+      false
+    }
+
+    for (offer <- offers) {
+      val started = startBroker(offer)
+      if (!started) driver.declineOffer(offer.getId)
+    }
+
+    for (id <- taskIds) {
+      val broker = cluster.getBroker(Broker.idFromTaskId(id))
+
+      if (broker == null || broker.shouldStop) {
+        logger.info("Killing task " + id)
+        driver.killTask(TaskID.newBuilder.setValue(id).build)
+      }
+    }
+  }
+  
   private def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
     if (broker == null) return
 
@@ -181,38 +206,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  def syncClusterState(offers: util.List[Offer] = new util.ArrayList[Offer]()): Unit = {
-    logger.debug("[syncClusterState]")
-    cluster.save()
-    if (driver == null) return
-
-    for (offer <- offers) {
-      var accepted = false
-
-      for (broker <- cluster.getBrokers) {
-        val acceptable = !accepted && broker.active &&
-          broker.matches(offer) && !broker.failover.isWaitingDelay()
-
-        if (broker.task == null && acceptable) {
-          accepted = true
-          launchTask(broker, offer)
-        }
-      }
-
-      if (!accepted)
-        driver.declineOffer(offer.getId)
-    }
-
-    for (id <- taskIds) {
-      val broker = cluster.getBroker(Broker.idFromTaskId(id))
-      if (broker == null || !broker.active) {
-        logger.info("Killing task " + id)
-        driver.killTask(TaskID.newBuilder.setValue(id).build)
-      }
-    }
-  }
-
-  def launchTask(broker: Broker, offer: Offer): Unit = {
+  private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
     val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
 

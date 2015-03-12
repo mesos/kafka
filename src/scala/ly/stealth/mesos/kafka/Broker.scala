@@ -31,7 +31,7 @@ class Broker(_id: String = "0") {
   @volatile var active: Boolean = false
 
   var host: String = null
-  var cpus: Double = 1
+  var cpus: Double = 0.5
   var mem: Long = 128
   var heap: Long = 128
 
@@ -88,6 +88,12 @@ class Broker(_id: String = "0") {
 
     true
   }
+  
+  def shouldStart(offer: Offer, now: Date = new Date()): Boolean = {
+    active && task == null && matches(offer) && !failover.isWaitingDelay(now) 
+  }
+
+  def shouldStop: Boolean = !active
 
   def state(now: Date = new Date()): String = {
     if (active) {

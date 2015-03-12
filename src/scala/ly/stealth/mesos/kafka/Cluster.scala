@@ -43,6 +43,8 @@ class Cluster {
 
   def removeBroker(broker: Broker): Unit = brokers.remove(broker)
 
+  def clear(): Unit = brokers.clear()
+
   def load(clearTasks: Boolean) {
     if (!Cluster.stateFile.exists()) return
 

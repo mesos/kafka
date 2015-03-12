@@ -75,6 +75,50 @@ class BrokerTest {
   }
 
   @Test
+  def shouldStart {
+    val broker = new Broker()
+    val offer = Mesos.offer(cpus = broker.cpus, mem = broker.mem.toInt)
+
+    // active
+    broker.active = false
+    assertFalse(broker.shouldStart(offer))
+    broker.active = true
+    assertTrue(broker.shouldStart(offer))
+
+    // has task
+    broker.task = new Task()
+    assertFalse(broker.shouldStart(offer))
+    broker.task = null
+    assertTrue(broker.shouldStart(offer))
+
+    // matches offer
+    broker.mem += 100
+    assertFalse(broker.shouldStart(offer))
+    broker.mem -= 100
+    assertTrue(broker.shouldStart(offer))
+
+    // failover waiting delay
+    val now = new Date(0)
+    broker.failover.delay = new Period("1s")
+    broker.failover.registerFailure(now)
+    assertTrue(broker.failover.isWaitingDelay(now))
+
+    assertFalse(broker.shouldStart(offer, now))
+    assertTrue(broker.shouldStart(offer, new Date(now.getTime + broker.failover.delay.ms)))
+    broker.failover.resetFailures()
+    assertTrue(broker.shouldStart(offer, now))
+  }
+
+  @Test
+  def shouldStop {
+    val broker = new Broker()
+    assertTrue(broker.shouldStop)
+
+    broker.active = true
+    assertFalse(broker.shouldStop)
+  }
+
+  @Test
   def state {
     val broker = new Broker()
     assertEquals("stopped", broker.state())

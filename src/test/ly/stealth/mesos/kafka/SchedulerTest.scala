@@ -2,14 +2,32 @@ package ly.stealth.mesos.kafka
 
 import java.util
 import scala.collection.JavaConversions._
-import org.junit.Test
+import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Mesos._
 import org.apache.mesos.Protos.Resource
 import java.util.Properties
 import java.io.StringReader
+import org.apache.log4j.BasicConfigurator
 
 class SchedulerTest {
+  var driver: TestSchedulerDriver = null
+
+  @Before
+  def before {
+    BasicConfigurator.configure()
+    Scheduler.getCluster.clear()
+
+    driver = schedulerDriver
+    Scheduler.registered(driver, frameworkId(), master())
+  }
+
+  @After
+  def after {
+    Scheduler.disconnected(driver)
+    BasicConfigurator.resetConfiguration()
+  }
+
   @Test
   def newExecutor {
     val broker = new Broker("1")
@@ -68,6 +86,28 @@ class SchedulerTest {
 
     assertEquals("kafka-logs", options.getProperty("log.dirs"))
     assertEquals("1", options.getProperty("a"))
+  }
+
+  @Test
+  def syncBrokers {
+    val broker = Scheduler.getCluster.addBroker(new Broker())
+    val offer = Mesos.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))
+
+    // broker !active
+    Scheduler.syncBrokers(util.Arrays.asList(offer))
+    assertEquals(0, driver.launchedTasks.size())
+
+    // broker active
+    broker.active = true
+    Scheduler.syncBrokers(util.Arrays.asList(offer))
+    assertEquals(1, driver.launchedTasks.size())
+    assertEquals(0, driver.killedTasks.size())
+
+    // broker !active
+    broker.active = false
+    Scheduler.syncBrokers(util.Arrays.asList())
+    assertEquals(1, driver.launchedTasks.size())
+    assertEquals(1, driver.killedTasks.size())
   }
 
   @Test
