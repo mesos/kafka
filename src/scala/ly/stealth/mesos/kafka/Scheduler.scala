@@ -37,7 +37,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def getCluster: Cluster = cluster
 
-  private def executor(broker: Broker): ExecutorInfo = {
+  private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jarName
     cmd += " -Xmx" + broker.heap + "m"
 
@@ -56,7 +56,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build()
   }
 
-  private def task(broker: Broker, offer: Offer): TaskInfo = {
+  private[kafka] def newTask(broker: Broker, offer: Offer): TaskInfo = {
     val port = findBrokerPort(offer)
 
     def taskData: ByteString = {
@@ -79,7 +79,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .setTaskId(TaskID.newBuilder.setValue(Broker.nextTaskId(broker)).build)
       .setSlaveId(offer.getSlaveId)
       .setData(taskData)
-      .setExecutor(executor(broker))
+      .setExecutor(newExecutor(broker))
 
     taskBuilder
       .addResources(Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.cpus)))
@@ -213,7 +213,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def launchTask(broker: Broker, offer: Offer): Unit = {
-    val task_ = task(broker, offer)
+    val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
