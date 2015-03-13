@@ -6,8 +6,35 @@ import org.apache.mesos.Protos.Value.{Text, Scalar}
 import scala.collection.JavaConversions._
 import org.apache.mesos.SchedulerDriver
 import java.util
+import org.junit.{After, Before}
+import org.apache.log4j.BasicConfigurator
+import java.io.File
 
-object Mesos {
+class MesosTest {
+  var driver: TestSchedulerDriver = null
+
+  @Before
+  def before {
+    BasicConfigurator.configure()
+
+    Cluster.stateFile = File.createTempFile(getClass.getSimpleName, null)
+    Cluster.stateFile.delete()
+    Scheduler.cluster.clear()
+
+    driver = schedulerDriver
+    Scheduler.registered(driver, frameworkId(), master())
+  }
+
+  @After
+  def after {
+    Scheduler.disconnected(driver)
+
+    Cluster.stateFile.delete()
+    Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
+
+    BasicConfigurator.resetConfiguration()
+  }
+
   val LOCALHOST_IP: Int = 2130706433
   
   def frameworkId(id: String = "" + UUID.randomUUID()): FrameworkID = FrameworkID.newBuilder().setValue(id).build()
@@ -82,6 +109,16 @@ object Mesos {
     }
 
     builder.build()
+  }
+
+  def taskStatus(
+    id: String = "" + UUID.randomUUID(),
+    state: TaskState
+  ): TaskStatus = {
+    TaskStatus.newBuilder()
+    .setTaskId(TaskID.newBuilder().setValue(id))
+    .setState(state)
+    .build()
   }
   
   def schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()

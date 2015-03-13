@@ -1,23 +1,16 @@
 package ly.stealth.mesos.kafka
 
-import org.junit.{After, Before, Test}
-import java.io.File
+import org.junit.{Before, Test}
 import java.util
 import org.junit.Assert._
 
-class ClusterTest {
-  var cluster: Cluster = null
+class ClusterTest extends MesosTest {
+  var cluster: Cluster = new Cluster()
 
   @Before
-  def before {
-    Cluster.stateFile = File.createTempFile("ClusterTest", null)
-    cluster = new Cluster()
-  }
-
-  @After
-  def after {
-    Cluster.stateFile.delete()
-    Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
+  override def before {
+    super.before
+    cluster.clear()
   }
 
   @Test

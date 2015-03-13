@@ -277,9 +277,9 @@ object Broker {
     }
   }
 
-  class Task(_id: String = null, _host: String = null, _port: Int = -1) {
+  class Task(_id: String = null, _host: String = null, _port: Int = -1, _running: Boolean = false) {
     var id: String = _id
-    @volatile var running: Boolean = false
+    @volatile var running: Boolean = _running
     var host: String = _host
     var port: Int = _port
 

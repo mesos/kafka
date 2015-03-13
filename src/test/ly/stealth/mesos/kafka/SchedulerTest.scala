@@ -2,32 +2,13 @@ package ly.stealth.mesos.kafka
 
 import java.util
 import scala.collection.JavaConversions._
-import org.junit.{After, Before, Test}
+import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Mesos._
-import org.apache.mesos.Protos.Resource
-import java.util.Properties
+import org.apache.mesos.Protos.{TaskState, Resource}
+import java.util.{Date, Properties}
 import java.io.StringReader
-import org.apache.log4j.BasicConfigurator
 
-class SchedulerTest {
-  var driver: TestSchedulerDriver = null
-
-  @Before
-  def before {
-    BasicConfigurator.configure()
-    Scheduler.getCluster.clear()
-
-    driver = schedulerDriver
-    Scheduler.registered(driver, frameworkId(), master())
-  }
-
-  @After
-  def after {
-    Scheduler.disconnected(driver)
-    BasicConfigurator.resetConfiguration()
-  }
-
+class SchedulerTest extends MesosTest {
   @Test
   def newExecutor {
     val broker = new Broker("1")
@@ -49,10 +30,7 @@ class SchedulerTest {
     broker.cpus = 0.5
     broker.mem = 256
 
-    val offer = Mesos.offer(
-      slaveId = "slave",
-      ports = Pair(1000, 1000)
-    )
+    val offer = this.offer(slaveId = "slave", ports = Pair(1000, 1000))
 
     val task = Scheduler.newTask(broker, offer)
     assertEquals("slave", task.getSlaveId.getValue)
@@ -90,8 +68,8 @@ class SchedulerTest {
 
   @Test
   def syncBrokers {
-    val broker = Scheduler.getCluster.addBroker(new Broker())
-    val offer = Mesos.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))
+    val broker = Scheduler.cluster.addBroker(new Broker())
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
@@ -108,6 +86,79 @@ class SchedulerTest {
     Scheduler.syncBrokers(util.Arrays.asList())
     assertEquals(1, driver.launchedTasks.size())
     assertEquals(1, driver.killedTasks.size())
+  }
+
+  @Test
+  def onBrokerStatus {
+    val broker = Scheduler.cluster.addBroker(new Broker())
+    broker.task = new Broker.Task(Broker.nextTaskId(broker))
+    assertFalse(broker.task.running)
+
+    // broker started
+    Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING))
+    assertTrue(broker.task.running)
+
+    // broker finished
+    Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_FINISHED))
+    assertNull(broker.task)
+    assertEquals(0, broker.failover.failures)
+  }
+
+  @Test
+  def onBrokerStarted {
+    val broker = Scheduler.cluster.addBroker(new Broker())
+    broker.task = new Broker.Task("task")
+    assertFalse(broker.task.running)
+
+    Scheduler.onBrokerStarted(broker, taskStatus(state = TaskState.TASK_RUNNING))
+    assertTrue(broker.task.running)
+  }
+
+  @Test
+  def onBrokerStopped {
+    val broker = Scheduler.cluster.addBroker(new Broker())
+    val task = new Broker.Task("task", _running = true)
+
+    // finished
+    broker.task = task
+    Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FINISHED))
+    assertNull(broker.task)
+    assertEquals(0, broker.failover.failures)
+
+    // failed
+    broker.active = true
+    broker.task = task
+    Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FAILED), new Date(0))
+    assertNull(broker.task)
+    assertEquals(1, broker.failover.failures)
+    assertEquals(new Date(0), broker.failover.failureTime)
+
+    // failed maxRetries exceeded
+    broker.failover.maxTries = 2
+    broker.task = task
+    Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FAILED), new Date(1))
+    assertNull(broker.task)
+    assertEquals(2, broker.failover.failures)
+    assertEquals(new Date(1), broker.failover.failureTime)
+
+    assertTrue(broker.failover.isMaxTriesExceeded)
+    assertFalse(broker.active)
+  }
+
+  @Test
+  def launchTask {
+    val broker = Scheduler.cluster.addBroker(new Broker("100"))
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000))
+
+    Scheduler.launchTask(broker, offer)
+    assertEquals(1, driver.launchedTasks.size())
+
+    assertNotNull(broker.task)
+    assertFalse(broker.task.running)
+
+    val task = driver.launchedTasks.get(0)
+    assertEquals(task.getTaskId.getValue, broker.task.id)
+    assertTrue(Scheduler.taskIds.contains(broker.task.id))
   }
 
   @Test

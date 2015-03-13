@@ -2,12 +2,11 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Mesos._
 import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
 
-class BrokerTest {
+class BrokerTest extends MesosTest {
   @Test
   def attributeMap {
     val broker = new Broker()
@@ -77,7 +76,7 @@ class BrokerTest {
   @Test
   def shouldStart {
     val broker = new Broker()
-    val offer = Mesos.offer(cpus = broker.cpus, mem = broker.mem.toInt)
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem.toInt)
 
     // active
     broker.active = false

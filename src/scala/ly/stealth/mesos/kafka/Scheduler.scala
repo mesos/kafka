@@ -22,20 +22,18 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.Properties
+import java.util.{Date, Properties}
 import java.io.StringWriter
 import scala.collection.JavaConversions._
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private val cluster: Cluster = new Cluster()
+  val cluster: Cluster = new Cluster()
   cluster.load(clearTasks = true)
 
   private var driver: SchedulerDriver = null
-  private val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
-
-  def getCluster: Cluster = cluster
+  private[kafka] val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jarName
@@ -112,17 +110,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
     logger.info("[statusUpdate] " + MesosStr.taskStatus(status))
-    val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
-
-    status.getState match {
-      case TaskState.TASK_RUNNING =>
-        onBrokerStarted(broker, status)
-      case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
-           TaskState.TASK_FAILED | TaskState.TASK_KILLED |
-           TaskState.TASK_ERROR =>
-        onBrokerStopped(broker, status)
-      case _ => logger.warn("Got unexpected task state: " + status.getState)
-    }
+    onBrokerStatus(status)
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
@@ -172,15 +160,29 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
   }
-  
-  private def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
+
+  private[kafka] def onBrokerStatus(status: TaskStatus) {
+    val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
+
+    status.getState match {
+      case TaskState.TASK_RUNNING =>
+        onBrokerStarted(broker, status)
+      case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
+           TaskState.TASK_FAILED | TaskState.TASK_KILLED |
+           TaskState.TASK_ERROR =>
+        onBrokerStopped(broker, status)
+      case _ => logger.warn("Got unexpected task state: " + status.getState)
+    }
+  }
+
+  private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
     if (broker == null) return
 
     if (broker.task != null) broker.task.running = true
     broker.failover.resetFailures()
   }
 
-  private def onBrokerStopped(broker: Broker, status: TaskStatus): Unit = {
+  private[kafka] def onBrokerStopped(broker: Broker, status: TaskStatus, now: Date = new Date()): Unit = {
     taskIds.remove(status.getTaskId.getValue)
     if (broker == null) return
 
@@ -188,7 +190,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val failed = status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
 
     if (failed) {
-      broker.failover.registerFailure()
+      broker.failover.registerFailure(now)
 
       var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
       if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries

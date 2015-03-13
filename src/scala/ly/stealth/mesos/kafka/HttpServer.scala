@@ -125,11 +125,11 @@ import scala.collection.mutable.ListBuffer
     }
 
     def handleGetBrokers(response: HttpServletResponse): Unit = {
-      response.getWriter.println("" + Scheduler.getCluster.toJson)
+      response.getWriter.println("" + Scheduler.cluster.toJson)
     }
 
     def handleAddUpdateBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster = Scheduler.getCluster
+      val cluster = Scheduler.cluster
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
@@ -228,7 +228,7 @@ import scala.collection.mutable.ListBuffer
     }
 
     def handleRemoveBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster = Scheduler.getCluster
+      val cluster = Scheduler.cluster
 
       val idExpr = request.getParameter("id")
       if (idExpr == null) { response.sendError(400, "id required"); return }
@@ -239,7 +239,7 @@ import scala.collection.mutable.ListBuffer
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
-        val broker = Scheduler.getCluster.getBroker(id)
+        val broker = Scheduler.cluster.getBroker(id)
         if (broker == null) { response.sendError(400, s"broker $id not found"); return }
         if (broker.active) { response.sendError(400, s"broker $id is active"); return }
         brokers.add(broker)
@@ -255,7 +255,7 @@ import scala.collection.mutable.ListBuffer
     }
 
     def handleStartStopBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster: Cluster = Scheduler.getCluster
+      val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
       
       var timeout: Long = 30 * 1000
