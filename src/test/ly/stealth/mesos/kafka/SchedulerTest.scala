@@ -73,19 +73,19 @@ class SchedulerTest extends MesosTestCase {
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
-    assertEquals(0, driver.launchedTasks.size())
+    assertEquals(0, schedulerDriver.launchedTasks.size())
 
     // broker active
     broker.active = true
     Scheduler.syncBrokers(util.Arrays.asList(offer))
-    assertEquals(1, driver.launchedTasks.size())
-    assertEquals(0, driver.killedTasks.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertEquals(0, schedulerDriver.killedTasks.size())
 
     // broker !active
     broker.active = false
     Scheduler.syncBrokers(util.Arrays.asList())
-    assertEquals(1, driver.launchedTasks.size())
-    assertEquals(1, driver.killedTasks.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertEquals(1, schedulerDriver.killedTasks.size())
   }
 
   @Test
@@ -151,12 +151,12 @@ class SchedulerTest extends MesosTestCase {
     val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000))
 
     Scheduler.launchTask(broker, offer)
-    assertEquals(1, driver.launchedTasks.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
 
     assertNotNull(broker.task)
     assertFalse(broker.task.running)
 
-    val task = driver.launchedTasks.get(0)
+    val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
     assertTrue(Scheduler.taskIds.contains(broker.task.id))
   }

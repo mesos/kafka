@@ -26,7 +26,7 @@ import org.apache.log4j._
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
-  @volatile var server: KafkaServer = null
+  var server: BrokerServer = new KafkaServer()
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo): Unit = {
     logger.info("[registered] framework:" + MesosStr.framework(framework) + " slave:" + MesosStr.slave(slave))
@@ -42,18 +42,12 @@ object Executor extends org.apache.mesos.Executor {
 
   def launchTask(driver: ExecutorDriver, task: TaskInfo): Unit = {
     logger.info("[launchTask] " + MesosStr.task(task))
-
-    new Thread {
-      override def run() {
-        setName("KafkaServer")
-        runBroker(driver, task)
-      }
-    }.start()
+    runBroker(driver, task)
   }
 
   def killTask(driver: ExecutorDriver, id: TaskID): Unit = {
     logger.info("[killTask] " + id.getValue)
-    if (server != null) server.stop()
+    if (server.isStarted) server.stop()
   }
 
   def frameworkMessage(driver: ExecutorDriver, data: Array[Byte]): Unit = {
@@ -62,7 +56,7 @@ object Executor extends org.apache.mesos.Executor {
 
   def shutdown(driver: ExecutorDriver): Unit = {
     logger.info("[shutdown]")
-    if (server != null) server.stop()
+    if (server.isStarted) server.stop()
   }
 
   def error(driver: ExecutorDriver, message: String): Unit = {
@@ -70,26 +64,31 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   private[kafka] def runBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    try {
-      server = new KafkaServer(task.getTaskId.getValue, optionMap(task))
-      server.start()
+    def runBroker0 {
+      try {
+        server.start(optionMap(task))
 
-      var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
-      driver.sendStatusUpdate(status)
+        var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
+        driver.sendStatusUpdate(status)
 
-      server.waitFor()
-      status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED).build
-      driver.sendStatusUpdate(status)
-    } catch {
-      case t: Throwable =>
-        logger.warn("", t)
-        sendTaskFailed(driver, task, t)
-    } finally {
-      if (server != null) {
-        server.stop()
-        server = null
+        server.waitFor()
+        status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED).build
+        driver.sendStatusUpdate(status)
+      } catch {
+        case t: Throwable =>
+          logger.warn("", t)
+          sendTaskFailed(driver, task, t)
+      } finally {
+        if (server.isStarted) server.stop()
       }
     }
+
+    new Thread {
+      override def run() {
+        setName("BrokerServer")
+        runBroker0
+      }
+    }.start()
   }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {

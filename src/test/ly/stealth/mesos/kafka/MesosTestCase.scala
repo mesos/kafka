@@ -4,16 +4,18 @@ import org.apache.mesos.Protos._
 import java.util.UUID
 import org.apache.mesos.Protos.Value.{Text, Scalar}
 import scala.collection.JavaConversions._
-import org.apache.mesos.SchedulerDriver
+import org.apache.mesos.{ExecutorDriver, SchedulerDriver}
 import java.util
 import org.junit.{Ignore, After, Before}
 import org.apache.log4j.BasicConfigurator
 import java.io.File
 import com.google.protobuf.ByteString
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Ignore
 class MesosTestCase {
-  var driver: TestSchedulerDriver = null
+  var schedulerDriver: TestSchedulerDriver = null
+  var executorDriver: TestExecutorDriver = null
 
   @Before
   def before {
@@ -23,17 +25,21 @@ class MesosTestCase {
     Cluster.stateFile.delete()
     Scheduler.cluster.clear()
 
-    driver = schedulerDriver
-    Scheduler.registered(driver, frameworkId(), master())
+    schedulerDriver = _schedulerDriver
+    Scheduler.registered(schedulerDriver, frameworkId(), master())
+
+    executorDriver = _executorDriver
+    Executor.server = new TestBrokerServer()
   }
 
   @After
   def after {
-    Scheduler.disconnected(driver)
+    Scheduler.disconnected(schedulerDriver)
 
     Cluster.stateFile.delete()
     Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
 
+    Executor.server = new KafkaServer()
     BasicConfigurator.resetConfiguration()
   }
 
@@ -139,16 +145,17 @@ class MesosTestCase {
     .build()
   }
   
-  def schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()
+  private def _schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()
+  private def _executorDriver: TestExecutorDriver = new TestExecutorDriver()
 
   class TestSchedulerDriver extends SchedulerDriver {
     var status: Status = Status.DRIVER_RUNNING
 
-    var declinedOffers: util.List[String] = new util.ArrayList[String]()
-    var acceptedOffers: util.List[String] = new util.ArrayList[String]()
+    val declinedOffers: util.List[String] = new util.ArrayList[String]()
+    val acceptedOffers: util.List[String] = new util.ArrayList[String]()
     
-    var launchedTasks: util.List[TaskInfo] = new util.ArrayList[TaskInfo]()
-    var killedTasks: util.List[String] = new util.ArrayList[String]()
+    val launchedTasks: util.List[TaskInfo] = new util.ArrayList[TaskInfo]()
+    val killedTasks: util.List[String] = new util.ArrayList[String]()
     
     def declineOffer(id: OfferID): Status = {
       declinedOffers.add(id.getValue)
@@ -208,5 +215,66 @@ class MesosTestCase {
     def abort(): Status = throw new UnsupportedOperationException
 
     def start(): Status = throw new UnsupportedOperationException
+  }
+
+  class TestExecutorDriver extends ExecutorDriver {
+    var status: Status = Status.DRIVER_RUNNING
+    
+    private val _statusUpdates: util.List[TaskStatus] = new util.concurrent.CopyOnWriteArrayList[TaskStatus]()
+    def statusUpdates: util.List[TaskStatus] = util.Collections.unmodifiableList(_statusUpdates)
+
+    def start(): Status = throw new UnsupportedOperationException
+
+    def stop(): Status = throw new UnsupportedOperationException
+
+    def abort(): Status = throw new UnsupportedOperationException
+
+    def join(): Status = throw new UnsupportedOperationException
+
+    def run(): Status = throw new UnsupportedOperationException
+
+    def sendStatusUpdate(status: TaskStatus): Status = {
+      _statusUpdates.synchronized {
+        _statusUpdates.add(status)
+        _statusUpdates.notify()
+      }
+      
+      this.status
+    }
+    
+    def waitForStatusUpdates(count: Int): Unit = {
+      _statusUpdates.synchronized {
+        while (_statusUpdates.size() < count)
+          _statusUpdates.wait()
+      }
+    }
+
+    def sendFrameworkMessage(message: Array[Byte]): Status = throw new UnsupportedOperationException
+  }
+}
+
+class TestBrokerServer extends BrokerServer {
+  var failOnStart: Boolean = false
+  private val started: AtomicBoolean = new AtomicBoolean(false)
+  var props: Map[String, String] = null
+
+  def isStarted: Boolean = started.get()
+
+  def start(props: Map[String, String]): Unit = {
+    if (failOnStart) throw new RuntimeException("failOnStart")
+    started.set(true)
+    this.props = props
+  }
+
+  def stop(): Unit = {
+    started.set(false)
+    started.synchronized { started.notify() }
+  }
+
+  def waitFor(): Unit = {
+    started.synchronized {
+      while (started.get)
+        started.wait()
+    }
   }
 }
