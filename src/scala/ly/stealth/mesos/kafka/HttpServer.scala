@@ -27,8 +27,9 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
+ import ly.stealth.mesos.kafka.Util.Period
 
-object HttpServer {
+ object HttpServer {
   val jarPath = findJar()
   def jarName = new File(jarPath).getName
 
@@ -124,11 +125,11 @@ object HttpServer {
     }
 
     def handleGetBrokers(response: HttpServletResponse): Unit = {
-      response.getWriter.println("" + Scheduler.getCluster.toJson)
+      response.getWriter.println("" + Scheduler.cluster.toJson)
     }
 
     def handleAddUpdateBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster = Scheduler.getCluster
+      val cluster = Scheduler.cluster
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
@@ -155,12 +156,12 @@ object HttpServer {
 
       val options: String = request.getParameter("options")
       if (options != null)
-        try { Broker.parseMap(request.getParameter("options"), ";", "=") }
+        try { Util.parseMap(request.getParameter("options"), ";", "=") }
         catch { case e: IllegalArgumentException => errors.add("Invalid options") }
 
       val attributes: String = request.getParameter("attributes")
       if (attributes != null)
-        try { Broker.parseMap(request.getParameter("attributes"), ";", ":") }
+        try { Util.parseMap(request.getParameter("attributes"), ";", ":") }
         catch { case e: IllegalArgumentException => errors.add("Invalid attributes") }
 
 
@@ -227,7 +228,7 @@ object HttpServer {
     }
 
     def handleRemoveBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster = Scheduler.getCluster
+      val cluster = Scheduler.cluster
 
       val idExpr = request.getParameter("id")
       if (idExpr == null) { response.sendError(400, "id required"); return }
@@ -238,7 +239,7 @@ object HttpServer {
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
-        val broker = Scheduler.getCluster.getBroker(id)
+        val broker = Scheduler.cluster.getBroker(id)
         if (broker == null) { response.sendError(400, s"broker $id not found"); return }
         if (broker.active) { response.sendError(400, s"broker $id is active"); return }
         brokers.add(broker)
@@ -254,7 +255,7 @@ object HttpServer {
     }
 
     def handleStartStopBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster: Cluster = Scheduler.getCluster
+      val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
       
       var timeout: Long = 30 * 1000

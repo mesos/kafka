@@ -21,17 +21,17 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSONObject
 import scala.collection
-import org.apache.mesos.Protos.Offer
-import java.util.regex.Pattern
+import org.apache.mesos.Protos.{Resource, Offer}
 import java.util.{Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
+import ly.stealth.mesos.kafka.Util.{Wildcard, Period}
 
 class Broker(_id: String = "0") {
   var id: String = _id
   @volatile var active: Boolean = false
 
   var host: String = null
-  var cpus: Double = 1
+  var cpus: Double = 0.5
   var mem: Long = 128
   var heap: Long = 128
 
@@ -40,11 +40,10 @@ class Broker(_id: String = "0") {
 
   var failover: Failover = new Failover()
 
-  def attributeMap: util.Map[String, String] = Broker.parseMap(attributes, ";", ":")
-  def optionMap: util.Map[String, String] = Broker.parseMap(options, ";", "=")
+  def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ";", ":")
 
-  def effectiveOptionMap: util.Map[String, String] = {
-    val result = optionMap
+  def optionMap(overrides: util.Map[String, String] = null): util.Map[String, String] = {
+    val result = Util.parseMap(options, ";", "=")
 
     for ((k, v) <- result) {
       var nv = v
@@ -54,10 +53,86 @@ class Broker(_id: String = "0") {
       result.put(k, nv)
     }
 
+    if (overrides != null) result.putAll(overrides)
+
+    if (!result.containsKey("log.dirs"))
+      result.put("log.dirs", "kafka-logs")
+
     result
   }
 
   @volatile var task: Broker.Task = null
+
+  def matches(offer: Offer): Boolean = {
+    if (host != null && !new Wildcard(host).matches(offer.getHostname)) return false
+
+    // check resources
+    val offerResources = new util.HashMap[String, Resource]()
+    for (resource <- offer.getResourcesList) offerResources.put(resource.getName, resource)
+
+    val cpusResource = offerResources.get("cpus")
+    if (cpusResource == null || cpusResource.getScalar.getValue < cpus) return false
+
+    val memResource = offerResources.get("mem")
+    if (memResource == null || memResource.getScalar.getValue < mem) return false
+
+    // check attributes
+    val offerAttributes = new util.HashMap[String, String]()
+    for (attribute <- offer.getAttributesList)
+      if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
+
+    for ((name, value) <- attributeMap) {
+      if (!offerAttributes.containsKey(name)) return false
+      if (!new Wildcard(value).matches(offerAttributes.get(name))) return false
+    }
+
+    true
+  }
+  
+  def shouldStart(offer: Offer, now: Date = new Date()): Boolean = {
+    active && task == null && matches(offer) && !failover.isWaitingDelay(now) 
+  }
+
+  def shouldStop: Boolean = !active
+
+  def state(now: Date = new Date()): String = {
+    if (active) {
+      if (task != null && task.running) return "running"
+
+      if (failover.isWaitingDelay(now)) {
+        var s = "failed " + failover.failures
+        if (failover.maxTries != null) s += "/" + failover.maxTries
+        s += " " + MesosStr.dateTime(failover.failureTime)
+        s += ", next start " + MesosStr.dateTime(failover.delayExpires)
+        return s
+      }
+
+      if (failover.failures > 0) {
+        var s = "starting " + (failover.failures + 1)
+        if (failover.maxTries != null) s += "/" + failover.maxTries
+        s += ", failed " + MesosStr.dateTime(failover.failureTime)
+        return s
+      }
+
+      return "starting"
+    }
+
+    if (task != null) return "stopping"
+    "stopped"
+  }
+
+  def waitForState(running: Boolean, timeout: java.lang.Long): Boolean = {
+    def stateMatches: Boolean = if (running) task != null && task.running else task == null
+
+    var t = timeout
+    while (t > 0 && !stateMatches) {
+      val delay = Math.min(100, t)
+      Thread.sleep(delay)
+      t -= delay
+    }
+
+    stateMatches
+  }
 
   def copy(): Broker = {
     val broker: Broker = new Broker()
@@ -116,73 +191,6 @@ class Broker(_id: String = "0") {
 
     new JSONObject(obj.toMap)
   }
-
-  def matches(offer: Offer): Boolean = {
-    if (host != null && !Broker.matches(host, offer.getHostname)) return false
-
-    for (resource <- offer.getResourcesList) {
-      resource.getName match {
-        case "cpus" => if (resource.getScalar.getValue < cpus) return false
-        case "mem" => if (resource.getScalar.getValue < mem) return false
-        case "heap" => if (resource.getScalar.getValue < heap) return false
-        case _ => // ignore
-      }
-    }
-
-    val offerAttributes = new util.HashMap[String, String]()
-    for (attribute <- offer.getAttributesList) {
-      var value: String = null
-      if (attribute.hasText) value = attribute.getText.getValue
-      if (attribute.hasScalar) value = "" + attribute.getScalar.getValue
-
-      if (value != null) offerAttributes.put(attribute.getName, value)
-    }
-
-    for ((name, value) <- attributeMap) {
-      if (!offerAttributes.containsKey(name)) return false
-      if (!Broker.matches(value, offerAttributes.get(name))) return false
-    }
-
-    true
-  }
-
-  def waitForState(running: Boolean, timeout: java.lang.Long): Boolean = {
-    def stateMatches: Boolean = if (running) task != null && task.running else task == null
-
-    var t = timeout
-    while (t > 0 && !stateMatches) {
-      t -= 200
-      if (t > 0) Thread.sleep(200)
-    }
-
-    stateMatches
-  }
-
-  def state: String = {
-    if (active) {
-      if (task != null && task.running) return "running"
-
-      if (failover.isWaitingDelay) {
-        var s = "failed " + failover.failures
-        if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += " " + MesosStr.dateTime(failover.failureTime)
-        s += ", next start " + MesosStr.dateTime(failover.delayExpires)
-        return s
-      }
-
-      if (failover.failures > 0) {
-        var s = "starting " + (failover.failures + 1)
-        if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += ", failed " + MesosStr.dateTime(failover.failureTime)
-        return s
-      }
-
-      return "starting"
-    }
-
-    if (task != null) return "stopping"
-    "stopped"
-  }
 }
 
 object Broker {
@@ -195,40 +203,9 @@ object Broker {
     parts(1)
   }
 
-  def matches(wildcard: String, value: String): Boolean = {
-    var regex: String = "^"
-    var token: String = ""
-    for (c <- wildcard.toCharArray) {
-      if (c == '*' || c == '?') {
-        regex += Pattern.quote(token)
-        token = ""
-        regex += (if (c == '*') ".*" else ".")
-      } else
-        token += c
-    }
-    if (token != "") regex += Pattern.quote(token)
-    regex += "$"
-
-    value.matches(regex)
-  }
-
-  def parseMap(s: String, entrySep: String, valueSep: String): util.LinkedHashMap[String, String] = {
-    val result = new util.LinkedHashMap[String, String]()
-    if (s == null) return result
-
-    for (entry <- s.split(entrySep))
-      if (entry.trim() != "") {
-        val pair = entry.split(valueSep)
-        if (pair.length == 2) result.put(pair(0).trim(), pair(1).trim())
-        else throw new IllegalArgumentException(s)
-      }
-
-    result
-  }
-
-  class Failover {
-    var delay: Period = new Period("10s")
-    var maxDelay: Period = new Period("60s")
+  class Failover(_delay: Period = new Period("10s"), _maxDelay: Period = new Period("60s")) {
+    var delay: Period = _delay
+    var maxDelay: Period = _maxDelay
     var maxTries: Integer = null
 
     @volatile var failures: Int = 0
@@ -238,26 +215,26 @@ object Broker {
       if (failures == 0) return new Period("0ms")
 
       val multiplier = 1 << (failures - 1)
-      val d = delay.toMs * multiplier
+      val d = delay.ms * multiplier
 
-      if (d > maxDelay.toMs) maxDelay else new Period(delay.getValue * multiplier + delay.getUnit)
+      if (d > maxDelay.ms) maxDelay else new Period(delay.value * multiplier + delay.unit)
     }
 
     def delayExpires: Date = {
       if (failures == 0) return new Date(0)
-      new Date(failureTime.getTime + currentDelay.toMs)
+      new Date(failureTime.getTime + currentDelay.ms)
     }
 
-    def isWaitingDelay: Boolean = delayExpires.getTime > System.currentTimeMillis()
+    def isWaitingDelay(now: Date = new Date()): Boolean = delayExpires.getTime > now.getTime
 
     def isMaxTriesExceeded: Boolean = {
       if (maxTries == null) return false
       failures >= maxTries
     }
 
-    def registerFailure(): Unit = {
+    def registerFailure(now: Date = new Date()): Unit = {
       failures += 1
-      failureTime = new Date()
+      failureTime = now
     }
 
     def resetFailures(): Unit = {
@@ -300,9 +277,9 @@ object Broker {
     }
   }
 
-  class Task(_id: String = null, _host: String = null, _port: Int = -1) {
+  class Task(_id: String = null, _host: String = null, _port: Int = -1, _running: Boolean = false) {
     var id: String = _id
-    @volatile var running: Boolean = false
+    @volatile var running: Boolean = _running
     var host: String = _host
     var port: Int = _port
 

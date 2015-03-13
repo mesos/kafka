@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 import org.apache.mesos.Protos._

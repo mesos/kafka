@@ -22,22 +22,20 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.Properties
+import java.util.{Date, Properties}
 import java.io.StringWriter
 import scala.collection.JavaConversions._
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private val cluster: Cluster = new Cluster()
+  val cluster: Cluster = new Cluster()
   cluster.load(clearTasks = true)
 
   private var driver: SchedulerDriver = null
-  private val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
+  private[kafka] val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
 
-  def getCluster: Cluster = cluster
-
-  private def executor(broker: Broker): ExecutorInfo = {
+  private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jarName
     cmd += " -Xmx" + broker.heap + "m"
 
@@ -56,21 +54,30 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build()
   }
 
-  private def task(broker: Broker, offer: Offer): TaskInfo = {
+  private[kafka] def newTask(broker: Broker, offer: Offer): TaskInfo = {
     val port = findBrokerPort(offer)
 
-    val props: Map[String, String] = Map(
-      "broker.id" -> broker.id,
-      "port" -> ("" + port),
-      "zookeeper.connect" -> Config.kafkaZkConnect
-    )
+    def taskData: ByteString = {
+      val overrides: Map[String, String] = Map(
+        "broker.id" -> broker.id,
+        "port" -> ("" + port),
+        "zookeeper.connect" -> Config.kafkaZkConnect
+      )
+
+      val p: Properties = new Properties()
+      p.putAll(broker.optionMap(overrides))
+
+      val buffer: StringWriter = new StringWriter()
+      p.store(buffer, "")
+      ByteString.copyFromUtf8("" + buffer)
+    }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
       .setName("BrokerTask")
       .setTaskId(TaskID.newBuilder.setValue(Broker.nextTaskId(broker)).build)
       .setSlaveId(offer.getSlaveId)
-      .setData(taskData(broker, props))
-      .setExecutor(executor(broker))
+      .setData(taskData)
+      .setExecutor(newExecutor(broker))
 
     taskBuilder
       .addResources(Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.cpus)))
@@ -94,7 +101,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
     logger.info("[resourceOffers]\n" + MesosStr.offers(offers))
-    syncClusterState(offers)
+    syncBrokers(offers)
   }
 
   def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
@@ -103,19 +110,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
     logger.info("[statusUpdate] " + MesosStr.taskStatus(status))
-    val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
-
-    status.getState match {
-      case TaskState.TASK_RUNNING =>
-        onBrokerStarted(broker, status)
-      case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
-           TaskState.TASK_FAILED | TaskState.TASK_KILLED |
-           TaskState.TASK_ERROR =>
-        onBrokerStopped(broker, status)
-      case _ => logger.warn("Got unexpected task state: " + status.getState)
-    }
-
-    syncClusterState()
+    onBrokerStatus(status)
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
@@ -139,14 +134,59 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("[error] " + message)
   }
 
-  private def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
+  private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
+    def startBroker(offer: Offer): Boolean = {
+      for (broker <- cluster.getBrokers) {
+        if (broker.shouldStart(offer)) {
+          launchTask(broker, offer)
+          return true
+        }
+      }
+
+      false
+    }
+
+    for (offer <- offers) {
+      val started = startBroker(offer)
+      if (!started) driver.declineOffer(offer.getId)
+    }
+
+    for (id <- taskIds) {
+      val broker = cluster.getBroker(Broker.idFromTaskId(id))
+
+      if (broker == null || broker.shouldStop) {
+        logger.info("Killing task " + id)
+        driver.killTask(TaskID.newBuilder.setValue(id).build)
+      }
+    }
+
+    cluster.save()
+  }
+
+  private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {
+    val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
+
+    status.getState match {
+      case TaskState.TASK_RUNNING =>
+        onBrokerStarted(broker, status)
+      case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
+           TaskState.TASK_FAILED | TaskState.TASK_KILLED |
+           TaskState.TASK_ERROR =>
+        onBrokerStopped(broker, status)
+      case _ => logger.warn("Got unexpected task state: " + status.getState)
+    }
+
+    cluster.save()
+  }
+
+  private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
     if (broker == null) return
 
     if (broker.task != null) broker.task.running = true
     broker.failover.resetFailures()
   }
 
-  private def onBrokerStopped(broker: Broker, status: TaskStatus): Unit = {
+  private[kafka] def onBrokerStopped(broker: Broker, status: TaskStatus, now: Date = new Date()): Unit = {
     taskIds.remove(status.getTaskId.getValue)
     if (broker == null) return
 
@@ -154,7 +194,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val failed = status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
 
     if (failed) {
-      broker.failover.registerFailure()
+      broker.failover.registerFailure(now)
 
       var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
       if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
@@ -172,39 +212,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  def syncClusterState(offers: util.List[Offer] = new util.ArrayList[Offer]()): Unit = {
-    logger.debug("[syncClusterState]")
-    cluster.save()
-    if (driver == null) return
-
-    for (offer <- offers) {
-      var accepted = false
-
-      for (broker <- cluster.getBrokers) {
-        val acceptable = !accepted && broker.active &&
-          broker.matches(offer) && !broker.failover.isWaitingDelay
-
-        if (broker.task == null && acceptable) {
-          accepted = true
-          launchTask(broker, offer)
-        }
-      }
-
-      if (!accepted)
-        driver.declineOffer(offer.getId)
-    }
-
-    for (id <- taskIds) {
-      val broker = cluster.getBroker(Broker.idFromTaskId(id))
-      if (broker == null || !broker.active) {
-        logger.info("Killing task " + id)
-        driver.killTask(TaskID.newBuilder.setValue(id).build)
-      }
-    }
-  }
-
-  def launchTask(broker: Broker, offer: Offer): Unit = {
-    val task_ = task(broker, offer)
+  private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
+    val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
@@ -214,32 +223,19 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("Launching task " + id + " by offer " + MesosStr.id(offer.getId.getValue) + "\n" + MesosStr.task(task_))
   }
 
-  private def findBrokerPort(offer: Offer): Int = {
+  private[kafka] def findBrokerPort(offer: Offer): Int = {
     for (resource <- offer.getResourcesList) {
       if (resource.getName == "ports") {
         val ranges: util.List[Value.Range] = resource.getRanges.getRangeList
         val range = if (ranges.isEmpty) null else ranges.get(0)
 
-        if (range == null || !range.hasBegin) throw new IllegalStateException("Invalid port range in offer " + MesosStr.offer(offer))
+        assert(range.hasBegin)
+        if (range == null) throw new IllegalArgumentException("Invalid port range in offer " + MesosStr.offer(offer))
         return range.getBegin.toInt
       }
     }
 
-    throw new IllegalStateException("No port range in offer " + MesosStr.offer(offer))
-  }
-
-  private def taskData(broker: Broker, props: Map[String, String]): ByteString = {
-    val p: Properties = new Properties()
-    for ((k, v) <- broker.effectiveOptionMap) p.setProperty(k, v)
-    for ((k, v) <- props) p.setProperty(k, v)
-
-    if (!p.containsKey("log.dirs"))
-      p.setProperty("log.dirs", "kafka-logs")
-
-    val buffer: StringWriter = new StringWriter()
-    p.store(buffer, "")
-
-    ByteString.copyFromUtf8("" + buffer)
+    throw new IllegalArgumentException("No port range in offer " + MesosStr.offer(offer))
   }
 
   def main(args: Array[String]) {

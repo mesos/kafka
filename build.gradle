@@ -15,6 +15,9 @@ sourceSets {
     main {
         scala { srcDirs = ['src/scala'] }
     }
+    test {
+        scala { srcDirs = ['src/test'] }
+    }
 }
 
 dependencies {
@@ -30,9 +33,11 @@ dependencies {
     compile "org.eclipse.jetty:jetty-servlet:9.0.4.v20130625"
     compile "org.eclipse.jetty:jetty-util:9.0.4.v20130625"
     compile "javax.servlet:javax.servlet-api:3.0.1"
+    testCompile 'junit:junit:4.12'
 }
 
 jar {
+    dependsOn 'test'
     doFirst {
         from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
             exclude "META-INF/*.SF"
