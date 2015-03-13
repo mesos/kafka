@@ -159,9 +159,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
         driver.killTask(TaskID.newBuilder.setValue(id).build)
       }
     }
+
+    cluster.save()
   }
 
-  private[kafka] def onBrokerStatus(status: TaskStatus) {
+  private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {
     val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
 
     status.getState match {
@@ -173,6 +175,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         onBrokerStopped(broker, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
+
+    cluster.save()
   }
 
   private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
