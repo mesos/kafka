@@ -19,8 +19,8 @@ class ExecutorTest extends MesosTestCase {
   }
 
   @Test
-  def runBroker_success {
-    Executor.runBroker(executorDriver, task())
+  def startBroker_success {
+    Executor.startBroker(executorDriver, task())
     executorDriver.waitForStatusUpdates(1)
     assertEquals(1, executorDriver.statusUpdates.size())
 
@@ -38,15 +38,47 @@ class ExecutorTest extends MesosTestCase {
   }
 
   @Test
-  def runBroker_failure {
+  def startBroker_failure {
     Executor.server.asInstanceOf[TestBrokerServer].failOnStart = true
-    Executor.runBroker(executorDriver, task())
+    Executor.startBroker(executorDriver, task())
 
     executorDriver.waitForStatusUpdates(1)
     assertEquals(1, executorDriver.statusUpdates.size())
 
     val status = executorDriver.statusUpdates.get(0)
     assertEquals(TaskState.TASK_FAILED, status.getState)
+    assertFalse(Executor.server.isStarted)
+  }
+
+  @Test
+  def stopBroker {
+    Executor.server.start(Map())
+    assertTrue(Executor.server.isStarted)
+
+    Executor.stopBroker
+    assertFalse(Executor.server.isStarted)
+
+    Executor.stopBroker // no error
+  }
+
+  @Test
+  def launchTask {
+    Executor.launchTask(executorDriver, task())
+    executorDriver.waitForStatusUpdates(1)
+    assertTrue(Executor.server.isStarted)
+  }
+
+  @Test
+  def killTasks {
+    Executor.server.start(Map())
+    Executor.killTask(executorDriver, taskId())
+    assertFalse(Executor.server.isStarted)
+  }
+
+  @Test
+  def shutdown {
+    Executor.server.start(Map())
+    Executor.shutdown(executorDriver)
     assertFalse(Executor.server.isStarted)
   }
 

@@ -39,6 +39,7 @@ class MesosTestCase {
     Cluster.stateFile.delete()
     Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
 
+    Executor.server.stop()
     Executor.server = new KafkaServer()
     BasicConfigurator.resetConfiguration()
   }
@@ -46,6 +47,7 @@ class MesosTestCase {
   val LOCALHOST_IP: Int = 2130706433
   
   def frameworkId(id: String = "" + UUID.randomUUID()): FrameworkID = FrameworkID.newBuilder().setValue(id).build()
+  def taskId(id: String = "" + UUID.randomUUID()): TaskID = TaskID.newBuilder().setValue(id).build()
 
   def master(
     id: String = "" + UUID.randomUUID(),
