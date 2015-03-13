@@ -46,7 +46,7 @@ object Executor extends org.apache.mesos.Executor {
     new Thread {
       override def run() {
         setName("KafkaServer")
-        runKafkaServer(driver, task)
+        runBroker(driver, task)
       }
     }.start()
   }
@@ -69,9 +69,9 @@ object Executor extends org.apache.mesos.Executor {
     logger.info("[error] " + message)
   }
 
-  private def runKafkaServer(driver: ExecutorDriver, task: TaskInfo): Unit = {
+  private[kafka] def runBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
     try {
-      server = new KafkaServer(task.getTaskId.getValue, props(task))
+      server = new KafkaServer(task.getTaskId.getValue, optionMap(task))
       server.start()
 
       var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
@@ -103,7 +103,7 @@ object Executor extends org.apache.mesos.Executor {
     )
   }
 
-  private def props(taskInfo: TaskInfo): Map[String, String] = {
+  private[kafka] def optionMap(taskInfo: TaskInfo): Map[String, String] = {
     val buffer = new StringReader(taskInfo.getData.toStringUtf8)
 
     val p: util.Properties = new util.Properties()

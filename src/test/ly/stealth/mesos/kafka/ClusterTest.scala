@@ -4,7 +4,7 @@ import org.junit.{Before, Test}
 import java.util
 import org.junit.Assert._
 
-class ClusterTest extends MesosTest {
+class ClusterTest extends MesosTestCase {
   var cluster: Cluster = new Cluster()
 
   @Before

@@ -6,11 +6,13 @@ import org.apache.mesos.Protos.Value.{Text, Scalar}
 import scala.collection.JavaConversions._
 import org.apache.mesos.SchedulerDriver
 import java.util
-import org.junit.{After, Before}
+import org.junit.{Ignore, After, Before}
 import org.apache.log4j.BasicConfigurator
 import java.io.File
+import com.google.protobuf.ByteString
 
-class MesosTest {
+@Ignore
+class MesosTestCase {
   var driver: TestSchedulerDriver = null
 
   @Before
@@ -107,6 +109,22 @@ class MesosTest {
         builder.addAttributes(attribute)
       }
     }
+
+    builder.build()
+  }
+
+  def task(
+    id: String = "" + UUID.randomUUID(),
+    name: String = "Task",
+    slaveId: String = "" + UUID.randomUUID(),
+    data: String = null
+  ): TaskInfo = {
+    val builder = TaskInfo.newBuilder()
+    .setName(id)
+    .setTaskId(TaskID.newBuilder().setValue(id))
+    .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
+
+    if (data != null) builder.setData(ByteString.copyFromUtf8(data))
 
     builder.build()
   }

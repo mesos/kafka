@@ -8,7 +8,7 @@ import org.apache.mesos.Protos.{TaskState, Resource}
 import java.util.{Date, Properties}
 import java.io.StringReader
 
-class SchedulerTest extends MesosTest {
+class SchedulerTest extends MesosTestCase {
   @Test
   def newExecutor {
     val broker = new Broker("1")

@@ -6,7 +6,7 @@ import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
 
-class BrokerTest extends MesosTest {
+class BrokerTest extends MesosTestCase {
   @Test
   def attributeMap {
     val broker = new Broker()
