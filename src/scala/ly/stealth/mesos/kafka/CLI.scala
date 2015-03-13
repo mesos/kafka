@@ -275,7 +275,7 @@ object CLI {
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = println("  " * indent + s)
 
-  private def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
+  private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
       var s = ""
       for ((name, value) <- params) {

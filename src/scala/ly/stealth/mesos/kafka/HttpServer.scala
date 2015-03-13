@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import java.io._
 import org.apache.log4j.Logger
@@ -27,9 +27,9 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
- import ly.stealth.mesos.kafka.Util.Period
+import ly.stealth.mesos.kafka.Util.Period
 
- object HttpServer {
+object HttpServer {
   val jarPath = findJar()
   def jarName = new File(jarPath).getName
 
@@ -257,11 +257,11 @@ import scala.collection.mutable.ListBuffer
     def handleStartStopBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
-      
+
       var timeout: Long = 30 * 1000
       try { timeout = java.lang.Long.parseLong(request.getParameter("timeout")) }
       catch { case ignore: NumberFormatException => }
-      
+
       val idExpr: String = request.getParameter("id")
       if (idExpr == null) { response.sendError(400, "id required"); return }
 

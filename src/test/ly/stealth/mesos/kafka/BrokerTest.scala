@@ -310,7 +310,7 @@ class BrokerTest extends MesosTestCase {
 
 object BrokerTest {
   def assertBrokerEquals(expected: Broker, actual: Broker) {
-    checkNulls(expected, actual)
+    if (checkNulls(expected, actual)) return
 
     assertEquals(expected.id, actual.id)
     assertEquals(expected.active, actual.active)
@@ -328,7 +328,7 @@ object BrokerTest {
   }
 
   def assertFailoverEquals(expected: Failover, actual: Failover) {
-    checkNulls(expected, actual)
+    if (checkNulls(expected, actual)) return
 
     assertEquals(expected.delay, actual.delay)
     assertEquals(expected.maxDelay, actual.maxDelay)
@@ -339,7 +339,7 @@ object BrokerTest {
   }
 
   def assertTaskEquals(expected: Task, actual: Task) {
-    checkNulls(expected, actual)
+    if (checkNulls(expected, actual)) return
 
     assertEquals(expected.id, actual.id)
     assertEquals(expected.running, actual.running)
@@ -347,9 +347,10 @@ object BrokerTest {
     assertEquals(expected.port, actual.port)
   }
 
-  private def checkNulls(expected: Object, actual: Object) {
-    if (expected == actual) return
-    if (expected == null && actual != null) throw new AssertionError("actual != null")
-    if (expected != null && actual == null) throw new AssertionError("actual == null")
+  private def checkNulls(expected: Object, actual: Object): Boolean = {
+    if (expected == actual) return true
+    if (expected == null) throw new AssertionError("actual != null")
+    if (actual == null) throw new AssertionError("actual == null")
+    false
   }
 }
