@@ -36,7 +36,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
-    var cmd = "java -cp " + HttpServer.jarName
+    var cmd = "java -cp " + HttpServer.jar.getName
     cmd += " -Xmx" + broker.heap + "m"
 
     if (Config.debug) cmd += " -Ddebug"
@@ -46,8 +46,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
       .setCommand(
         CommandInfo.newBuilder
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jarName))
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/kafka/" + HttpServer.kafkaDistName))
+          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jar.getName))
+          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/kafka/" + HttpServer.kafkaDist.getName))
           .setValue(cmd)
       )
       .setName("BrokerExecutor")

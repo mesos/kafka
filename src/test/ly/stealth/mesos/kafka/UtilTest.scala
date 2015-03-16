@@ -3,6 +3,8 @@ package ly.stealth.mesos.kafka
 import org.junit.Test
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.{Wildcard, Period}
+import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
+import java.util
 
 class UtilTest {
   @Test
@@ -32,6 +34,27 @@ class UtilTest {
     assertEquals(2, node.size)
     assertEquals("1", node("a").asInstanceOf[String])
     assertEquals("2", node("b").asInstanceOf[String])
+  }
+
+  @Test
+  def copyAndClose {
+    val data = new Array[Byte](16 * 1024)
+    for (i <- 0 until data.length) data(i) = i.toByte
+
+    var inClosed = false
+    var outClosed = false
+
+    val in = new ByteArrayInputStream(data) {
+      override def close(): Unit = super.close(); inClosed = true
+    }
+    val out = new ByteArrayOutputStream() {
+      override def close(): Unit = super.close(); outClosed = true
+    }
+
+    Util.copyAndClose(in, out)
+    assertTrue(util.Arrays.equals(data, out.toByteArray))
+    assertTrue(inClosed)
+    assertTrue(outClosed)
   }
 
   // Period

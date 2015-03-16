@@ -3,6 +3,7 @@ package ly.stealth.mesos.kafka
 import java.util.regex.Pattern
 import java.util
 import scala.util.parsing.json.JSON
+import java.io.{IOException, OutputStream, InputStream}
 
 object Util {
   def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
@@ -23,6 +24,24 @@ object Util {
     val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
     if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
     node
+  }
+
+  def copyAndClose(in: InputStream, out: OutputStream): Unit = {
+    val buffer = new Array[Byte](16 * 1024)
+    var actuallyRead = 0
+
+    try {
+      while (actuallyRead != -1) {
+        actuallyRead = in.read(buffer)
+        if (actuallyRead != -1) out.write(buffer, 0, actuallyRead)
+      }
+    } finally {
+      try { in.close() }
+      catch { case ignore: IOException => }
+
+      try { out.close() }
+      catch { case ignore: IOException => }
+    }
   }
 
   class Period(s: String) {
