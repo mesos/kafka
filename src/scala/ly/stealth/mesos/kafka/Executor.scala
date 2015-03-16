@@ -23,17 +23,18 @@ import java.io._
 import java.util
 import scala.collection.immutable.HashMap
 import org.apache.log4j._
+import Util.Str
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
   var server: BrokerServer = new KafkaServer()
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo): Unit = {
-    logger.info("[registered] framework:" + MesosStr.framework(framework) + " slave:" + MesosStr.slave(slave))
+    logger.info("[registered] framework:" + Str.framework(framework) + " slave:" + Str.slave(slave))
   }
 
   def reregistered(driver: ExecutorDriver, slave: SlaveInfo): Unit = {
-    logger.info("[reregistered] " + MesosStr.slave(slave))
+    logger.info("[reregistered] " + Str.slave(slave))
   }
 
   def disconnected(driver: ExecutorDriver): Unit = {
@@ -41,7 +42,7 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   def launchTask(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    logger.info("[launchTask] " + MesosStr.task(task))
+    logger.info("[launchTask] " + Str.task(task))
     startBroker(driver, task)
   }
 
