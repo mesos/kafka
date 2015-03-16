@@ -2,7 +2,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.{Test, After, Before}
 import org.junit.Assert._
-import CLI.sendRequest
+import Cli.sendRequest
 import BrokerTest.assertBrokerEquals
 import ly.stealth.mesos.kafka.Util.{Period, parseMap}
 import java.io.{FileWriter, FileOutputStream, File}

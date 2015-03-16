@@ -25,7 +25,7 @@ import java.util
 import scala.collection.JavaConversions._
 import java.util.Collections
 
-object CLI {
+object Cli {
   def main(args: Array[String]): Unit = {
     if (args.length == 0) {
       printHelp()

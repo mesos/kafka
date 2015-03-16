@@ -45,5 +45,5 @@ jar {
             exclude "META-INF/*.RSA"
         }
     }
-    manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.CLI")
+    manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.Cli")
 }
