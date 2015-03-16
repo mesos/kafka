@@ -25,27 +25,19 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 import Util.Period
 
 class CliTest extends MesosTestCase {
-  var out: ByteArrayOutputStream = null
-  var err: ByteArrayOutputStream = null
+  val out: ByteArrayOutputStream = new ByteArrayOutputStream()
 
   @Before
   override def before {
     super.before
-
     Config.schedulerUrl = "http://localhost:7000"
     HttpServer.start(resolveDeps = false)
-
-    out = new ByteArrayOutputStream()
-    err = new ByteArrayOutputStream()
     Cli.out = new PrintStream(out, true)
-    Cli.err = new PrintStream(err, true)
   }
 
   @After
   override def after {
     Cli.out = System.out
-    Cli.err = System.err
-
     HttpServer.stop()
     super.after
   }
@@ -135,13 +127,40 @@ class CliTest extends MesosTestCase {
     assertFalse(broker1.active)
   }
 
+  @Test
+  def usage_errors {
+    // no command
+    try { exec(""); fail() }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("command required")) }
+
+    // no id
+    try { exec("add"); fail()  }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("id required")) }
+
+    // invalid command
+    try { exec("unsupported 0"); fail()  }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("unsupported command")) }
+  }
+
+  @Test
+  def connection_refused {
+    HttpServer.stop()
+    try {
+      try { exec("add 0"); fail()  }
+      catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Connection refused")) }
+    } finally {
+      HttpServer.start()
+    }
+  }
+
   private def assertOutContains(s: String): Unit = assertTrue("" + out, out.toString.contains(s))
 
   private def exec(cmd: String): Unit = {
     out.reset()
 
     val args = new util.ArrayList[String]()
-    args.addAll(cmd.split(" ").toList)
+    for (arg <- cmd.split(" "))
+      if (!cmd.isEmpty) args.add(arg)
     Cli.exec(args.toArray(new Array[String](args.length)))
   }
 }
