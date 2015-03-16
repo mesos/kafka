@@ -43,7 +43,7 @@ class HttpServerTest extends MesosTestCase {
     }
 
     HttpServer.jar = createTempFile("executor.jar", "executor")
-    HttpServer.kafkaDistro = createTempFile("kafka.tgz", "kafka")
+    HttpServer.kafkaDist = createTempFile("kafka.tgz", "kafka")
     HttpServer.start(resolveDeps = false)
   }
   

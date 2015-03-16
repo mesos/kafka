@@ -31,7 +31,7 @@ import ly.stealth.mesos.kafka.Util.Period
 
 object HttpServer {
   var jar: File = null
-  var kafkaDistro: File = null
+  var kafkaDist: File = null
 
   val logger = Logger.getLogger(HttpServer.getClass)
   var server: Server = null
@@ -73,18 +73,18 @@ object HttpServer {
 
     for (file <- new File(".").listFiles()) {
       if (file.getName.matches(jarMask)) jar = file
-      if (file.getName.matches(kafkaMask)) kafkaDistro = file
+      if (file.getName.matches(kafkaMask)) kafkaDist = file
     }
 
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
-    if (kafkaDistro == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
+    if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
   }
 
   class Servlet extends HttpServlet {
     override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val uri = request.getRequestURI
       if (uri.startsWith("/executor/")) downloadFile(HttpServer.jar, response)
-      else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDistro, response)
+      else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
       else response.sendError(404)
     }
