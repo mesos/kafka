@@ -20,16 +20,27 @@
 import joptsimple.{OptionException, OptionSet, OptionParser}
 import java.net.{HttpURLConnection, URLEncoder, URL}
 import scala.io.Source
-import java.io.IOException
+import java.io.{PrintStream, IOException}
 import java.util
 import scala.collection.JavaConversions._
 import java.util.Collections
 
 object Cli {
+  var out: PrintStream = System.out
+  var err: PrintStream = System.err
+
   def main(args: Array[String]): Unit = {
+    try { exec(args) }
+    catch { case e: Error =>
+      err.println("Error: " + e.getMessage)
+      System.exit(1)
+    }
+  }
+  
+  def exec(args: Array[String]): Unit = {
     if (args.length == 0) {
       printHelp()
-      System.exit(1)
+      throw new Error("command required")
     }
 
     val command = args(0)
@@ -38,7 +49,7 @@ object Cli {
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <id>
-    if (args.length < 2) die("id required")
+    if (args.length < 2) throw new Error("id required")
     val id = args(1)
     val a = args.slice(2, args.length)
 
@@ -46,18 +57,18 @@ object Cli {
       case "add" | "update" => handleAddUpdateBroker(id, a, command == "add")
       case "remove" => handleRemoveBroker(id)
       case "start" | "stop" => handleStartStopBroker(id, a, command == "start")
-      case _ => die("unsupported command: " + command)
+      case _ => throw new Error("unsupported command " + command)
     }
   }
 
   private def printHelp(command: String = null): Unit = {
     command match {
       case null =>
-        System.out.println("Usage: {help {command}|scheduler|status|add|update|remove|start|stop}")
+        out.println("Usage: {help {command}|scheduler|status|add|update|remove|start|stop}")
       case "help" =>
-        System.out.println("Print general or command-specific help\nUsage: help {command}")
+        out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
-        System.out.println("Start scheduler process\nUsage: scheduler")
+        out.println("Start scheduler process\nUsage: scheduler")
       case "status" =>
         handleStatus(help = true)
       case "add" | "update" => 
@@ -67,19 +78,19 @@ object Cli {
       case "start" | "stop" =>
         handleStartStopBroker(null, null, command == "start", help = true)
       case _ =>
-        die("unsupported command " + command)
+        throw new Error("unsupported command " + command)
     }
   }
 
   private def handleStatus(help: Boolean = false): Unit = {
     if (help) {
-      System.out.println("Print cluster status\nUsage: status")
+      out.println("Print cluster status\nUsage: status")
       return
     }
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/status", Collections.emptyMap()) }
-    catch { case e: IOException => die(e) }
+    catch { case e: IOException => throw new Error("" + e) }
     
     val cluster: Cluster = new Cluster()
     cluster.fromJson(json)
@@ -105,10 +116,10 @@ object Cli {
 
     if (help) {
       val command = if (add) "add" else "update"
-      System.out.println(s"${command.capitalize} broker\nUsage: $command <broker-id-expression>\n")
+      out.println(s"${command.capitalize} broker\nUsage: $command <broker-id-expression>\n")
       printBrokerIdExpressions()
-      parser.printHelpOn(System.out)
-      if (!add) System.out.println("\nNote: use \"\" arg to unset the option")
+      parser.printHelpOn(out)
+      if (!add) out.println("\nNote: use \"\" arg to unset the option")
       return
     }
 
@@ -116,10 +127,9 @@ object Cli {
     try { options = parser.parse(args: _*) }
     catch {
       case e: OptionException =>
-        System.err.println(e)
-        System.out.println()
-        parser.printHelpOn(System.out)
-        System.exit(1)
+        parser.printHelpOn(out)
+        out.println()
+        throw new Error(e.getMessage)
     }
 
     val host = options.valueOf("host").asInstanceOf[String]
@@ -150,7 +160,7 @@ object Cli {
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + (if (add) "add" else "update"), params) }
-    catch { case e: IOException => die(e) }
+    catch { case e: IOException => throw new Error("" + e) }
     val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
     val addedUpdated = if (add) "added" else "updated"
@@ -169,14 +179,14 @@ object Cli {
 
   private def handleRemoveBroker(id: String, help: Boolean = false): Unit = {
     if (help) {
-      System.out.println("Remove broker\nUsage: remove <broker-id-expression>\n")
+      out.println("Remove broker\nUsage: remove <broker-id-expression>\n")
       printBrokerIdExpressions()
       return
     }
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/remove", Collections.singletonMap("id", id)) }
-    catch { case e: IOException => die(e) }
+    catch { case e: IOException => throw new Error("" + e) }
 
     val ids = json("ids").asInstanceOf[String]
     val brokers = "Broker" + (if (ids.contains(",")) "s" else "")
@@ -190,9 +200,9 @@ object Cli {
 
     if (help) {
       val command = if (start) "start" else "stop"
-      System.out.println(s"${command.capitalize} broker\nUsage: $command <broker-id-expression>\n")
+      out.println(s"${command.capitalize} broker\nUsage: $command <broker-id-expression>\n")
       printBrokerIdExpressions()
-      parser.printHelpOn(System.out)
+      parser.printHelpOn(out)
       return 
     }
 
@@ -200,10 +210,9 @@ object Cli {
     try { options = parser.parse(args: _*) }
     catch {
       case e: OptionException =>
-        System.err.println(e)
-        System.out.println()
-        parser.printHelpOn(System.out)
-        System.exit(1)
+        parser.printHelpOn(out)
+        out.println()
+        throw new Error(e.getMessage)
     }
 
     val command: String = if (start) "start" else "stop"
@@ -215,7 +224,7 @@ object Cli {
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + command, params) }
-    catch { case e: IOException => die(e) }
+    catch { case e: IOException => throw new Error("" + e) }
 
     val success = json("success").asInstanceOf[Boolean]
     val ids = json("ids").asInstanceOf[String]
@@ -226,7 +235,7 @@ object Cli {
 
     if (success) printLine(s"$brokers $ids $startStopped")
     else if (timeout == 0) printLine(s"$brokers $ids scheduled to $startStop")
-    else die(s"$brokers $ids scheduled to $startStop. Timeout")
+    else throw new Error(s"$brokers $ids scheduled to $startStop. Timeout")
   }
 
   private def printCluster(cluster: Cluster): Unit = {
@@ -273,7 +282,7 @@ object Cli {
     printLine()
   }
 
-  private def printLine(s: Object = "", indent: Int = 0): Unit = println("  " * indent + s)
+  private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
 
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
@@ -311,13 +320,5 @@ object Cli {
     node
   }
 
-  private def die(e: Exception): Unit = {
-    System.err.println(e)
-    System.exit(1)
-  }
-
-  private def die(message: String): Unit = {
-    System.err.println("Error: " + message)
-    System.exit(1)
-  }
+  class Error(message: String) extends java.lang.Error(message) {}
 }
