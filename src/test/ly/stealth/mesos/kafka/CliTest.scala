@@ -34,24 +34,39 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
+  def help {
+    exec("help")
+    assertOutContains("Usage:")
+    assertOutContains("scheduler")
+    assertOutContains("start")
+    assertOutContains("stop")
+
+    // command help
+    for (command <- "help scheduler status add update remove start stop".split(" ")) {
+      exec("help " + command)
+      assertOutContains("Usage: " + command)
+    }
+  }
+
+  @Test
   def status {
     Scheduler.cluster.addBroker(new Broker("0"))
     Scheduler.cluster.addBroker(new Broker("1"))
     Scheduler.cluster.addBroker(new Broker("2"))
 
     exec("status")
-    assertTrue("" + out, out.toString.contains("status received"))
-    assertTrue("" + out, out.toString.contains("id: 0"))
-    assertTrue("" + out, out.toString.contains("id: 1"))
-    assertTrue("" + out, out.toString.contains("id: 2"))
+    assertOutContains("status received")
+    assertOutContains("id: 0")
+    assertOutContains("id: 1")
+    assertOutContains("id: 2")
   }
 
   @Test
   def add {
     exec("add 0 --cpus=0.1 --mem=128")
-    assertTrue("" + out, out.toString.contains("Broker added"))
-    assertTrue("" + out, out.toString.contains("id: 0"))
-    assertTrue("" + out, out.toString.contains("cpus:0.10, mem:128"))
+    assertOutContains("Broker added")
+    assertOutContains("id: 0")
+    assertOutContains("cpus:0.10, mem:128")
 
     assertEquals(1, Scheduler.cluster.getBrokers.size())
     val broker = Scheduler.cluster.getBroker("0")
@@ -64,9 +79,9 @@ class CliTest extends MesosTestCase {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
 
     exec("update 0 --failoverDelay=10s --failoverMaxDelay=20s --options=log.dirs=/tmp/kafka-logs")
-    assertTrue("" + out, out.toString.contains("Broker updated"))
-    assertTrue("" + out, out.toString.contains("delay:10s, maxDelay:20s"))
-    assertTrue("" + out, out.toString.contains("options: log.dirs=/tmp/kafka-logs"))
+    assertOutContains("Broker updated")
+    assertOutContains("delay:10s, maxDelay:20s")
+    assertOutContains("options: log.dirs=/tmp/kafka-logs")
 
     assertEquals(new Period("10s"), broker.failover.delay)
     assertEquals(new Period("20s"), broker.failover.maxDelay)
@@ -78,11 +93,36 @@ class CliTest extends MesosTestCase {
     Scheduler.cluster.addBroker(new Broker("0"))
     exec("remove 0")
 
-    assertTrue("" + out, out.toString.contains("Broker 0 removed"))
+    assertOutContains("Broker 0 removed")
     assertNull(Scheduler.cluster.getBroker("0"))
   }
 
-  def exec(cmd: String) {
+  @Test
+  def start_stop {
+    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
+    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
+
+    exec("start * --timeout=0")
+    assertOutContains("Brokers 0,1")
+    assertTrue(broker0.active)
+    assertTrue(broker1.active)
+
+    exec("stop 0 --timeout=0")
+    assertOutContains("Broker 0")
+    assertFalse(broker0.active)
+    assertTrue(broker1.active)
+
+    exec("stop 1 --timeout=0")
+    assertOutContains("Broker 1")
+    assertFalse(broker0.active)
+    assertFalse(broker1.active)
+  }
+
+  private def assertOutContains(s: String): Unit = assertTrue("" + out, out.toString.contains(s))
+
+  private def exec(cmd: String): Unit = {
+    out.reset()
+
     val args = new util.ArrayList[String]()
     args.addAll(cmd.split(" ").toList)
     Cli.exec(args.toArray(new Array[String](args.length)))

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import joptsimple.{OptionException, OptionSet, OptionParser}
 import java.net.{HttpURLConnection, URLEncoder, URL}
@@ -39,12 +39,12 @@ object Cli {
   
   def exec(args: Array[String]): Unit = {
     if (args.length == 0) {
-      printHelp()
+      handleHelp()
       throw new Error("command required")
     }
 
     val command = args(0)
-    if (command == "help") { printHelp(if (args.length > 1) args(1) else null); return }
+    if (command == "help") { handleHelp(if (args.length > 1) args(1) else null); return }
     if (command == "scheduler") { Scheduler.main(args); return }
     if (command == "status") { handleStatus(); return }
 
@@ -61,7 +61,7 @@ object Cli {
     }
   }
 
-  private def printHelp(command: String = null): Unit = {
+  private def handleHelp(command: String = null): Unit = {
     command match {
       case null =>
         out.println("Usage: {help {command}|scheduler|status|add|update|remove|start|stop}")
