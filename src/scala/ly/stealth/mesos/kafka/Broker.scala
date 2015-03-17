@@ -24,7 +24,7 @@ import scala.collection
 import org.apache.mesos.Protos.{Resource, Offer}
 import java.util.{Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
-import ly.stealth.mesos.kafka.Util.{Wildcard, Period}
+import Util.{Wildcard, Period, Str}
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -102,15 +102,15 @@ class Broker(_id: String = "0") {
       if (failover.isWaitingDelay(now)) {
         var s = "failed " + failover.failures
         if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += " " + MesosStr.dateTime(failover.failureTime)
-        s += ", next start " + MesosStr.dateTime(failover.delayExpires)
+        s += " " + Str.dateTime(failover.failureTime)
+        s += ", next start " + Str.dateTime(failover.delayExpires)
         return s
       }
 
       if (failover.failures > 0) {
         var s = "starting " + (failover.failures + 1)
         if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += ", failed " + MesosStr.dateTime(failover.failureTime)
+        s += ", failed " + Str.dateTime(failover.failureTime)
         return s
       }
 

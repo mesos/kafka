@@ -1,6 +1,6 @@
 apply plugin: 'scala'
 
-version = '0.5'
+version = '0.6'
 
 jar.archiveName = "kafka-mesos-${version}.jar"
 
@@ -45,5 +45,5 @@ jar {
             exclude "META-INF/*.RSA"
         }
     }
-    manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.CLI")
+    manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.Cli")
 }

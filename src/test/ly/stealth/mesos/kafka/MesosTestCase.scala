@@ -1,17 +1,38 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ly.stealth.mesos.kafka
 
 import org.apache.mesos.Protos._
 import java.util.UUID
 import org.apache.mesos.Protos.Value.{Text, Scalar}
 import scala.collection.JavaConversions._
-import org.apache.mesos.SchedulerDriver
+import org.apache.mesos.{ExecutorDriver, SchedulerDriver}
 import java.util
-import org.junit.{After, Before}
+import org.junit.{Ignore, After, Before}
 import org.apache.log4j.BasicConfigurator
 import java.io.File
+import com.google.protobuf.ByteString
+import java.util.concurrent.atomic.AtomicBoolean
 
-class MesosTest {
-  var driver: TestSchedulerDriver = null
+@Ignore
+class MesosTestCase {
+  var schedulerDriver: TestSchedulerDriver = null
+  var executorDriver: TestExecutorDriver = null
 
   @Before
   def before {
@@ -21,23 +42,29 @@ class MesosTest {
     Cluster.stateFile.delete()
     Scheduler.cluster.clear()
 
-    driver = schedulerDriver
-    Scheduler.registered(driver, frameworkId(), master())
+    schedulerDriver = _schedulerDriver
+    Scheduler.registered(schedulerDriver, frameworkId(), master())
+
+    executorDriver = _executorDriver
+    Executor.server = new TestBrokerServer()
   }
 
   @After
   def after {
-    Scheduler.disconnected(driver)
+    Scheduler.disconnected(schedulerDriver)
 
     Cluster.stateFile.delete()
     Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
 
+    Executor.server.stop()
+    Executor.server = new KafkaServer()
     BasicConfigurator.resetConfiguration()
   }
 
   val LOCALHOST_IP: Int = 2130706433
   
   def frameworkId(id: String = "" + UUID.randomUUID()): FrameworkID = FrameworkID.newBuilder().setValue(id).build()
+  def taskId(id: String = "" + UUID.randomUUID()): TaskID = TaskID.newBuilder().setValue(id).build()
 
   def master(
     id: String = "" + UUID.randomUUID(),
@@ -111,6 +138,22 @@ class MesosTest {
     builder.build()
   }
 
+  def task(
+    id: String = "" + UUID.randomUUID(),
+    name: String = "Task",
+    slaveId: String = "" + UUID.randomUUID(),
+    data: String = null
+  ): TaskInfo = {
+    val builder = TaskInfo.newBuilder()
+    .setName(id)
+    .setTaskId(TaskID.newBuilder().setValue(id))
+    .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
+
+    if (data != null) builder.setData(ByteString.copyFromUtf8(data))
+
+    builder.build()
+  }
+
   def taskStatus(
     id: String = "" + UUID.randomUUID(),
     state: TaskState
@@ -121,16 +164,17 @@ class MesosTest {
     .build()
   }
   
-  def schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()
+  private def _schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()
+  private def _executorDriver: TestExecutorDriver = new TestExecutorDriver()
 
   class TestSchedulerDriver extends SchedulerDriver {
     var status: Status = Status.DRIVER_RUNNING
 
-    var declinedOffers: util.List[String] = new util.ArrayList[String]()
-    var acceptedOffers: util.List[String] = new util.ArrayList[String]()
+    val declinedOffers: util.List[String] = new util.ArrayList[String]()
+    val acceptedOffers: util.List[String] = new util.ArrayList[String]()
     
-    var launchedTasks: util.List[TaskInfo] = new util.ArrayList[TaskInfo]()
-    var killedTasks: util.List[String] = new util.ArrayList[String]()
+    val launchedTasks: util.List[TaskInfo] = new util.ArrayList[TaskInfo]()
+    val killedTasks: util.List[String] = new util.ArrayList[String]()
     
     def declineOffer(id: OfferID): Status = {
       declinedOffers.add(id.getValue)
@@ -190,5 +234,66 @@ class MesosTest {
     def abort(): Status = throw new UnsupportedOperationException
 
     def start(): Status = throw new UnsupportedOperationException
+  }
+
+  class TestExecutorDriver extends ExecutorDriver {
+    var status: Status = Status.DRIVER_RUNNING
+    
+    private val _statusUpdates: util.List[TaskStatus] = new util.concurrent.CopyOnWriteArrayList[TaskStatus]()
+    def statusUpdates: util.List[TaskStatus] = util.Collections.unmodifiableList(_statusUpdates)
+
+    def start(): Status = throw new UnsupportedOperationException
+
+    def stop(): Status = throw new UnsupportedOperationException
+
+    def abort(): Status = throw new UnsupportedOperationException
+
+    def join(): Status = throw new UnsupportedOperationException
+
+    def run(): Status = throw new UnsupportedOperationException
+
+    def sendStatusUpdate(status: TaskStatus): Status = {
+      _statusUpdates.synchronized {
+        _statusUpdates.add(status)
+        _statusUpdates.notify()
+      }
+      
+      this.status
+    }
+    
+    def waitForStatusUpdates(count: Int): Unit = {
+      _statusUpdates.synchronized {
+        while (_statusUpdates.size() < count)
+          _statusUpdates.wait()
+      }
+    }
+
+    def sendFrameworkMessage(message: Array[Byte]): Status = throw new UnsupportedOperationException
+  }
+}
+
+class TestBrokerServer extends BrokerServer {
+  var failOnStart: Boolean = false
+  private val started: AtomicBoolean = new AtomicBoolean(false)
+  var props: Map[String, String] = null
+
+  def isStarted: Boolean = started.get()
+
+  def start(props: Map[String, String]): Unit = {
+    if (failOnStart) throw new RuntimeException("failOnStart")
+    started.set(true)
+    this.props = props
+  }
+
+  def stop(): Unit = {
+    started.set(false)
+    started.synchronized { started.notify() }
+  }
+
+  def waitFor(): Unit = {
+    started.synchronized {
+      while (started.get)
+        started.wait()
+    }
   }
 }

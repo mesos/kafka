@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ly.stealth.mesos.kafka
 
 import org.junit.Test
@@ -6,7 +23,7 @@ import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
 
-class BrokerTest extends MesosTest {
+class BrokerTest extends MesosTestCase {
   @Test
   def attributeMap {
     val broker = new Broker()
@@ -310,7 +327,7 @@ class BrokerTest extends MesosTest {
 
 object BrokerTest {
   def assertBrokerEquals(expected: Broker, actual: Broker) {
-    checkNulls(expected, actual)
+    if (checkNulls(expected, actual)) return
 
     assertEquals(expected.id, actual.id)
     assertEquals(expected.active, actual.active)
@@ -328,7 +345,7 @@ object BrokerTest {
   }
 
   def assertFailoverEquals(expected: Failover, actual: Failover) {
-    checkNulls(expected, actual)
+    if (checkNulls(expected, actual)) return
 
     assertEquals(expected.delay, actual.delay)
     assertEquals(expected.maxDelay, actual.maxDelay)
@@ -339,7 +356,7 @@ object BrokerTest {
   }
 
   def assertTaskEquals(expected: Task, actual: Task) {
-    checkNulls(expected, actual)
+    if (checkNulls(expected, actual)) return
 
     assertEquals(expected.id, actual.id)
     assertEquals(expected.running, actual.running)
@@ -347,9 +364,10 @@ object BrokerTest {
     assertEquals(expected.port, actual.port)
   }
 
-  private def checkNulls(expected: Object, actual: Object) {
-    if (expected == actual) return
-    if (expected == null && actual != null) throw new AssertionError("actual != null")
-    if (expected != null && actual == null) throw new AssertionError("actual == null")
+  private def checkNulls(expected: Object, actual: Object): Boolean = {
+    if (expected == actual) return true
+    if (expected == null) throw new AssertionError("actual != null")
+    if (actual == null) throw new AssertionError("actual == null")
+    false
   }
 }

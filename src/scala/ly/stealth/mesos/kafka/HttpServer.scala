@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka
 
 import java.io._
 import org.apache.log4j.Logger
@@ -27,20 +27,18 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
- import ly.stealth.mesos.kafka.Util.Period
+import ly.stealth.mesos.kafka.Util.Period
 
- object HttpServer {
-  val jarPath = findJar()
-  def jarName = new File(jarPath).getName
-
-  val kafkaDistPath = findKafkaDist()
-  def kafkaDistName = new File(kafkaDistPath).getName
+object HttpServer {
+  var jar: File = null
+  var kafkaDist: File = null
 
   val logger = Logger.getLogger(HttpServer.getClass)
   var server: Server = null
 
-  def start() {
+  def start(resolveDeps: Boolean = true) {
     if (server != null) throw new IllegalStateException("started")
+    if (resolveDeps) this.resolveDeps
 
     val threadPool = new QueuedThreadPool(16)
     threadPool.setName("Jetty")
@@ -69,47 +67,32 @@ import scala.collection.mutable.ListBuffer
     logger.info("stopped")
   }
 
-  private def findJar(): String = {
+  private def resolveDeps: Unit = {
     val jarMask: String = "kafka-mesos.*\\.jar"
-
-    for (file <- new File(".").listFiles()) {
-      if (file.getName.matches(jarMask))
-        return file.getPath
-    }
-
-    val classpath = System.getProperty("java.class.path")
-    for (path <- classpath.split(File.pathSeparator)) {
-      if (path.matches(jarMask))
-        return path
-    }
-
-    throw new IllegalStateException(jarMask + " not found in current dir and on classpath")
-  }
-
-  private def findKafkaDist(): String = {
     val kafkaMask: String = "kafka.*\\.tgz"
 
-    for (file <- new File(jarPath).getParentFile.listFiles()) {
-      if (file.getName.matches(kafkaMask))
-        return file.getPath
+    for (file <- new File(".").listFiles()) {
+      if (file.getName.matches(jarMask)) jar = file
+      if (file.getName.matches(kafkaMask)) kafkaDist = file
     }
 
-    throw new IllegalStateException(kafkaMask + " not found in " + new File(jarPath).getParentFile)
+    if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
+    if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
   }
 
   class Servlet extends HttpServlet {
     override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val uri = request.getRequestURI
-      if (uri.startsWith("/executor/")) downloadFile(HttpServer.jarPath, response)
-      else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDistPath, response)
+      if (uri.startsWith("/executor/")) downloadFile(HttpServer.jar, response)
+      else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
       else response.sendError(404)
     }
 
-    def downloadFile(path: String, response: HttpServletResponse): Unit = {
+    def downloadFile(file: File, response: HttpServletResponse): Unit = {
       response.setContentType("application/zip")
-      response.setHeader("Content-Disposition", "attachment; filename=\"" + new File(path).getName + "\"")
-      copyAndClose(new FileInputStream(path), response.getOutputStream)
+      response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
+      Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
     }
 
     def handleBrokersApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -117,14 +100,14 @@ import scala.collection.mutable.ListBuffer
       var uri: String = request.getRequestURI.substring("/api/brokers".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "status") handleGetBrokers(response)
+      if (uri == "status") handleStatus(response)
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
       else response.sendError(404)
     }
 
-    def handleGetBrokers(response: HttpServletResponse): Unit = {
+    def handleStatus(response: HttpServletResponse): Unit = {
       response.getWriter.println("" + Scheduler.cluster.toJson)
     }
 
@@ -257,11 +240,11 @@ import scala.collection.mutable.ListBuffer
     def handleStartStopBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
-      
+
       var timeout: Long = 30 * 1000
       try { timeout = java.lang.Long.parseLong(request.getParameter("timeout")) }
       catch { case ignore: NumberFormatException => }
-      
+
       val idExpr: String = request.getParameter("id")
       if (idExpr == null) { response.sendError(400, "id required"); return }
 
@@ -296,24 +279,6 @@ import scala.collection.mutable.ListBuffer
       result("ids") = ids.mkString(",")
 
       response.getWriter.println(JSONObject(result.toMap))
-    }
-
-    private def copyAndClose(in: InputStream, out: OutputStream): Unit = {
-      val buffer = new Array[Byte](16 * 1024)
-      var actuallyRead = 0
-
-      try {
-        while (actuallyRead != -1) {
-          actuallyRead = in.read(buffer)
-          if (actuallyRead != -1) out.write(buffer, 0, actuallyRead)
-        }
-      } finally {
-        try { in.close() }
-        catch { case ignore: IOException => }
-
-        try { out.close() }
-        catch { case ignore: IOException => }
-      }
     }
   }
 }

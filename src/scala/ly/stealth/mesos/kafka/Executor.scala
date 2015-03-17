@@ -23,17 +23,18 @@ import java.io._
 import java.util
 import scala.collection.immutable.HashMap
 import org.apache.log4j._
+import Util.Str
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
-  @volatile var server: KafkaServer = null
+  var server: BrokerServer = new KafkaServer()
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo): Unit = {
-    logger.info("[registered] framework:" + MesosStr.framework(framework) + " slave:" + MesosStr.slave(slave))
+    logger.info("[registered] framework:" + Str.framework(framework) + " slave:" + Str.slave(slave))
   }
 
   def reregistered(driver: ExecutorDriver, slave: SlaveInfo): Unit = {
-    logger.info("[reregistered] " + MesosStr.slave(slave))
+    logger.info("[reregistered] " + Str.slave(slave))
   }
 
   def disconnected(driver: ExecutorDriver): Unit = {
@@ -41,19 +42,13 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   def launchTask(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    logger.info("[launchTask] " + MesosStr.task(task))
-
-    new Thread {
-      override def run() {
-        setName("KafkaServer")
-        runKafkaServer(driver, task)
-      }
-    }.start()
+    logger.info("[launchTask] " + Str.task(task))
+    startBroker(driver, task)
   }
 
   def killTask(driver: ExecutorDriver, id: TaskID): Unit = {
     logger.info("[killTask] " + id.getValue)
-    if (server != null) server.stop()
+    stopBroker
   }
 
   def frameworkMessage(driver: ExecutorDriver, data: Array[Byte]): Unit = {
@@ -62,35 +57,42 @@ object Executor extends org.apache.mesos.Executor {
 
   def shutdown(driver: ExecutorDriver): Unit = {
     logger.info("[shutdown]")
-    if (server != null) server.stop()
+    stopBroker
   }
 
   def error(driver: ExecutorDriver, message: String): Unit = {
     logger.info("[error] " + message)
   }
 
-  private def runKafkaServer(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    try {
-      server = new KafkaServer(task.getTaskId.getValue, props(task))
-      server.start()
+  private[kafka] def startBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
+    def runBroker0 {
+      try {
+        server.start(optionMap(task))
 
-      var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
-      driver.sendStatusUpdate(status)
+        var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
+        driver.sendStatusUpdate(status)
 
-      server.waitFor()
-      status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED).build
-      driver.sendStatusUpdate(status)
-    } catch {
-      case t: Throwable =>
-        logger.warn("", t)
-        sendTaskFailed(driver, task, t)
-    } finally {
-      if (server != null) {
-        server.stop()
-        server = null
+        server.waitFor()
+        status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED).build
+        driver.sendStatusUpdate(status)
+      } catch {
+        case t: Throwable =>
+          logger.warn("", t)
+          sendTaskFailed(driver, task, t)
+      } finally {
+        stopBroker
       }
     }
+
+    new Thread {
+      override def run() {
+        setName("BrokerServer")
+        runBroker0
+      }
+    }.start()
   }
+  
+  private[kafka] def stopBroker: Unit = { if (server.isStarted) server.stop() }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {
     val stackTrace = new StringWriter()
@@ -103,7 +105,7 @@ object Executor extends org.apache.mesos.Executor {
     )
   }
 
-  private def props(taskInfo: TaskInfo): Map[String, String] = {
+  private[kafka] def optionMap(taskInfo: TaskInfo): Map[String, String] = {
     val buffer = new StringReader(taskInfo.getData.toStringUtf8)
 
     val p: util.Properties = new util.Properties()

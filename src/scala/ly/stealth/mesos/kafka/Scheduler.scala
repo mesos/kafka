@@ -25,6 +25,7 @@ import com.google.protobuf.ByteString
 import java.util.{Date, Properties}
 import java.io.StringWriter
 import scala.collection.JavaConversions._
+import Util.Str
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -36,7 +37,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
-    var cmd = "java -cp " + HttpServer.jarName
+    var cmd = "java -cp " + HttpServer.jar.getName
     cmd += " -Xmx" + broker.heap + "m"
 
     if (Config.debug) cmd += " -Ddebug"
@@ -46,8 +47,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
       .setCommand(
         CommandInfo.newBuilder
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jarName))
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/kafka/" + HttpServer.kafkaDistName))
+          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jar.getName))
+          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/kafka/" + HttpServer.kafkaDist.getName))
           .setValue(cmd)
       )
       .setName("BrokerExecutor")
@@ -90,31 +91,31 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
-    logger.info("[registered] framework:" + MesosStr.id(id.getValue) + " master:" + MesosStr.master(master))
+    logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
     this.driver = driver
   }
 
   def reregistered(driver: SchedulerDriver, master: MasterInfo): Unit = {
-    logger.info("[reregistered] master:" + MesosStr.master(master))
+    logger.info("[reregistered] master:" + Str.master(master))
     this.driver = driver
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
-    logger.info("[resourceOffers]\n" + MesosStr.offers(offers))
+    logger.info("[resourceOffers]\n" + Str.offers(offers))
     syncBrokers(offers)
   }
 
   def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
-    logger.info("[offerRescinded] " + MesosStr.id(id.getValue))
+    logger.info("[offerRescinded] " + Str.id(id.getValue))
   }
 
   def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
-    logger.info("[statusUpdate] " + MesosStr.taskStatus(status))
+    logger.info("[statusUpdate] " + Str.taskStatus(status))
     onBrokerStatus(status)
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
-    logger.info("[frameworkMessage] executor:" + MesosStr.id(executorId.getValue) + " slave:" + MesosStr.id(slaveId.getValue) + " data: " + new String(data))
+    logger.info("[frameworkMessage] executor:" + Str.id(executorId.getValue) + " slave:" + Str.id(slaveId.getValue) + " data: " + new String(data))
   }
 
   def disconnected(driver: SchedulerDriver): Unit = {
@@ -123,11 +124,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def slaveLost(driver: SchedulerDriver, id: SlaveID): Unit = {
-    logger.info("[slaveLost] " + MesosStr.id(id.getValue))
+    logger.info("[slaveLost] " + Str.id(id.getValue))
   }
 
   def executorLost(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, status: Int): Unit = {
-    logger.info("[executorLost] executor:" + MesosStr.id(executorId.getValue) + " slave:" + MesosStr.id(slaveId.getValue) + " status:" + status)
+    logger.info("[executorLost] executor:" + Str.id(executorId.getValue) + " slave:" + Str.id(slaveId.getValue) + " status:" + status)
   }
 
   def error(driver: SchedulerDriver, message: String): Unit = {
@@ -201,7 +202,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       if (!broker.failover.isMaxTriesExceeded) {
         msg += ", waiting " + broker.failover.currentDelay
-        msg += ", next start ~ " + MesosStr.dateTime(broker.failover.delayExpires)
+        msg += ", next start ~ " + Str.dateTime(broker.failover.delayExpires)
       } else {
         broker.active = false
         msg += ", failure limit exceeded"
@@ -220,7 +221,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer))
     taskIds.add(id)
 
-    logger.info("Launching task " + id + " by offer " + MesosStr.id(offer.getId.getValue) + "\n" + MesosStr.task(task_))
+    logger.info("Launching task " + id + " by offer " + Str.id(offer.getId.getValue) + "\n" + Str.task(task_))
   }
 
   private[kafka] def findBrokerPort(offer: Offer): Int = {
@@ -230,12 +231,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
         val range = if (ranges.isEmpty) null else ranges.get(0)
 
         assert(range.hasBegin)
-        if (range == null) throw new IllegalArgumentException("Invalid port range in offer " + MesosStr.offer(offer))
+        if (range == null) throw new IllegalArgumentException("Invalid port range in offer " + Str.offer(offer))
         return range.getBegin.toInt
       }
     }
 
-    throw new IllegalArgumentException("No port range in offer " + MesosStr.offer(offer))
+    throw new IllegalArgumentException("No port range in offer " + Str.offer(offer))
   }
 
   def main(args: Array[String]) {

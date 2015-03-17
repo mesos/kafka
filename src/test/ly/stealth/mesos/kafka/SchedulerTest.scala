@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ly.stealth.mesos.kafka
 
 import java.util
@@ -8,7 +25,7 @@ import org.apache.mesos.Protos.{TaskState, Resource}
 import java.util.{Date, Properties}
 import java.io.StringReader
 
-class SchedulerTest extends MesosTest {
+class SchedulerTest extends MesosTestCase {
   @Test
   def newExecutor {
     val broker = new Broker("1")
@@ -73,19 +90,19 @@ class SchedulerTest extends MesosTest {
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
-    assertEquals(0, driver.launchedTasks.size())
+    assertEquals(0, schedulerDriver.launchedTasks.size())
 
     // broker active
     broker.active = true
     Scheduler.syncBrokers(util.Arrays.asList(offer))
-    assertEquals(1, driver.launchedTasks.size())
-    assertEquals(0, driver.killedTasks.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertEquals(0, schedulerDriver.killedTasks.size())
 
     // broker !active
     broker.active = false
     Scheduler.syncBrokers(util.Arrays.asList())
-    assertEquals(1, driver.launchedTasks.size())
-    assertEquals(1, driver.killedTasks.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertEquals(1, schedulerDriver.killedTasks.size())
   }
 
   @Test
@@ -151,12 +168,12 @@ class SchedulerTest extends MesosTest {
     val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000))
 
     Scheduler.launchTask(broker, offer)
-    assertEquals(1, driver.launchedTasks.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
 
     assertNotNull(broker.task)
     assertFalse(broker.task.running)
 
-    val task = driver.launchedTasks.get(0)
+    val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
     assertTrue(Scheduler.taskIds.contains(broker.task.id))
   }
