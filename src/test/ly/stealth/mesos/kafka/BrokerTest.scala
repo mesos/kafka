@@ -182,13 +182,13 @@ class BrokerTest extends MesosTestCase {
     }
 
     scheduleStateSwitch(running = true, 100)
-    assertTrue(broker.waitForState(running = true, 200))
+    assertTrue(broker.waitForState(running = true, new Period("200ms")))
 
     scheduleStateSwitch(running = false, 100)
-    assertTrue(broker.waitForState(running = false, 200))
+    assertTrue(broker.waitForState(running = false, new Period("200ms")))
 
     // timeout
-    assertFalse(broker.waitForState(running = true, 50))
+    assertFalse(broker.waitForState(running = true, new Period("50ms")))
   }
 
   @Test

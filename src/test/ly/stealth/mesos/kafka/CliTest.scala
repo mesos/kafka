@@ -128,6 +128,19 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
+  def start_stop_timeout {
+    val broker = Scheduler.cluster.addBroker(new Broker("0"))
+    try { exec("start 0 --timeout=1ms"); fail() }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    assertTrue(broker.active)
+
+    broker.task = new Broker.Task("id", "host", 1000, true)
+    try { exec("stop 0 --timeout=1ms"); fail() }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    assertFalse(broker.active)
+  }
+
+  @Test
   def usage_errors {
     // no command
     try { exec(""); fail() }

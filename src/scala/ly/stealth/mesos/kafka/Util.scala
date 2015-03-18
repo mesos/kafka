@@ -77,10 +77,13 @@ object Util {
 
       var unitIdx = s.length - 1
       if (s.endsWith("ms")) unitIdx -= 1
+      if (s == "0") unitIdx = 1
 
       try { _value = java.lang.Long.valueOf(s.substring(0, unitIdx)) }
       catch { case e: IllegalArgumentException => throw new IllegalArgumentException(s) }
+
       _unit = s.substring(unitIdx)
+      if (s == "0") _unit = "ms"
 
       _ms = value
       if (_unit == "ms") _ms *= 1

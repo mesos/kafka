@@ -121,10 +121,10 @@ class Broker(_id: String = "0") {
     "stopped"
   }
 
-  def waitForState(running: Boolean, timeout: java.lang.Long): Boolean = {
+  def waitForState(running: Boolean, timeout: Period): Boolean = {
     def stateMatches: Boolean = if (running) task != null && task.running else task == null
 
-    var t = timeout
+    var t = timeout.ms
     while (t > 0 && !stateMatches) {
       val delay = Math.min(100, t)
       Thread.sleep(delay)
@@ -212,7 +212,7 @@ object Broker {
     @volatile var failureTime: Date = null
 
     def currentDelay: Period = {
-      if (failures == 0) return new Period("0ms")
+      if (failures == 0) return new Period("0")
 
       val multiplier = 1 << (failures - 1)
       val d = delay.ms * multiplier

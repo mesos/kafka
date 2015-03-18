@@ -138,18 +138,21 @@ class HttpServerTest extends MesosTestCase {
     val broker0 = cluster.addBroker(new Broker("0"))
     val broker1 = cluster.addBroker(new Broker("1"))
 
-    var json = sendRequest("/brokers/start", parseMap("id=*,timeout=0"))
+    var json = sendRequest("/brokers/start", parseMap("id=*,timeout=0s"))
     assertEquals("0,1", json("ids"))
+    assertEquals("scheduled", json("status"))
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
-    json = sendRequest("/brokers/stop", parseMap("id=1,timeout=0"))
+    json = sendRequest("/brokers/stop", parseMap("id=1,timeout=0s"))
     assertEquals("1", json("ids"))
+    assertEquals("scheduled", json("status"))
     assertTrue(broker0.active)
     assertFalse(broker1.active)
 
-    json = sendRequest("/brokers/stop", parseMap("id=0,timeout=0"))
+    json = sendRequest("/brokers/stop", parseMap("id=0,timeout=0s"))
     assertEquals("0", json("ids"))
+    assertEquals("scheduled", json("status"))
     assertFalse(broker0.active)
     assertFalse(broker1.active)
   }

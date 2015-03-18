@@ -242,9 +242,10 @@ object HttpServer {
       val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
 
-      var timeout: Long = 30 * 1000
-      try { timeout = java.lang.Long.parseLong(request.getParameter("timeout")) }
-      catch { case ignore: NumberFormatException => }
+      var timeout: Period = new Period("30s")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
       val idExpr: String = request.getParameter("id")
       if (idExpr == null) { response.sendError(400, "id required"); return }
@@ -267,16 +268,19 @@ object HttpServer {
       }
       cluster.save()
 
-      def waitForBrokers(): Boolean = {
+      def waitForBrokers(): String = {
+        if (timeout.ms == 0) return "scheduled"
+
         for (broker <- brokers)
           if (!broker.waitForState(start, timeout))
-            return false
-        true
+            return "timeout"
+
+        if (start) "started" else "stopped"
       }
-      val success = waitForBrokers()
+      val status = waitForBrokers()
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("success") = success
+      result("status") = status
       result("ids") = ids.mkString(",")
 
       response.getWriter.println(JSONObject(result.toMap))

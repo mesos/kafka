@@ -199,7 +199,7 @@ object Cli {
 
   private def handleStartStopBroker(id: String, args: Array[String], start: Boolean, help: Boolean = false): Unit = {
     val parser = new OptionParser()
-    parser.accepts("timeout", "timeout in seconds. 0 - for no timeout").withRequiredArg().ofType(classOf[Integer]).defaultsTo(30)
+    parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       val command = if (start) "start" else "stop"
@@ -219,31 +219,31 @@ object Cli {
     }
 
     val command: String = if (start) "start" else "stop"
-    val timeout: java.lang.Integer = options.valueOf("timeout").asInstanceOf[Integer]
+    val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]()
     params.put("id", id)
-    params.put("timeout", "" + timeout * 1000)
+    if (timeout != null) params.put("timeout", timeout)
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + command, params) }
     catch { case e: IOException => throw new Error("" + e) }
 
-    val success = json("success").asInstanceOf[Boolean]
+    val status = json("status").asInstanceOf[String]
     val ids = json("ids").asInstanceOf[String]
     
     val brokers = "Broker" + (if (ids.contains(",")) "s" else "")
-    val startStop = if (start) "start" else "stop" 
-    val startStopped = if (start) "started" else "stopped"
+    val startStop = if (start) "start" else "stop"
 
-    if (success) printLine(s"$brokers $ids $startStopped")
-    else if (timeout == 0) printLine(s"$brokers $ids scheduled to $startStop")
-    else throw new Error(s"$brokers $ids scheduled to $startStop. Timeout")
+    // started|stopped|scheduled|timeout
+    if (status == "timeout") throw new Error(s"$brokers $ids scheduled to $startStop. Got timeout")
+    else if (status == "scheduled") printLine(s"$brokers $ids scheduled to $startStop")
+    else printLine(s"$brokers $ids $status")
   }
 
   private def handleRebalance(id: String, args: Array[String], help: Boolean = false): Unit = {
     val parser = new OptionParser()
-    parser.accepts("timeout", "timeout in seconds. 0 - for no timeout").withRequiredArg().ofType(classOf[Integer]).defaultsTo(30)
+    parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       out.println("Rebalance\nUsage: rebalance <id-expr>\n")
@@ -261,11 +261,11 @@ object Cli {
         throw new Error(e.getMessage)
     }
 
-    val timeout: java.lang.Integer = options.valueOf("timeout").asInstanceOf[Integer]
+    val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]()
     params.put("id", id)
-    params.put("timeout", "" + timeout * 1000)
+    if (timeout != null) params.put("timeout", timeout)
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/rebalance", params) }
