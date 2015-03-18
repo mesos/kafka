@@ -104,6 +104,7 @@ object HttpServer {
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
+      else if (uri == "rebalance") handleRebalance(request, response)
       else response.sendError(404)
     }
 
@@ -276,6 +277,23 @@ object HttpServer {
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("success") = success
+      result("ids") = ids.mkString(",")
+
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+
+      val idExpr: String = request.getParameter("id")
+      if (idExpr == null) { response.sendError(400, "id required"); return }
+
+      var ids: util.List[String] = null
+      try { ids = cluster.expandIds(idExpr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("success") = true
       result("ids") = ids.mkString(",")
 
       response.getWriter.println(JSONObject(result.toMap))
