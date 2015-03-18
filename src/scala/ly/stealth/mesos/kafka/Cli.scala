@@ -277,6 +277,9 @@ object Cli {
 
     val status = json("status").asInstanceOf[String]
     printLine(s"Rebalance $status")
+
+    val state: String = json("state").asInstanceOf[String]
+    if (!state.isEmpty) printLine("\nReassignments:\n" + state)
   }
 
   private def printCluster(cluster: Cluster): Unit = {

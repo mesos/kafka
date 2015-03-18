@@ -307,6 +307,7 @@ object HttpServer {
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("status") = status
       if (ids != null) result("ids") = ids.mkString(",")
+      result("state") = Rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
     }
