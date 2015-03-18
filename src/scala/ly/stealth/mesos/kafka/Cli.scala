@@ -106,9 +106,9 @@ object Cli {
   private def handleAddUpdateBroker(id: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
     val parser = new OptionParser()
     parser.accepts("host", "slave hostname").withRequiredArg()
-    parser.accepts("cpus", "cpu amount").withRequiredArg().ofType(classOf[java.lang.Double])
-    parser.accepts("mem", "mem amount").withRequiredArg().ofType(classOf[java.lang.Long])
-    parser.accepts("heap", "heap amount").withRequiredArg().ofType(classOf[java.lang.Long])
+    parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
+    parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
+    parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
     parser.accepts("options", "kafka options (a=1;b=2)").withRequiredArg()
     parser.accepts("attributes", "slave attributes (rack:1;role:master)").withRequiredArg()
