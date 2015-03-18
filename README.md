@@ -195,13 +195,17 @@ This will eventually be a plugable interface so you can store it some place else
 
 Failed Broker Recovery
 ------------------------
-When the broker fails, the kafka mesos scheduler assumes that the failure is recoverable so as to keep placement of the broker.
-The scheduler will start another broker on the same node after waiting failoverDelay (i.e 30s, 2m). After each failure the delay doubles for failoverMaxTries or until failoverMaxDelay. After the failure limit is reached the scheduler will scheduler the broker on another slave.
+When the broker fails, kafka mesos scheduler assumes that the failure is recoverable. Scheduler will try
+to restart broker after waiting failoverDelay (i.e. 30s, 2m) on any matched slave. Initially waiting
+delay is equal to failoverDelay setting. After each serial failure it doubles until it reaches failoverMaxDelay value.
 
+If failoverMaxTries is defined and serial failure count exceeds it, broker will be deactivated.
+
+Following failover settings exists:
 ```
---failoverDelay
---failoverMaxTries
---failoverMaxDelay
+--failoverDelay    - initial failover delay to wait after failure, required
+--failoverMaxDelay - max failover delay, required
+--failoverMaxTries - max failover tries to deactivate broker, optional
 ```
 
 Navigating the CLI
@@ -327,9 +331,10 @@ Expression examples:
 Using the REST API
 ========================
 
-The scheduler REST API fully exposes all feature of the CLI with the following format.
-
-    /api/brokers/<cli command>/id={broker.id}&<setting>=<value>
+The scheduler REST API fully exposes all features of the CLI using following request format:
+```
+/api/brokers/<cli command>/id={broker.id}&<setting>=<value>
+```
 
 Adding a broker
 
@@ -372,4 +377,4 @@ Project Goals
 
 * scaling the cluster up and down with automatic, programmatic and manual options.
 
-* smart partition assignmnet via constraints visa vi roles, resources and attributes.
+* smart partition assignment via constraints, roles, resources and attributes.
