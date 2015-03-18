@@ -169,7 +169,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -219,7 +219,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -251,7 +251,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -290,7 +290,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("success") = true

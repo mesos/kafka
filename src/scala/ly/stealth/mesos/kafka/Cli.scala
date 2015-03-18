@@ -119,8 +119,8 @@ object Cli {
 
     if (help) {
       val command = if (add) "add" else "update"
-      out.println(s"${command.capitalize} broker\nUsage: $command <broker-id-expression>\n")
-      printBrokerIdExpressions()
+      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr>\n")
+      printIdExprExamples()
       parser.printHelpOn(out)
       if (!add) out.println("\nNote: use \"\" arg to unset the option")
       return
@@ -182,8 +182,8 @@ object Cli {
 
   private def handleRemoveBroker(id: String, help: Boolean = false): Unit = {
     if (help) {
-      out.println("Remove broker\nUsage: remove <broker-id-expression>\n")
-      printBrokerIdExpressions()
+      out.println("Remove broker\nUsage: remove <id-expr>\n")
+      printIdExprExamples()
       return
     }
 
@@ -203,8 +203,8 @@ object Cli {
 
     if (help) {
       val command = if (start) "start" else "stop"
-      out.println(s"${command.capitalize} broker\nUsage: $command <broker-id-expression>\n")
-      printBrokerIdExpressions()
+      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr>\n")
+      printIdExprExamples()
       parser.printHelpOn(out)
       return 
     }
@@ -246,8 +246,8 @@ object Cli {
     parser.accepts("timeout", "timeout in seconds. 0 - for no timeout").withRequiredArg().ofType(classOf[Integer]).defaultsTo(30)
 
     if (help) {
-      out.println("Rebalance\nUsage: rebalance <broker-id-expression>\n")
-      printBrokerIdExpressions()
+      out.println("Rebalance\nUsage: rebalance <id-expr>\n")
+      printIdExprExamples()
       parser.printHelpOn(out)
       return
     }
@@ -310,13 +310,13 @@ object Cli {
     }
   }
 
-  private def printBrokerIdExpressions(): Unit = {
-    printLine("Expression examples:")
+  private def printIdExprExamples(): Unit = {
+    printLine("id-expr examples:")
     printLine("0      - broker 0", 1)
     printLine("0,1    - brokers 0,1", 1)
     printLine("0..2   - brokers 0,1,2", 1)
     printLine("0,1..2 - brokers 0,1,2", 1)
-    printLine("\"*\"    - any broker", 1)
+    printLine("*      - any broker", 1)
     printLine()
   }
 
