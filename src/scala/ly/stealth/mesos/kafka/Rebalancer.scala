@@ -12,6 +12,7 @@ import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import kafka.admin._
 import kafka.common.TopicAndPartition
 import kafka.utils.{ZkUtils, ZKStringSerializer}
+import ly.stealth.mesos.kafka.Util.Period
 
 object Rebalancer {
   private val zk = new ZkClient(Config.kafkaZkConnect, 30000, 30000, ZKStringSerializer)
@@ -55,6 +56,19 @@ object Rebalancer {
     }
 
     s
+  }
+  
+  def waitFor(running: Boolean, timeout: Period): Boolean = {
+    def matches: Boolean = Rebalancer.running == running
+
+    var t = timeout.ms
+    while (t > 0 && !matches) {
+      val delay = Math.min(100, t)
+      Thread.sleep(delay)
+      t -= delay
+    }
+
+    matches
   }
 
   private def getReassignments(brokerIds: Seq[Int], assignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, Seq[Int]] = {

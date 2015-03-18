@@ -276,10 +276,15 @@ object Cli {
     catch { case e: IOException => throw new Error("" + e) }
 
     val status = json("status").asInstanceOf[String]
-    printLine(s"Rebalance $status")
-
     val state: String = json("state").asInstanceOf[String]
-    if (!state.isEmpty) printLine("\nReassignments:\n" + state)
+
+    val is: String = if (status == "idle" || status == "running") "is " else ""
+    val colon: String = if (state.isEmpty) "" else ":"
+
+    // started|completed|failed|running|idle|timeout
+    if (status == "timeout") throw new Error("Rebalance timeout:\n" + state)
+    printLine(s"Rebalance $is$status$colon")
+    if (!state.isEmpty) printLine(state)
   }
 
   private def printCluster(cluster: Cluster): Unit = {

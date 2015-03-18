@@ -272,7 +272,7 @@ object HttpServer {
         if (timeout.ms == 0) return "scheduled"
 
         for (broker <- brokers)
-          if (!broker.waitForState(start, timeout))
+          if (!broker.waitFor(running = start, timeout))
             return "timeout"
 
         if (start) "started" else "stopped"
@@ -297,16 +297,28 @@ object HttpServer {
 
       if (ids != null && Rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
 
-      var status: String = null
-      if (ids != null) {
+      var timeout: Period = new Period("0")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+      def startRebalance: String = {
         val started = Rebalancer.start(ids, null)
-        status = if (started) "started" else "failed"
-      } else
-        status = if (Rebalancer.running) "running" else "idle"
+        if (!started) return "failed"
+
+        if (timeout.ms > 0)
+          if (!Rebalancer.waitFor(running = false, timeout)) return "timeout"
+          else return "completed"
+
+        "started"
+      }
+
+      var status: String = null
+      if (ids != null) status = startRebalance
+      else status = if (Rebalancer.running) "running" else "idle"
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("status") = status
-      if (ids != null) result("ids") = ids.mkString(",")
       result("state") = Rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))

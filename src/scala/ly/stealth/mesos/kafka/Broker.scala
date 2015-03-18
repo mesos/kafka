@@ -121,17 +121,17 @@ class Broker(_id: String = "0") {
     "stopped"
   }
 
-  def waitForState(running: Boolean, timeout: Period): Boolean = {
-    def stateMatches: Boolean = if (running) task != null && task.running else task == null
+  def waitFor(running: Boolean, timeout: Period): Boolean = {
+    def matches: Boolean = if (running) task != null && task.running else task == null
 
     var t = timeout.ms
-    while (t > 0 && !stateMatches) {
+    while (t > 0 && !matches) {
       val delay = Math.min(100, t)
       Thread.sleep(delay)
       t -= delay
     }
 
-    stateMatches
+    matches
   }
 
   def copy(): Broker = {
