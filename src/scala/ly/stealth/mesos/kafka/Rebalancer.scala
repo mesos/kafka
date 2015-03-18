@@ -12,20 +12,22 @@ import kafka.common.TopicAndPartition
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 
 object Rebalancer {
-  val zk = new ZkClient(Config.kafkaZkConnect, 30000, 30000, ZKStringSerializer)
+  private val zk = new ZkClient(Config.kafkaZkConnect, 30000, 30000, ZKStringSerializer)
+  @volatile private var assignment: Map[TopicAndPartition, Seq[Int]] = null
+  @volatile private var reassignment: Map[TopicAndPartition, Seq[Int]] = null
 
-  @volatile var reassignment: Map[TopicAndPartition, Seq[Int]] = null
+  def running: Boolean = zk.exists(ZkUtils.ReassignPartitionsPath)
 
-  def start(ids: util.List[String], topics: util.List[String]): Boolean = {
-    // todo check running?
-    val _ids: util.List[Int] = ids.map(Integer.parseInt)
-    val _topics: Seq[String] = if (topics == null) ZkUtils.getAllTopics(zk) else topics
+  def start(_ids: util.List[String], _topics: util.List[String]): Boolean = {
+    val ids: util.List[Int] = _ids.map(Integer.parseInt)
+    val topics: Seq[String] = if (_topics == null) ZkUtils.getAllTopics(zk) else _topics
 
-    val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zk, _topics)
-    val reassignment = getBalancedReassignment(_ids, assignment)
+    val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zk, topics)
+    val reassignment = getReassignment(ids, assignment)
 
     if (!reassignPartitions(reassignment)) return false
     this.reassignment = reassignment
+    this.assignment = assignment
     true
   }
 
@@ -45,7 +47,7 @@ object Rebalancer {
     "" // todo
   }
 
-  private def getBalancedReassignment(brokerIds: Seq[Int], assignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, Seq[Int]] = {
+  private def getReassignment(brokerIds: Seq[Int], assignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, Seq[Int]] = {
     var reassignment : Map[TopicAndPartition, Seq[Int]] = new mutable.HashMap[TopicAndPartition, List[Int]]()
 
     val groupedByTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
@@ -70,8 +72,8 @@ object Rebalancer {
   private def checkIfReassignmentSucceeded(reassignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, ReassignmentStatus] = {
     val partitionsBeingReassigned: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getPartitionsBeingReassigned(zk).mapValues(_.newReplicas)
 
-    reassignment.map { topicAndPartition =>
-      (topicAndPartition._1, checkIfPartitionReassignmentSucceeded(topicAndPartition._1, topicAndPartition._2, reassignment, partitionsBeingReassigned))
+    reassignment.map { entry =>
+      (entry._1, checkIfPartitionReassignmentSucceeded(entry._1, entry._2, reassignment, partitionsBeingReassigned))
     }
   }
 

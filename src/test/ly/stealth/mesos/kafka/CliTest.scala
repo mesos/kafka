@@ -30,7 +30,7 @@ class CliTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.schedulerUrl = "http://localhost:7000"
+    Config.schedulerUrl = "http://localhost:8000"
     HttpServer.start(resolveDeps = false)
     Cli.out = new PrintStream(out, true)
   }
@@ -148,7 +148,7 @@ class CliTest extends MesosTestCase {
 
     // no id
     try { exec("add"); fail()  }
-    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("id required")) }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("argument required")) }
 
     // invalid command
     try { exec("unsupported 0"); fail()  }

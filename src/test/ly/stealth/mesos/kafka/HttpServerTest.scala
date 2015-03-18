@@ -29,7 +29,7 @@ class HttpServerTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.schedulerUrl = "http://localhost:7000"
+    Config.schedulerUrl = "http://localhost:8000"
 
     def createTempFile(name: String, content: String): File = {
       val file = File.createTempFile(getClass.getSimpleName, name)

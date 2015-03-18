@@ -37,27 +37,31 @@ object Cli {
     }
   }
   
-  def exec(args: Array[String]): Unit = {
+  def exec(_args: Array[String]): Unit = {
+    var args = _args
+
     if (args.length == 0) {
       handleHelp()
       throw new Error("command required")
     }
 
     val command = args(0)
-    if (command == "help") { handleHelp(if (args.length > 1) args(1) else null); return }
+    args = args.slice(1, args.length)
+    
+    if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
     if (command == "scheduler") { Scheduler.main(args); return }
     if (command == "status") { handleStatus(); return }
 
-    // rest of the commands require <id>
-    if (args.length < 2) throw new Error("id required")
-    val id = args(1)
-    val a = args.slice(2, args.length)
+    // rest of the commands require <argument>
+    if (args.length < 1) throw new Error("argument required")
+    val arg = args(0)
+    args = args.slice(1, args.length)
 
     command match {
-      case "add" | "update" => handleAddUpdateBroker(id, a, command == "add")
-      case "remove" => handleRemoveBroker(id)
-      case "start" | "stop" => handleStartStopBroker(id, a, command == "start")
-      case "rebalance" => handleRebalance(id, a)
+      case "add" | "update" => handleAddUpdateBroker(arg, args, command == "add")
+      case "remove" => handleRemoveBroker(arg)
+      case "start" | "stop" => handleStartStopBroker(arg, args, command == "start")
+      case "rebalance" => handleRebalance(arg, args)
       case _ => throw new Error("unsupported command " + command)
     }
   }
@@ -241,12 +245,12 @@ object Cli {
     else printLine(s"$brokers $ids $status")
   }
 
-  private def handleRebalance(id: String, args: Array[String], help: Boolean = false): Unit = {
+  private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
     val parser = new OptionParser()
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
-      out.println("Rebalance\nUsage: rebalance <id-expr>\n")
+      out.println("Rebalance\nUsage: rebalance <id-expr>|status\n")
       printIdExprExamples()
       parser.printHelpOn(out)
       return
@@ -264,16 +268,15 @@ object Cli {
     val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]()
-    params.put("id", id)
+    if (arg != "status") params.put("id", arg)
     if (timeout != null) params.put("timeout", timeout)
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/rebalance", params) }
     catch { case e: IOException => throw new Error("" + e) }
 
-    val success = json("success").asInstanceOf[Boolean]
-    if (success) printLine("Rebalance started")
-    else printLine("Failed to start rebalance")
+    val status = json("status").asInstanceOf[String]
+    printLine(s"Rebalance $status")
   }
 
   private def printCluster(cluster: Cluster): Unit = {

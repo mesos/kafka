@@ -242,7 +242,7 @@ object HttpServer {
       val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
 
-      var timeout: Period = new Period("30s")
+      var timeout: Period = new Period("60s")
       if (request.getParameter("timeout") != null)
         try { timeout = new Period(request.getParameter("timeout")) }
         catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
@@ -290,17 +290,23 @@ object HttpServer {
       val cluster: Cluster = Scheduler.cluster
 
       val idExpr: String = request.getParameter("id")
-      if (idExpr == null) { response.sendError(400, "id required"); return }
-
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      if (idExpr != null)
+        try { ids = cluster.expandIds(idExpr) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
-      val success = Rebalancer.start(ids, null)
+      if (ids != null && Rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
+
+      var status: String = null
+      if (ids != null) {
+        val started = Rebalancer.start(ids, null)
+        status = if (started) "started" else "failed"
+      } else
+        status = if (Rebalancer.running) "running" else "idle"
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("success") = success
-      result("ids") = ids.mkString(",")
+      result("status") = status
+      if (ids != null) result("ids") = ids.mkString(",")
 
       response.getWriter.println(JSONObject(result.toMap))
     }
