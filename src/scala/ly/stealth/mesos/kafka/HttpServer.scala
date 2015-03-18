@@ -296,8 +296,10 @@ object HttpServer {
       try { ids = cluster.expandIds(idExpr) }
       catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
+      val success = Rebalancer.start(ids, null)
+
       val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("success") = true
+      result("success") = success
       result("ids") = ids.mkString(",")
 
       response.getWriter.println(JSONObject(result.toMap))

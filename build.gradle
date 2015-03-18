@@ -20,11 +20,6 @@ sourceSets {
     }
 }
 
-configurations {
-    provided
-    compile.extendsFrom provided
-}
-
 dependencies {
     compile "org.scala-lang:scala-library:2.10.3"
     compile "org.apache.mesos:mesos:0.21.1"
@@ -40,7 +35,7 @@ dependencies {
     compile "javax.servlet:javax.servlet-api:3.0.1"
     testCompile 'junit:junit:4.12'
 
-    provided ('org.apache.kafka:kafka_2.9.2:0.8.1.1') {
+    compile ('org.apache.kafka:kafka_2.10:0.8.1.1') {
         exclude group: "javax.jms"
         exclude group: "com.sun.jdmk"
         exclude group: "com.sun.jmx"
@@ -50,7 +45,7 @@ dependencies {
 jar {
     dependsOn 'test'
     doFirst {
-        from((configurations.compile - configurations.provided).collect { it.isDirectory() ? it : zipTree(it) }) {
+        from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
             exclude "META-INF/*.SF"
             exclude "META-INF/*.DSA"
             exclude "META-INF/*.RSA"
