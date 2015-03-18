@@ -12,6 +12,7 @@ This is an *ALPHA* version. More features will be continued to be added until we
 * [Changing the location of data stored](#changing-the-location-of-data-stored)
 * [Starting 3 brokers](#starting-3-brokers)
 * [Flushing scheduler state](#flusing-scheduler-state)
+* [Failed Broker Recovery](#failed-broker-recovery)
 
 
 [Navigating the CLI](#navigating-the-cli)
@@ -20,6 +21,8 @@ This is an *ALPHA* version. More features will be continued to be added until we
 * [Starting brokers](#starting-brokers-in-the-cluster-)
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
+
+[Using the REST API](#using-the-rest-api)    
 
 [Project Goals](#project-goals)
 
@@ -190,6 +193,16 @@ This will eventually be a plugable interface so you can store it some place else
 
     # rm -f kafka-mesos.json
 
+Failed Broker Recovery
+------------------------
+When the broker fails, the kafka mesos scheduler assumes that the failure is recoverable so as to keep placement of the broker.
+The scheduler will start another broker on the same node after waiting failoverDelay (i.e 30s, 2m). After each failure the delay doubles for failoverMaxTries or until failoverMaxDelay. After the failure limit is reached the scheduler will scheduler the broker on another slave.
+
+```
+--failoverDelay
+--failoverMaxTries
+--failoverMaxDelay
+```
 
 Navigating the CLI
 ==================
@@ -309,6 +322,41 @@ Expression examples:
   0,1..2 - brokers 0,1,2
   "*"    - any broker
 
+```
+
+Using the REST API
+========================
+
+The scheduler REST API fully exposes all feature of the CLI with the following format.
+
+    /api/brokers/<cli command>/id={broker.id}&<setting>=<value>
+
+Adding a broker
+
+```
+# curl "http://localhost:7000/api/brokers/add?id=0&cpus=8&mem=43008"
+{"brokers" : [{"id" : "0", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}]}
+```
+
+Starting a broker
+
+```
+# curl "http://localhost:7000/api/brokers/start?id=0"
+{"success" : true, "ids" : "0"}
+```
+
+Stopping a broker
+
+```
+# curl"http://localhost:7000/api/brokers/stop?id=0"
+{"success" : true, "ids" : "0"}
+```
+
+Status
+
+```
+# curl "http://localhost:7000/api/brokers/status?id=0"
+{"brokers" : [{"id" : "0", "mem" : 128, "cpus" : 0.1, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s", "failures" : 5, "failureTime" : 1426651240585}, "active" : true}, {"id" : "5", "mem" : 128, "cpus" : 0.5, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}, {"id" : "8", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : true}]}
 ```
 
 Project Goals
