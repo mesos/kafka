@@ -247,6 +247,7 @@ object Cli {
 
   private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
     val parser = new OptionParser()
+    parser.accepts("topics", "topics (comma-separated). Default all topics").withRequiredArg().ofType(classOf[String])
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
@@ -265,10 +266,12 @@ object Cli {
         throw new Error(e.getMessage)
     }
 
+    val topics: String = options.valueOf("topics").asInstanceOf[String]
     val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]()
     if (arg != "status") params.put("id", arg)
+    if (topics != null) params.put("topics", topics)
     if (timeout != null) params.put("timeout", timeout)
 
     var json: Map[String, Object] = null

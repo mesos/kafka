@@ -295,7 +295,12 @@ object HttpServer {
         try { ids = cluster.expandIds(idExpr) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
-      if (ids != null && Rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
+      if (ids != null && Rebalance.running) { response.sendError(400, "rebalance is already running"); return }
+
+      var topics: util.List[String] = null
+      if (request.getParameter("topics") != null)
+        topics = request.getParameter("topics").split(",").map(_.trim).filter(!_.isEmpty).toList
+      if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
 
       var timeout: Period = new Period("0")
       if (request.getParameter("timeout") != null)
@@ -303,11 +308,11 @@ object HttpServer {
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
       def startRebalance: String = {
-        val started = Rebalancer.start(ids, null)
+        val started = Rebalance.start(ids, topics)
         if (!started) return "failed"
 
         if (timeout.ms > 0)
-          if (!Rebalancer.waitFor(running = false, timeout)) return "timeout"
+          if (!Rebalance.waitFor(running = false, timeout)) return "timeout"
           else return "completed"
 
         "started"
@@ -315,11 +320,11 @@ object HttpServer {
 
       var status: String = null
       if (ids != null) status = startRebalance
-      else status = if (Rebalancer.running) "running" else "idle"
+      else status = if (Rebalance.running) "running" else "idle"
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("status") = status
-      result("state") = Rebalancer.state
+      result("state") = Rebalance.state
 
       response.getWriter.println(JSONObject(result.toMap))
     }
