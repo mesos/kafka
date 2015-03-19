@@ -39,6 +39,8 @@ dependencies {
         exclude group: "javax.jms"
         exclude group: "com.sun.jdmk"
         exclude group: "com.sun.jmx"
+        exclude group: "junit"
+        exclude group: "jline"
     }
 }
 
@@ -46,6 +48,8 @@ jar {
     dependsOn 'test'
     doFirst {
         from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
+            exclude "*"
+            exclude "about_files/*"
             exclude "META-INF/*.SF"
             exclude "META-INF/*.DSA"
             exclude "META-INF/*.RSA"
