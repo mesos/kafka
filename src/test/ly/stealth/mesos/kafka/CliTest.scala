@@ -141,6 +141,20 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
+  def rebalance {
+    val cluster: Cluster = Scheduler.cluster
+    val rebalancer: Rebalancer = cluster.rebalancer
+
+    cluster.addBroker(new Broker("0"))
+    cluster.addBroker(new Broker("1"))
+    assertFalse(rebalancer.running)
+
+    exec("rebalance *")
+    assertTrue(rebalancer.running)
+    assertOutContains("Rebalance started")
+  }
+
+  @Test
   def usage_errors {
     // no command
     try { exec(""); fail() }

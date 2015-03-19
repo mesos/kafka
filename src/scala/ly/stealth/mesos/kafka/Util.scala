@@ -28,6 +28,12 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.Protos
 
 object Util {
+  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
+  kafka.utils.Json.myConversionFunc // init class
+  JSON.globalNumberParser = parseNumber
+  JSON.perThreadNumberParser = parseNumber
+  private val jsonLock = new Object
+
   def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
     if (s == null) return result
@@ -43,9 +49,11 @@ object Util {
   }
 
   def parseJson(json: String): Map[String, Object] = {
-    val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
-    if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
-    node
+    jsonLock synchronized {
+      val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
+      if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
+      node
+    }
   }
 
   def copyAndClose(in: InputStream, out: OutputStream): Unit = {

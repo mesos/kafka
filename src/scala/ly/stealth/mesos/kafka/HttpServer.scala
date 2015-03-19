@@ -297,6 +297,7 @@ object HttpServer {
 
     def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
+      val rebalancer: Rebalancer = cluster.rebalancer
 
       val idExpr: String = request.getParameter("id")
       var ids: util.List[String] = null
@@ -304,7 +305,7 @@ object HttpServer {
         try { ids = cluster.expandIds(idExpr) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
-      if (ids != null && Rebalance.running) { response.sendError(400, "rebalance is already running"); return }
+      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
 
       var topics: util.List[String] = null
       if (request.getParameter("topics") != null)
@@ -318,11 +319,11 @@ object HttpServer {
 
 
       def startRebalance: (String, String) = {
-        try { Rebalance.start(ids, topics) }
-        catch { case e: Rebalance.Exception => return ("failed", e.getMessage) }
+        try { rebalancer.start(ids, topics) }
+        catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)
-          if (!Rebalance.waitFor(running = false, timeout)) return ("timeout", null)
+          if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", null)
           else return ("completed", null)
 
         ("started", null)
@@ -336,12 +337,12 @@ object HttpServer {
         status = result._1
         error = result._2
       } else
-        status = if (Rebalance.running) "running" else "idle"
+        status = if (rebalancer.running) "running" else "idle"
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("status") = status
       if (error != null) result("error") = error
-      result("state") = Rebalance.state
+      result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
     }

@@ -31,55 +31,69 @@ import kafka.common.TopicAndPartition
 import kafka.utils.{ZkUtils, ZKStringSerializer}
 import ly.stealth.mesos.kafka.Util.Period
 
-object Rebalance {
-  private val zkClient = new ZkClient(Config.kafkaZkConnect, 30000, 30000, ZKStringSerializer)
-
+class Rebalancer {
   @volatile private var assignment: Map[TopicAndPartition, Seq[Int]] = null
   @volatile private var reassignment: Map[TopicAndPartition, Seq[Int]] = null
 
-  def running: Boolean = zkClient.exists(ZkUtils.ReassignPartitionsPath)
+  private def newZkClient: ZkClient = new ZkClient(Config.kafkaZkConnect, 30000, 30000, ZKStringSerializer)
+
+  def running: Boolean = {
+    val zkClient = newZkClient
+    try { zkClient.exists(ZkUtils.ReassignPartitionsPath) }
+    finally { zkClient.close() }
+  }
 
   def start(_ids: util.List[String], _topics: util.List[String]): Unit = {
-    val ids: util.List[Int] = _ids.map(Integer.parseInt)
+    val zkClient = newZkClient
+    try {
+      val ids: util.List[Int] = _ids.map(Integer.parseInt)
 
-    val allTopics = ZkUtils.getAllTopics(zkClient)
-    val topics: Seq[String] = if (_topics == null) allTopics else _topics.intersect(allTopics)
-    if (topics.isEmpty) throw new Exception("no topics found")
+      val allTopics = ZkUtils.getAllTopics(zkClient)
+      val topics: Seq[String] = if (_topics == null) allTopics else _topics.intersect(allTopics)
+      if (topics.isEmpty) throw new Rebalancer.Exception("no topics found")
 
-    val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
-    val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, assignment)
+      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
+      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, assignment)
 
-    reassignPartitions(reassignment)
-    this.reassignment = reassignment
-    this.assignment = assignment
+      reassignPartitions(zkClient, reassignment)
+      this.reassignment = reassignment
+      this.assignment = assignment
+    } finally {
+      zkClient.close()
+    }
   }
 
   def state: String = {
     if (assignment == null) return ""
-    
     var s = ""
-    val reassigning: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getPartitionsBeingReassigned(zkClient).mapValues(_.newReplicas)
-    
-    val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
-    for (topic <- byTopic.keys.to[List].sorted) {
-      s += topic + "\n"
 
-      val partitions: Map[TopicAndPartition, Seq[Int]] = byTopic.getOrElse(topic, null)
-      for (topicAndPartition <- partitions.keys.to[List].sortBy(_.partition)) {
-        val brokers = partitions.getOrElse(topicAndPartition, null)
-        s += "  " + topicAndPartition.partition + ": " + brokers.mkString(",")
-        s += " -> "
-        s += reassignment.getOrElse(topicAndPartition, null).mkString(",")
-        s += " - " + getReassignmentState(topicAndPartition, reassigning)
-        s += "\n"
+    val zkClient = newZkClient
+    try {
+      val reassigning: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getPartitionsBeingReassigned(zkClient).mapValues(_.newReplicas)
+
+      val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
+      for (topic <- byTopic.keys.to[List].sorted) {
+        s += topic + "\n"
+
+        val partitions: Map[TopicAndPartition, Seq[Int]] = byTopic.getOrElse(topic, null)
+        for (topicAndPartition <- partitions.keys.to[List].sortBy(_.partition)) {
+          val brokers = partitions.getOrElse(topicAndPartition, null)
+          s += "  " + topicAndPartition.partition + ": " + brokers.mkString(",")
+          s += " -> "
+          s += reassignment.getOrElse(topicAndPartition, null).mkString(",")
+          s += " - " + getReassignmentState(zkClient, topicAndPartition, reassigning)
+          s += "\n"
+        }
       }
+    } finally {
+      zkClient.close()
     }
 
     s
   }
   
   def waitFor(running: Boolean, timeout: Period): Boolean = {
-    def matches: Boolean = Rebalance.running == running
+    def matches: Boolean = this.running == running
 
     var t = timeout.ms
     while (t > 0 && !matches) {
@@ -103,7 +117,7 @@ object Rebalance {
     reassignment.toMap
   }
 
-  private def getReassignmentState(topicAndPartition: TopicAndPartition, reassigning: Map[TopicAndPartition, Seq[Int]]): String = {
+  private def getReassignmentState(zkClient: ZkClient, topicAndPartition: TopicAndPartition, reassigning: Map[TopicAndPartition, Seq[Int]]): String = {
     reassigning.get(topicAndPartition) match {
       case Some(partition) => "running"
       case None =>
@@ -116,14 +130,16 @@ object Rebalance {
     }
   }
 
-  private def reassignPartitions(partitions: Map[TopicAndPartition, Seq[Int]]): Unit = {
+  private def reassignPartitions(zkClient: ZkClient, partitions: Map[TopicAndPartition, Seq[Int]]): Unit = {
     try {
       val json = ZkUtils.getPartitionReassignmentZkData(partitions)
       ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, json)
     } catch {
-      case ze: ZkNodeExistsException => throw new Exception("rebalance is in progress")
+      case ze: ZkNodeExistsException => throw new Rebalancer.Exception("rebalance is in progress")
     }
   }
+}
 
+object Rebalancer {
   class Exception(message: String) extends java.lang.Exception(message)
 }

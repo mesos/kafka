@@ -27,6 +27,7 @@ import java.io.{FileWriter, File}
 
 class Cluster {
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
+  private[kafka] var rebalancer: Rebalancer = new Rebalancer()
 
   def getBrokers:util.List[Broker] = Collections.unmodifiableList(brokers)
 

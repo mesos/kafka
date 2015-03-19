@@ -19,7 +19,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.{Test, After, Before}
 import org.junit.Assert._
-import java.io.{FileWriter, FileOutputStream, File}
+import java.io.{FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
 import Util.{Period, parseMap}
 import Cli.sendRequest
@@ -30,20 +30,6 @@ class HttpServerTest extends MesosTestCase {
   override def before {
     super.before
     Config.schedulerUrl = "http://localhost:8000"
-
-    def createTempFile(name: String, content: String): File = {
-      val file = File.createTempFile(getClass.getSimpleName, name)
-
-      val writer = new FileWriter(file)
-      try { writer.write(content) }
-      finally { writer.close(); }
-
-      file.deleteOnExit()
-      file
-    }
-
-    HttpServer.jar = createTempFile("executor.jar", "executor")
-    HttpServer.kafkaDist = createTempFile("kafka.tgz", "kafka")
     HttpServer.start(resolveDeps = false)
   }
   
@@ -155,6 +141,23 @@ class HttpServerTest extends MesosTestCase {
     assertEquals("scheduled", json("status"))
     assertFalse(broker0.active)
     assertFalse(broker1.active)
+  }
+
+  @Test
+  def brokers_rebalance {
+    val cluster = Scheduler.cluster
+    cluster.addBroker(new Broker("0"))
+    cluster.addBroker(new Broker("1"))
+
+    val rebalancer: TestRebalancer = cluster.rebalancer.asInstanceOf[TestRebalancer]
+    assertFalse(rebalancer.running)
+
+    val json = sendRequest("/brokers/rebalance", parseMap("id=*"))
+    assertTrue(rebalancer.running)
+
+    assertEquals("started", json("status"))
+    assertFalse(json.contains("error"))
+    assertEquals(rebalancer.state, json("state").asInstanceOf[String])
   }
 
   @Test
