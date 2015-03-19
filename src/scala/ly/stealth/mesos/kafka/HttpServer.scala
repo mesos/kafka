@@ -316,23 +316,31 @@ object HttpServer {
         try { timeout = new Period(request.getParameter("timeout")) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
-      def startRebalance: String = {
-        val started = Rebalance.start(ids, topics)
-        if (!started) return "failed"
+
+      def startRebalance: (String, String) = {
+        try { Rebalance.start(ids, topics) }
+        catch { case e: Rebalance.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)
-          if (!Rebalance.waitFor(running = false, timeout)) return "timeout"
-          else return "completed"
+          if (!Rebalance.waitFor(running = false, timeout)) return ("timeout", null)
+          else return ("completed", null)
 
-        "started"
+        ("started", null)
       }
 
       var status: String = null
-      if (ids != null) status = startRebalance
-      else status = if (Rebalance.running) "running" else "idle"
+      var error: String = null
+
+      if (ids != null) {
+        val result: (String, String) = startRebalance
+        status = result._1
+        error = result._2
+      } else
+        status = if (Rebalance.running) "running" else "idle"
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
       result("status") = status
+      if (error != null) result("error") = error
       result("state") = Rebalance.state
 
       response.getWriter.println(JSONObject(result.toMap))

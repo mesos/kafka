@@ -39,17 +39,19 @@ object Rebalance {
 
   def running: Boolean = zkClient.exists(ZkUtils.ReassignPartitionsPath)
 
-  def start(_ids: util.List[String], _topics: util.List[String]): Boolean = {
+  def start(_ids: util.List[String], _topics: util.List[String]): Unit = {
     val ids: util.List[Int] = _ids.map(Integer.parseInt)
-    val topics: Seq[String] = if (_topics == null) ZkUtils.getAllTopics(zkClient) else _topics
+
+    val allTopics = ZkUtils.getAllTopics(zkClient)
+    val topics: Seq[String] = if (_topics == null) allTopics else _topics.intersect(allTopics)
+    if (topics.isEmpty) throw new Exception("no topics found")
 
     val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
     val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, assignment)
 
-    if (!reassignPartitions(reassignment)) return false
+    reassignPartitions(reassignment)
     this.reassignment = reassignment
     this.assignment = assignment
-    true
   }
 
   def state: String = {
@@ -114,13 +116,14 @@ object Rebalance {
     }
   }
 
-  private def reassignPartitions(partitions: Map[TopicAndPartition, Seq[Int]]): Boolean = {
+  private def reassignPartitions(partitions: Map[TopicAndPartition, Seq[Int]]): Unit = {
     try {
       val json = ZkUtils.getPartitionReassignmentZkData(partitions)
       ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, json)
-      true
     } catch {
-      case ze: ZkNodeExistsException => false
+      case ze: ZkNodeExistsException => throw new Exception("rebalance is in progress")
     }
   }
+
+  class Exception(message: String) extends java.lang.Exception(message)
 }
