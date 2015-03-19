@@ -44,7 +44,7 @@ object Rebalance {
     val topics: Seq[String] = if (_topics == null) ZkUtils.getAllTopics(zkClient) else _topics
 
     val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
-    val reassignment = getReassignments(ids, assignment)
+    val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, assignment)
 
     if (!reassignPartitions(reassignment)) return false
     this.reassignment = reassignment

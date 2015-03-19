@@ -80,8 +80,17 @@ object HttpServer {
     if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
   }
 
-  class Servlet extends HttpServlet {
+  private class Servlet extends HttpServlet {
     override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      try { handle(request, response) }
+      catch {
+        case e: Exception =>
+          response.sendError(500, "" + e) // specify error message
+          throw e
+      }
+    }
+
+    def handle(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val uri = request.getRequestURI
       if (uri.startsWith("/executor/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)

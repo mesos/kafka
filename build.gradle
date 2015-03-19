@@ -25,6 +25,7 @@ dependencies {
     compile "org.apache.mesos:mesos:0.21.1"
     compile "com.google.protobuf:protobuf-java:2.5.0"
     compile "log4j:log4j:1.2.16"
+    compile 'org.slf4j:slf4j-log4j12:1.7.2'
     compile "net.sf.jopt-simple:jopt-simple:4.8"
     compile "org.eclipse.jetty:jetty-http:9.0.4.v20130625"
     compile "org.eclipse.jetty:jetty-io:9.0.4.v20130625"
