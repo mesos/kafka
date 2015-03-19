@@ -35,7 +35,7 @@ class ExecutorTest extends MesosTestCase {
     assertEquals("2", read.getOrElse("b", null))
   }
 
-  @Test
+  @Test(timeout = 5000)
   def startBroker_success {
     Executor.startBroker(executorDriver, task())
     executorDriver.waitForStatusUpdates(1)
@@ -54,7 +54,7 @@ class ExecutorTest extends MesosTestCase {
     assertFalse(Executor.server.isStarted)
   }
 
-  @Test
+  @Test(timeout = 5000)
   def startBroker_failure {
     Executor.server.asInstanceOf[TestBrokerServer].failOnStart = true
     Executor.startBroker(executorDriver, task())
@@ -78,7 +78,7 @@ class ExecutorTest extends MesosTestCase {
     Executor.stopBroker // no error
   }
 
-  @Test
+  @Test(timeout = 5000)
   def launchTask {
     Executor.launchTask(executorDriver, task())
     executorDriver.waitForStatusUpdates(1)
