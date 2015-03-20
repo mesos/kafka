@@ -23,7 +23,6 @@ import java.io.File
 import org.I0Itec.zkclient.{ZkServer, ZkClient, IDefaultNameSpace}
 import kafka.utils.{ZKStringSerializer, ZkUtils}
 import java.util
-import scala.util.parsing.json.JSON
 
 class RebalancerTest extends MesosTestCase {
   var rebalancer: Rebalancer = null
@@ -72,17 +71,11 @@ class RebalancerTest extends MesosTestCase {
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
 
-    System.err.println("1111111:" + JSON.globalNumberParser.apply("1"))
-    System.err.println("1111111:" + JSON.perThreadNumberParser.apply("1"))
-
     createTopic("topic", Map[Int, Seq[Int]](0 -> Seq(0), 1 -> Seq(0)))
     assertFalse(rebalancer.running)
     rebalancer.start(util.Arrays.asList("0", "1"), null)
 
     assertTrue(rebalancer.running)
-    System.err.println("1111111:" + JSON.globalNumberParser.apply("1"))
-    System.err.println("1111111:" + JSON.perThreadNumberParser.apply("1"))
-
     assertFalse(rebalancer.state.isEmpty)
   }
 
