@@ -5,25 +5,46 @@ import org.junit.Assert._
 
 class ConstraintTest {
   @Test
-  def condition {
-    def c(s: String): Constraint.Condition = {
-      new Constraint(s).condition
-    }
+  def parse {
+    def c(s: String): Constraint.Condition = new Constraint(s).condition
 
+    // pattern
     assertEquals(classOf[Constraint.Pattern], c("").getClass)
-    assertEquals(classOf[Constraint.Pattern], c("abc").getClass)
 
+    val pattern = c("abc").asInstanceOf[Constraint.Pattern]
+    assertEquals("abc", pattern.value)
+
+    // same | unique
     assertEquals(classOf[Constraint.Same], c("#same").getClass)
     assertEquals(classOf[Constraint.Unique], c("#unique").getClass)
 
-    assertEquals(classOf[Constraint.Regex], c("#regex:.").getClass)
+    // regex
+    val regex = c("#regex:.").asInstanceOf[Constraint.Regex]
+    assertEquals(".", regex.value)
 
-    assertEquals(classOf[Constraint.Group], c("#group").getClass)
-    assertEquals(classOf[Constraint.Group], c("#group:2").getClass)
+    // group
+    var group = c("#group").asInstanceOf[Constraint.Group]
+    assertEquals(1, group.groups)
+
+    group = c("#group:2").asInstanceOf[Constraint.Group]
+    assertEquals(2, group.groups)
 
     // unsupported
     try { c("#unsupported"); fail() }
     catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.contains("unsupported condition")) }
+  }
+
+  @Test
+  def matches {
+    // smoke tests
+    assertTrue(new Constraint("abc").matches("abc"))
+    assertFalse(new Constraint("abc").matches("abc1"))
+
+    assertTrue(new Constraint("a*").matches("abc"))
+    assertFalse(new Constraint("a*").matches("bc"))
+
+    assertTrue(new Constraint("#unique").matches("a", Array()))
+    assertFalse(new Constraint("#same").matches("a", Array("b")))
   }
 
   @Test
@@ -101,6 +122,11 @@ class ConstraintTest {
     assertFalse(pattern.matches("a1a2"))
     assertFalse(pattern.matches("1a2a"))
     assertFalse(pattern.matches("1ab2"))
+
+    // negated
+    pattern = new Constraint.Pattern("!a*")
+    assertFalse(pattern.matches("ab"))
+    assertTrue(pattern.matches("1b"))
   }
 
   @Test
