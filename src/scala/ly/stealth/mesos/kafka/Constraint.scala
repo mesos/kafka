@@ -11,6 +11,7 @@ class Constraint(s: String) {
     else {
       if (s == "#same") _condition = new Constraint.Same()
       else if (s == "#unique") _condition = new Constraint.Unique()
+      else if (s.startsWith("#regex:")) _condition = new Constraint.Regex(s.substring("#regex:".length))
       else throw new IllegalArgumentException("unsupported condition " + s)
     }
   }
@@ -74,16 +75,26 @@ object Constraint {
     }
 
 
-    def matches(value: String, values: Array[String]): Boolean = _pattern.matcher(value).find()
+    def matches(value: String, values: Array[String] = Array()): Boolean = _pattern.matcher(value).find()
 
     override def toString: String = s
   }
 
   class Same extends Condition {
     def matches(value: String, values: Array[String]): Boolean = values.isEmpty || values(0) == value
+    override def toString: String = "#same"
   }
 
   class Unique extends Condition {
     def matches(value: String, values: Array[String]): Boolean = !values.contains(value)
+    override def toString: String = "#unique"
+  }
+  
+  class Regex(s: String) extends Condition {
+    val _pattern = java.util.regex.Pattern.compile("^" + s + "$")
+    def pattern = _pattern
+    
+    def matches(value: String, values: Array[String] = Array()): Boolean = _pattern.matcher(value).find()
+    override def toString: String = "#regex:" + s
   }
 }

@@ -16,6 +16,7 @@ class ConstraintTest {
 
     assertEquals(classOf[Constraint.Same], c("#same").getClass)
     assertEquals(classOf[Constraint.Unique], c("#unique").getClass)
+    assertEquals(classOf[Constraint.Regex], c("#regex:.").getClass)
 
     // unsupported
     try { c("#unsupported"); fail() }
@@ -79,6 +80,27 @@ class ConstraintTest {
   }
 
   @Test
+  def Pattern_matches {
+    var pattern = new Constraint.Pattern("12")
+    assertTrue(pattern.matches("12"))
+    assertFalse(pattern.matches("13"))
+    assertFalse(pattern.matches("a12b"))
+
+    pattern = new Constraint.Pattern("1*2")
+    assertTrue(pattern.matches("12"))
+    assertTrue(pattern.matches("1ab2"))
+    assertFalse(pattern.matches("a12"))
+    assertFalse(pattern.matches("12b"))
+
+    pattern = new Constraint.Pattern("1?2")
+    assertTrue(pattern.matches("1a2"))
+    assertFalse(pattern.matches("12"))
+    assertFalse(pattern.matches("a1a2"))
+    assertFalse(pattern.matches("1a2a"))
+    assertFalse(pattern.matches("1ab2"))
+  }
+
+  @Test
   def Same_matches {
     val same = new Constraint.Same()
     assertTrue(same.matches("1", Array()))
@@ -98,5 +120,15 @@ class ConstraintTest {
 
     assertFalse(unique.matches("1", Array("1", "2")))
     assertFalse(unique.matches("2", Array("1", "2")))
+  }
+
+  @Test
+  def Regex_matches {
+    val regex = new Constraint.Regex("1.2")
+    assertTrue(regex.matches("1a2"))
+
+    assertFalse(regex.matches("12"))
+    assertFalse(regex.matches("a1a2"))
+    assertFalse(regex.matches("1a2a"))
   }
 }
