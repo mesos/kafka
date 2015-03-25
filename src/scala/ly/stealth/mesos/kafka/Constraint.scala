@@ -1,5 +1,7 @@
 package ly.stealth.mesos.kafka
 
+import java.util.regex.PatternSyntaxException
+
 class Constraint(_value: String) {
   var _condition: Constraint.Condition = null
 
@@ -15,8 +17,13 @@ class Constraint(_value: String) {
       else if (_value == "#unique") _condition = new Constraint.Unique()
       else if (_value.startsWith("#regex:")) _condition = new Constraint.Regex(_value.substring("#regex:".length))
       else if (_value.startsWith("#group")) {
-        val arg = _value.substring("#group".length)
-        val count: Int = if (arg.startsWith(":")) Integer.valueOf(arg.substring(1)) else 1
+        val tail = _value.substring("#group".length)
+
+        var count: Int = 1
+        if (tail.startsWith(":"))
+          try { count = Integer.valueOf(tail.substring(1)) }
+          catch { case e: NumberFormatException => throw new IllegalArgumentException(s"invalid condition ${_value}") }
+
         _condition = new Constraint.Group(count)
       }
       else throw new IllegalArgumentException("unsupported condition " + _value)
@@ -69,14 +76,14 @@ object Constraint {
           regex += (if (c == '*') ".*" else ".")
         }
         else if ((c == '!' || c == '#') && !escaped)
-          throw new IllegalArgumentException(s"unescaped $c inside expression")
+          throw new IllegalArgumentException(s"unescaped $c in pattern")
         else {
           token += c
           escaped = false
         }
       }
 
-      if (escaped) throw new IllegalArgumentException("unterminated escaping")
+      if (escaped) throw new IllegalArgumentException("unterminated \\ in pattern")
 
       if (token != "") regex += java.util.regex.Pattern.quote(token)
       regex + "$"
@@ -98,7 +105,9 @@ object Constraint {
   }
   
   class Regex(_value: String) extends Condition {
-    val _pattern = java.util.regex.Pattern.compile("^" + _value + "$")
+    var _pattern: java.util.regex.Pattern = null
+    try { _pattern = java.util.regex.Pattern.compile("^" + _value + "$") }
+    catch { case e: PatternSyntaxException => throw new IllegalArgumentException("invalid #regex: " + e.getMessage) }
 
     def value = _value
     def pattern = _pattern

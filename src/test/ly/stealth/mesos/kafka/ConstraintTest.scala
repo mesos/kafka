@@ -90,14 +90,14 @@ class ConstraintTest {
     assertEquals("(1*?2)", r("1\\*\\?2"))
 
     try { r("\\"); fail() }
-    catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.equals("unterminated escaping"))}
+    catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.contains("unterminated \\"))}
 
     // #,!
     try { r("#"); fail() }
-    catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.contains("# inside expression"))}
+    catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.contains("unescaped #"))}
 
     try { r("!"); fail() }
-    catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.contains("! inside expression"))}
+    catch { case e: IllegalArgumentException => assertTrue("" + e, e.getMessage.contains("unescaped !"))}
 
     // complex
     assertEquals("(1?).(2#).*(3\\)", r("1\\??2\\#*3\\\\"))
