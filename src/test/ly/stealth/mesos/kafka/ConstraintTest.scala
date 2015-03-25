@@ -2,6 +2,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
+import ly.stealth.mesos.kafka.Constraint.Same
 
 class ConstraintTest {
   @Test
@@ -75,5 +76,27 @@ class ConstraintTest {
 
     // complex
     assertEquals("(1?).(2#).*(3\\)", r("1\\??2\\#*3\\\\"))
+  }
+
+  @Test
+  def Same_matches {
+    val same = new Constraint.Same()
+    assertTrue(same.matches("1", Array()))
+    assertTrue(same.matches("1", Array("1")))
+    assertTrue(same.matches("1", Array("1", "1")))
+
+    assertFalse(same.matches("1", Array("2")))
+    assertFalse(same.matches("1", Array("2", "1")))
+  }
+
+  @Test
+  def Unique_matches {
+    val unique = new Constraint.Unique()
+    assertTrue(unique.matches("1", Array()))
+    assertTrue(unique.matches("2", Array("1")))
+    assertTrue(unique.matches("3", Array("1", "2")))
+
+    assertFalse(unique.matches("1", Array("1", "2")))
+    assertFalse(unique.matches("2", Array("1", "2")))
   }
 }
