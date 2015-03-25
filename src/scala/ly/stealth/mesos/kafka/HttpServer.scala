@@ -80,8 +80,17 @@ object HttpServer {
     if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
   }
 
-  class Servlet extends HttpServlet {
+  private class Servlet extends HttpServlet {
     override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      try { handle(request, response) }
+      catch {
+        case e: Exception =>
+          response.sendError(500, "" + e) // specify error message
+          throw e
+      }
+    }
+
+    def handle(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val uri = request.getRequestURI
       if (uri.startsWith("/executor/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
@@ -104,6 +113,7 @@ object HttpServer {
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
+      else if (uri == "rebalance") handleRebalance(request, response)
       else response.sendError(404)
     }
 
@@ -168,7 +178,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -218,7 +228,7 @@ object HttpServer {
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -241,16 +251,17 @@ object HttpServer {
       val cluster: Cluster = Scheduler.cluster
       val start: Boolean = request.getRequestURI.endsWith("start")
 
-      var timeout: Long = 30 * 1000
-      try { timeout = java.lang.Long.parseLong(request.getParameter("timeout")) }
-      catch { case ignore: NumberFormatException => }
+      var timeout: Period = new Period("60s")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
       val idExpr: String = request.getParameter("id")
       if (idExpr == null) { response.sendError(400, "id required"); return }
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expression"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -266,17 +277,72 @@ object HttpServer {
       }
       cluster.save()
 
-      def waitForBrokers(): Boolean = {
+      def waitForBrokers(): String = {
+        if (timeout.ms == 0) return "scheduled"
+
         for (broker <- brokers)
-          if (!broker.waitForState(start, timeout))
-            return false
-        true
+          if (!broker.waitFor(running = start, timeout))
+            return "timeout"
+
+        if (start) "started" else "stopped"
       }
-      val success = waitForBrokers()
+      val status = waitForBrokers()
 
       val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("success") = success
+      result("status") = status
       result("ids") = ids.mkString(",")
+
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+      val rebalancer: Rebalancer = cluster.rebalancer
+
+      val idExpr: String = request.getParameter("id")
+      var ids: util.List[String] = null
+      if (idExpr != null)
+        try { ids = cluster.expandIds(idExpr) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+
+      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
+
+      var topics: util.List[String] = null
+      if (request.getParameter("topics") != null)
+        topics = request.getParameter("topics").split(",").map(_.trim).filter(!_.isEmpty).toList
+      if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
+
+      var timeout: Period = new Period("0")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+
+      def startRebalance: (String, String) = {
+        try { rebalancer.start(ids, topics) }
+        catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
+
+        if (timeout.ms > 0)
+          if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", null)
+          else return ("completed", null)
+
+        ("started", null)
+      }
+
+      var status: String = null
+      var error: String = null
+
+      if (ids != null) {
+        val result: (String, String) = startRebalance
+        status = result._1
+        error = result._2
+      } else
+        status = if (rebalancer.running) "running" else "idle"
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("status") = status
+      if (error != null) result("error") = error
+      result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
     }

@@ -85,6 +85,9 @@ class UtilTest {
       fail()
     } catch { case e: IllegalArgumentException => }
 
+    // zero without units
+    new Period("0")
+
     // no units
     try {
       new Period("1")
@@ -118,6 +121,7 @@ class UtilTest {
 
   @Test
   def Period_ms {
+    assertEquals(0, new Period("0").ms)
     assertEquals(1, new Period("1ms").ms)
     assertEquals(10, new Period("10ms").ms)
 
@@ -140,6 +144,7 @@ class UtilTest {
 
   @Test
   def Period_value {
+    assertEquals(0, new Period("0").value)
     assertEquals(10, new Period("10ms").value)
     assertEquals(50, new Period("50h").value)
     assertEquals(20, new Period("20d").value)
@@ -147,6 +152,7 @@ class UtilTest {
 
   @Test
   def Period_unit {
+    assertEquals("ms", new Period("0").unit)
     assertEquals("ms", new Period("10ms").unit)
     assertEquals("h", new Period("50h").unit)
     assertEquals("d", new Period("20d").unit)

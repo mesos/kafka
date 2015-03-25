@@ -162,11 +162,11 @@ class BrokerTest extends MesosTestCase {
     assertTrue(state, state.startsWith("starting 2"))
   }
 
-  @Test
-  def waitForState {
+  @Test(timeout = 5000)
+  def waitFor {
     val broker = new Broker()
 
-    def scheduleStateSwitch(running: Boolean, delay: Long) {
+    def deferStateSwitch(running: Boolean, delay: Long) {
       new Thread() {
         override def run() {
           setName(classOf[BrokerTest].getSimpleName + "-scheduleState")
@@ -181,14 +181,14 @@ class BrokerTest extends MesosTestCase {
       }.start()
     }
 
-    scheduleStateSwitch(running = true, 100)
-    assertTrue(broker.waitForState(running = true, 200))
+    deferStateSwitch(running = true, 100)
+    assertTrue(broker.waitFor(running = true, new Period("200ms")))
 
-    scheduleStateSwitch(running = false, 100)
-    assertTrue(broker.waitForState(running = false, 200))
+    deferStateSwitch(running = false, 100)
+    assertTrue(broker.waitFor(running = false, new Period("200ms")))
 
     // timeout
-    assertFalse(broker.waitForState(running = true, 50))
+    assertFalse(broker.waitFor(running = true, new Period("50ms")))
   }
 
   @Test

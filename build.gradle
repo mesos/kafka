@@ -1,6 +1,6 @@
 apply plugin: 'scala'
 
-version = '0.6'
+version = '0.7'
 
 jar.archiveName = "kafka-mesos-${version}.jar"
 
@@ -34,12 +34,22 @@ dependencies {
     compile "org.eclipse.jetty:jetty-util:9.0.4.v20130625"
     compile "javax.servlet:javax.servlet-api:3.0.1"
     testCompile 'junit:junit:4.12'
+
+    compile ('org.apache.kafka:kafka_2.10:0.8.1.1') {
+        exclude group: "javax.jms"
+        exclude group: "com.sun.jdmk"
+        exclude group: "com.sun.jmx"
+        exclude group: "junit"
+        exclude group: "jline"
+    }
 }
 
 jar {
     dependsOn 'test'
     doFirst {
         from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
+            exclude "*"
+            exclude "about_files/*"
             exclude "META-INF/*.SF"
             exclude "META-INF/*.DSA"
             exclude "META-INF/*.RSA"

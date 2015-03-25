@@ -28,6 +28,13 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.Protos
 
 object Util {
+  Class.forName(kafka.utils.Json.getClass.getName) // init class
+  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
+
+  JSON.globalNumberParser = parseNumber
+  JSON.perThreadNumberParser = parseNumber
+  private val jsonLock = new Object
+
   def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
     if (s == null) return result
@@ -43,9 +50,11 @@ object Util {
   }
 
   def parseJson(json: String): Map[String, Object] = {
-    val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
-    if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
-    node
+    jsonLock synchronized {
+      val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
+      if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
+      node
+    }
   }
 
   def copyAndClose(in: InputStream, out: OutputStream): Unit = {
@@ -77,10 +86,13 @@ object Util {
 
       var unitIdx = s.length - 1
       if (s.endsWith("ms")) unitIdx -= 1
+      if (s == "0") unitIdx = 1
 
       try { _value = java.lang.Long.valueOf(s.substring(0, unitIdx)) }
       catch { case e: IllegalArgumentException => throw new IllegalArgumentException(s) }
+
       _unit = s.substring(unitIdx)
+      if (s == "0") _unit = "ms"
 
       _ms = value
       if (_unit == "ms") _ms *= 1

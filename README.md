@@ -217,52 +217,53 @@ Adding brokers to the cluster
 ```
 # ./kafka-mesos.sh help add
 Add broker
-Usage: add <broker-id-expression>
+Usage: add <id-expr>
 
-Expression examples:
+id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
-  "*"    - any broker
+  *      - any broker
 
 Option              Description
 ------              -----------
 --attributes        slave attributes (rack:1;role:master)
---cpus <Double>     cpu amount
+--cpus <Double>     cpu amount (0.5, 1, 2)
 --failoverDelay     failover delay (10s, 5m, 3h)
 --failoverMaxDelay  max failover delay. See failoverDelay.
 --failoverMaxTries  max failover tries
---heap <Long>       heap amount
+--heap <Long>       heap amount in Mb
 --host              slave hostname
---mem <Long>        mem amount
+--mem <Long>        mem amount in Mb
 --options           kafka options (a=1;b=2)
 ```
 
-Updating the broker configurations
+Updating broker configurations
 -----------------------------------
 
 ```
+# ./kafka-mesos.sh help update
 Update broker
-Usage: update <broker-id-expression>
+Usage: update <id-expr>
 
-Expression examples:
+id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
-  "*"    - any broker
+  *      - any broker
 
 Option              Description
 ------              -----------
 --attributes        slave attributes (rack:1;role:master)
---cpus <Double>     cpu amount
+--cpus <Double>     cpu amount (0.5, 1, 2)
 --failoverDelay     failover delay (10s, 5m, 3h)
 --failoverMaxDelay  max failover delay. See failoverDelay.
 --failoverMaxTries  max failover tries
---heap <Long>       heap amount
+--heap <Long>       heap amount in Mb
 --host              slave hostname
---mem <Long>        mem amount
+--mem <Long>        mem amount in Mb
 --options           kafka options (a=1;b=2)
 
 Note: use "" arg to unset the option
@@ -274,19 +275,18 @@ Starting brokers in the cluster
 ```
 # ./kafka-mesos.sh help start
 Start broker
-Usage: start <broker-id-expression>
+Usage: start <id-expr>
 
-Expression examples:
+id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
-  "*"    - any broker
+  *      - any broker
 
-Option               Description
-------               -----------
---timeout <Integer>  timeout in seconds. 0 - for no timeout
-                       (default: 30)
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
 ```
 
 Stopping brokers in the cluster
@@ -295,20 +295,18 @@ Stopping brokers in the cluster
 ```
 # ./kafka-mesos.sh help stop
 Stop broker
-Usage: stop <broker-id-expression>
+Usage: stop <id-expr>
 
-Expression examples:
+id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
-  "*"    - any broker
+  *      - any broker
 
-Option               Description
-------               -----------
---timeout <Integer>  timeout in seconds. 0 - for no timeout
-                       (default: 30)
-
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
 ```
 
 Removing brokers from the cluster
@@ -317,15 +315,35 @@ Removing brokers from the cluster
 ```
 # ./kafka-mesos.sh help remove
 Remove broker
-Usage: remove <broker-id-expression>
+Usage: remove <id-expr>
 
-Expression examples:
+id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
-  "*"    - any broker
+  *      - any broker
+```
 
+Rebalancing brokers in the cluster
+----------------------------------
+```
+# ./kafka-mesos.sh help rebalance
+Rebalance
+Usage: rebalance <id-expr>|status
+
+id-expr examples:
+  0      - broker 0
+  0,1    - brokers 0,1
+  0..2   - brokers 0,1,2
+  0,1..2 - brokers 0,1,2
+  *      - any broker
+
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
+--topics   topics (comma-separated). Default - all
+             topics
 ```
 
 Using the REST API
