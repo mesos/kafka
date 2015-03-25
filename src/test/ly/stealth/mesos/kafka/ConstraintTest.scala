@@ -2,7 +2,6 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Constraint.Same
 
 class ConstraintTest {
   @Test
@@ -16,7 +15,11 @@ class ConstraintTest {
 
     assertEquals(classOf[Constraint.Same], c("#same").getClass)
     assertEquals(classOf[Constraint.Unique], c("#unique").getClass)
+
     assertEquals(classOf[Constraint.Regex], c("#regex:.").getClass)
+
+    assertEquals(classOf[Constraint.Group], c("#group").getClass)
+    assertEquals(classOf[Constraint.Group], c("#group:2").getClass)
 
     // unsupported
     try { c("#unsupported"); fail() }
@@ -130,5 +133,25 @@ class ConstraintTest {
     assertFalse(regex.matches("12"))
     assertFalse(regex.matches("a1a2"))
     assertFalse(regex.matches("1a2a"))
+  }
+
+  @Test
+  def Group_matches {
+    var group = new Constraint.Group(1)
+    assertTrue(group.matches("1", Array()))
+    assertTrue(group.matches("1", Array("1")))
+    assertTrue(group.matches("1", Array("1", "1")))
+    assertTrue(group.matches("2", Array("1")))
+
+    group = new Constraint.Group(2)
+    assertTrue(group.matches("1", Array()))
+    assertFalse(group.matches("1", Array("1")))
+    assertTrue(group.matches("2", Array("1")))
+
+    assertTrue(group.matches("1", Array("1", "2")))
+    assertTrue(group.matches("2", Array("1", "2")))
+
+    assertFalse(group.matches("1", Array("1", "1", "2")))
+    assertTrue(group.matches("2", Array("1", "1", "2")))
   }
 }

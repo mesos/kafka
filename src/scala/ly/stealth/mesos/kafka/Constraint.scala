@@ -12,6 +12,11 @@ class Constraint(s: String) {
       if (s == "#same") _condition = new Constraint.Same()
       else if (s == "#unique") _condition = new Constraint.Unique()
       else if (s.startsWith("#regex:")) _condition = new Constraint.Regex(s.substring("#regex:".length))
+      else if (s.startsWith("#group")) {
+        val arg = s.substring("#group".length)
+        val count: Int = if (arg.startsWith(":")) Integer.valueOf(arg.substring(1)) else 1
+        _condition = new Constraint.Group(count)
+      }
       else throw new IllegalArgumentException("unsupported condition " + s)
     }
   }
@@ -96,5 +101,21 @@ object Constraint {
     
     def matches(value: String, values: Array[String] = Array()): Boolean = _pattern.matcher(value).find()
     override def toString: String = "#regex:" + s
+  }
+
+  class Group(groups: Int) extends Condition {
+    def matches(value: String, values: Array[String]): Boolean = {
+      val counts: Map[String, Int] = values.groupBy("" + _).mapValues(_.size)
+      val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
+
+      // implementation approach taken from
+      // https://github.com/mesosphere/marathon/blob/master/src/main/scala/mesosphere/mesos/Constraints.scala
+
+      // Return true if any of these are also true:
+      // a) this offer matches the smallest grouping when there are >= minimum groupings
+      // b) the constraint value from the offer is not yet in the grouping
+      val count = counts.getOrElse(value, 0)
+      count == 0 || (counts.size >= groups && count == minCount)
+    }
   }
 }
