@@ -49,6 +49,12 @@ class Constraint(_value: String) {
 
   def matches(value: String, values: Array[String] = Array()): Boolean = condition.matches(value, values)
 
+  override def hashCode(): Int = _value.hashCode
+  override def equals(obj: scala.Any): Boolean = {
+    if (!obj.isInstanceOf[Constraint]) return false
+    value == obj.asInstanceOf[Constraint].value
+  }
+
   override def toString: String = _value
 }
 

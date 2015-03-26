@@ -39,9 +39,8 @@ class BrokerTest extends MesosTestCase {
   @Test
   def offectiveOptions {
     // $var substitution
-    broker.host = "host"
-    broker.options = parseMap("a=$id,b=2,c=$host")
-    assertEquals(parseMap("a=0,b=2,c=host,log.dirs=kafka-logs"), broker.effectiveOptions())
+    broker.options = parseMap("a=$id,b=2")
+    assertEquals(parseMap("a=0,b=2,log.dirs=kafka-logs"), broker.effectiveOptions())
 
     // log.dirs override
     broker.options = parseMap("log.dirs=logs")
@@ -73,24 +72,24 @@ class BrokerTest extends MesosTestCase {
     assertTrue(broker.matches(offer(host = "slave")))
 
     // token
-    broker.host = "master"
+    broker.host = new Constraint("master")
     assertTrue(broker.matches(offer(host = "master")))
     assertFalse(broker.matches(offer(host = "slave")))
 
     // pattern
-    broker.host = "master*"
+    broker.host = new Constraint("master*")
     assertTrue(broker.matches(offer(host = "master")))
     assertTrue(broker.matches(offer(host = "master-2")))
     assertFalse(broker.matches(offer(host = "slave")))
 
     // #same
-    broker.host = "#same"
+    broker.host = new Constraint("#same")
     assertTrue(broker.matches(offer(host = "master")))
     assertTrue(broker.matches(offer(host = "master"), _ => Array("master")))
     assertFalse(broker.matches(offer(host = "master"), _ => Array("slave")))
 
     // #unique
-    broker.host = "#unique"
+    broker.host = new Constraint("#unique")
     assertTrue(broker.matches(offer(host = "master")))
     assertFalse(broker.matches(offer(host = "master"), _ => Array("master")))
     assertTrue(broker.matches(offer(host = "master"), _ => Array("slave")))
@@ -209,7 +208,7 @@ class BrokerTest extends MesosTestCase {
   @Test
   def toJson_fromJson {
     broker.active = true
-    broker.host = "host"
+    broker.host = new Constraint("host")
     broker.cpus = 0.5
     broker.mem = 128
     broker.heap = 128

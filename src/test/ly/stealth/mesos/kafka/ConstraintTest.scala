@@ -65,6 +65,14 @@ class ConstraintTest {
   }
 
   @Test
+  def _toString {
+    assertEquals("", "" + new Constraint(""))
+    assertEquals("abc", "" + new Constraint("abc"))
+    assertEquals("#group:2", "" + new Constraint("#group:2"))
+    assertEquals("#same", "" + new Constraint("#same"))
+  }
+
+  @Test
   def Pattern_negated {
     assertTrue(new Constraint.Pattern("!a").negated)
     assertFalse(new Constraint.Pattern("a").negated)

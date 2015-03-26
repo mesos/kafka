@@ -30,7 +30,7 @@ class Broker(_id: String = "0") {
   var id: String = _id
   @volatile var active: Boolean = false
 
-  var host: String = null
+  var host: Constraint = null
   var cpus: Double = 0.5
   var mem: Long = 128
   var heap: Long = 128
@@ -43,13 +43,8 @@ class Broker(_id: String = "0") {
   def effectiveOptions(overrides: util.Map[String, String] = null): util.Map[String, String] = {
     val result = new util.LinkedHashMap[String, String](options)
 
-    for ((k, v) <- result) {
-      var nv = v
-      nv = nv.replace("$id", id)
-      if (host != null) nv = nv.replace("$host", host)
-
-      result.put(k, nv)
-    }
+    for ((k, v) <- result)
+      result.put(k, v.replace("$id", id))
 
     if (overrides != null) result.putAll(overrides)
 
@@ -62,7 +57,7 @@ class Broker(_id: String = "0") {
   @volatile var task: Broker.Task = null
 
   def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): Boolean = {
-    if (host != null && !new Constraint(host).matches(offer.getHostname, otherAttributes("host"))) return false
+    if (host != null && !host.matches(offer.getHostname, otherAttributes("host"))) return false
 
     // check resources
     val offerResources = new util.HashMap[String, Resource]()
@@ -136,7 +131,7 @@ class Broker(_id: String = "0") {
     id = node("id").asInstanceOf[String]
     active = node("active").asInstanceOf[Boolean]
 
-    if (node.contains("host")) host = node("host").asInstanceOf[String]
+    if (node.contains("host")) host = new Constraint(node("host").asInstanceOf[String])
     cpus = node("cpus").asInstanceOf[Number].doubleValue()
     mem = node("mem").asInstanceOf[Number].longValue()
     heap = node("heap").asInstanceOf[Number].longValue()
@@ -157,7 +152,7 @@ class Broker(_id: String = "0") {
     obj("id") = id
     obj("active") = active
 
-    if (host != null) obj("host") = host
+    if (host != null) obj("host") = "" + host
     obj("cpus") = cpus
     obj("mem") = mem
     obj("heap") = heap

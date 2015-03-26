@@ -129,7 +129,10 @@ object HttpServer {
       val idExpr: String = request.getParameter("id")
       if (idExpr == null || idExpr.isEmpty) errors.add("id required")
 
-      val host: String = request.getParameter("host")
+      var host: Constraint = null
+      if (request.getParameter("host") != null)
+        try { host = new Constraint(request.getParameter("host")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid host: " + e.getMessage) }
 
       var cpus: java.lang.Double = null
       if (request.getParameter("cpus") != null)
@@ -198,7 +201,7 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       for (broker <- brokers) {
-        if (host != null) broker.host = if (host != "") host else null
+        if (host != null) broker.host = if (!host.value.isEmpty) host else null
         if (cpus != null) broker.cpus = cpus
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
