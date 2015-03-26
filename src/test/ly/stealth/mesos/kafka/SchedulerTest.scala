@@ -22,8 +22,7 @@ import scala.collection.JavaConversions._
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.{TaskState, Resource}
-import java.util.{Date, Properties}
-import java.io.StringReader
+import java.util.Date
 
 class SchedulerTest extends MesosTestCase {
   @Test
@@ -43,7 +42,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def newTask {
     val broker = new Broker("1")
-    broker.options = "a=1"
+    broker.options = Util.parseMap("a=1")
     broker.cpus = 0.5
     broker.mem = 256
 
@@ -74,13 +73,12 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(1000, range.getEnd)
 
     // options
-    val options = new Properties()
-    options.load(new StringReader(task.getData.toStringUtf8))
-    assertEquals(broker.id, options.getProperty("broker.id"))
-    assertEquals("" + 1000, options.getProperty("port"))
+    val options = Util.parseMap(task.getData.toStringUtf8)
+    assertEquals(broker.id, options.get("broker.id"))
+    assertEquals("" + 1000, options.get("port"))
 
-    assertEquals("kafka-logs", options.getProperty("log.dirs"))
-    assertEquals("1", options.getProperty("a"))
+    assertEquals("kafka-logs", options.get("log.dirs"))
+    assertEquals("1", options.get("a"))
   }
 
   @Test

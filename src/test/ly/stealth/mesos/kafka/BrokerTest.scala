@@ -22,6 +22,7 @@ import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
+import Util.parseMap
 
 class BrokerTest extends MesosTestCase {
   var broker: Broker = null
@@ -38,23 +39,23 @@ class BrokerTest extends MesosTestCase {
   @Test
   def attributeMap {
     broker.attributes = "a:1;b:2"
-    assertEquals(broker.attributeMap, Util.parseMap("a=1,b=2"))
+    assertEquals(broker.attributeMap, parseMap("a=1,b=2"))
   }
 
   @Test
-  def optionMap {
+  def offectiveOptions {
     // $var substitution
     broker.host = "host"
-    broker.options = "a=$id;b=2;c=$host"
-    assertEquals(broker.optionMap(), Util.parseMap("a=0,b=2,c=host,log.dirs=kafka-logs"))
+    broker.options = parseMap("a=$id,b=2,c=$host")
+    assertEquals(parseMap("a=0,b=2,c=host,log.dirs=kafka-logs"), broker.effectiveOptions())
 
     // log.dirs override
-    broker.options = "log.dirs=logs"
-    assertEquals(broker.optionMap(), Util.parseMap("log.dirs=logs"))
+    broker.options = parseMap("log.dirs=logs")
+    assertEquals(parseMap("log.dirs=logs"), broker.effectiveOptions(parseMap("log.dirs=logs")))
 
     // option override
-    broker.options = "a=1;log.dirs=logs"
-    assertEquals(broker.optionMap(Util.parseMap("a=2")), Util.parseMap("a=2,log.dirs=logs"))
+    broker.options = parseMap("a=1,log.dirs=logs")
+    assertEquals(parseMap("a=2,log.dirs=logs"), broker.effectiveOptions(parseMap("a=2")))
   }
 
   @Test
@@ -220,7 +221,7 @@ class BrokerTest extends MesosTestCase {
     broker.heap = 128
 
     broker.attributes = "a:1"
-    broker.options = "a=1"
+    broker.options = parseMap("a=1")
 
     broker.failover.registerFailure(new Date(0))
     broker.task = new Task("1", "host", 9092)
@@ -332,7 +333,7 @@ class BrokerTest extends MesosTestCase {
   // Task
   @Test
   def Task_toJson_fromJson {
-    val task = new Task("id", "host", 9092, Util.parseMap("a=1,b=2"))
+    val task = new Task("id", "host", 9092, parseMap("a=1,b=2"))
     task.running = true
 
     val read: Task = new Task()

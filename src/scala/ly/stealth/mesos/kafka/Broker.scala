@@ -36,14 +36,14 @@ class Broker(_id: String = "0") {
   var heap: Long = 128
 
   var attributes: String = null
-  var options: String = null
+  var options: util.Map[String, String] = new util.LinkedHashMap()
 
   var failover: Failover = new Failover()
 
   def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ';', ':')
 
-  def optionMap(overrides: util.Map[String, String] = null): util.Map[String, String] = {
-    val result = Util.parseMap(options, ';', '=')
+  def effectiveOptions(overrides: util.Map[String, String] = null): util.Map[String, String] = {
+    val result = new util.LinkedHashMap[String, String](options)
 
     for ((k, v) <- result) {
       var nv = v
@@ -134,25 +134,6 @@ class Broker(_id: String = "0") {
     matches
   }
 
-  def copy(): Broker = {
-    val broker: Broker = new Broker()
-    broker.id = id
-    broker.active = active
-
-    broker.host = host
-    broker.cpus = cpus
-    broker.mem = mem
-    broker.heap = heap
-
-    broker.attributes = attributes
-    broker.options = options
-
-    broker.failover = failover.copy
-    if (task != null) broker.task = task.copy
-
-    broker
-  }
-
   def fromJson(node: Map[String, Object]): Unit = {
     id = node("id").asInstanceOf[String]
     active = node("active").asInstanceOf[Boolean]
@@ -163,7 +144,7 @@ class Broker(_id: String = "0") {
     heap = node("heap").asInstanceOf[Number].longValue()
 
     if (node.contains("attributes")) attributes = node("attributes").asInstanceOf[String]
-    if (node.contains("options")) options = node("options").asInstanceOf[String]
+    if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
 
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
@@ -184,7 +165,7 @@ class Broker(_id: String = "0") {
     obj("heap") = heap
 
     if (attributes != null) obj("attributes") = attributes
-    if (options != null) obj("options") = options
+    if (!options.isEmpty) obj("options") = Util.formatMap(options)
 
     obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson
@@ -242,18 +223,6 @@ object Broker {
       failureTime = null
     }
 
-    def copy: Failover = {
-      val failover = new Failover()
-
-      failover.delay = delay
-      failover.maxDelay = maxDelay
-      failover.maxTries = maxTries
-
-      failover.failures = failures
-      failover.failureTime = failureTime
-      failover
-    }
-
     def fromJson(node: Map[String, Object]): Unit = {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
@@ -292,19 +261,6 @@ object Broker {
     var attributes: util.Map[String, String] = _attributes
 
     def endpoint: String = host + ":" + port
-
-    def copy: Task = {
-      val task = new Task()
-
-      task.id = id
-      task.running = running
-
-      task.host = host
-      task.port = port
-      task.attributes = new util.HashMap[String, String](attributes)
-
-      task
-    }
 
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]

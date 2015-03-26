@@ -308,7 +308,7 @@ object Cli {
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
 
     if (broker.attributes != null) printLine("attributes: " + broker.attributes, indent)
-    if (broker.options != null) printLine("options: " + broker.options, indent)
+    if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
 
     var failover = "failover:"
     failover += " delay:" + broker.failover.delay

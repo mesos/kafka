@@ -58,15 +58,16 @@ object Util {
       parts.toArray(Array[String]())
     }
 
-    val result = new util.HashMap[String, String]()
+    val result = new util.LinkedHashMap[String, String]()
     if (s == null) return result
 
     for (entry <- splitEscaped(s, entrySep)) {
       if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
-      val pair = splitEscaped(entry, valueSep, unescape = true)
 
-      if (pair.length == 2) result.put(pair(0).trim, pair(1).trim)
-      else result.put(pair(0).trim, null)
+      val pair = splitEscaped(entry, valueSep, unescape = true)
+      if (pair.length < 2) throw new IllegalArgumentException(s)
+
+      result.put(pair(0).trim, pair(1).trim)
     }
 
     result

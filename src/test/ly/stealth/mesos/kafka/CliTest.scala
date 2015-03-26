@@ -94,7 +94,7 @@ class CliTest extends MesosTestCase {
 
     assertEquals(new Period("10s"), broker.failover.delay)
     assertEquals(new Period("20s"), broker.failover.maxDelay)
-    assertEquals("log.dirs=/tmp/kafka-logs", broker.options)
+    assertEquals(Util.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
   }
 
   @Test

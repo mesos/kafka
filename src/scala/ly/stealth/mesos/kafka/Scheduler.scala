@@ -22,8 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.{Date, Properties}
-import java.io.StringWriter
+import java.util.Date
 import scala.collection.JavaConversions._
 import Util.Str
 
@@ -65,12 +64,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "zookeeper.connect" -> Config.kafkaZkConnect
       )
 
-      val p: Properties = new Properties()
-      p.putAll(broker.optionMap(overrides))
-
-      val buffer: StringWriter = new StringWriter()
-      p.store(buffer, "")
-      ByteString.copyFromUtf8("" + buffer)
+      val options = Util.formatMap(broker.effectiveOptions(overrides))
+      ByteString.copyFromUtf8(options)
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder

@@ -22,10 +22,11 @@ import java.io.{FileInputStream, File}
 import java.net.{URL, URLClassLoader}
 import java.util.Properties
 import java.util
+import scala.collection.JavaConversions._
 
 abstract class BrokerServer {
   def isStarted: Boolean
-  def start(props: Map[String, String]): Unit
+  def start(props: util.Map[String, String] = new util.HashMap()): Unit
   def stop(): Unit
   def waitFor(): Unit
 }
@@ -36,7 +37,7 @@ class KafkaServer extends BrokerServer {
 
   def isStarted: Boolean = server != null
 
-  def start(props: Map[String, String]): Unit = {
+  def start(props: util.Map[String, String]): Unit = {
     if (isStarted) throw new IllegalStateException("started")
 
     server = BrokerServer.Distro.newServer(props)
@@ -66,7 +67,7 @@ object BrokerServer {
     var loader: URLClassLoader = null
     init()
 
-    def newServer(props: Map[String, String]): Object = {
+    def newServer(props: util.Map[String, String]): Object = {
       val p: Properties = new Properties()
       val stream: FileInputStream = new FileInputStream(dir + "/config/server.properties")
       try { p.load(stream) }

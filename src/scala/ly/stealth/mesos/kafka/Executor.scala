@@ -20,8 +20,6 @@ package ly.stealth.mesos.kafka
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 import org.apache.mesos.Protos._
 import java.io._
-import java.util
-import scala.collection.immutable.HashMap
 import org.apache.log4j._
 import Util.Str
 
@@ -67,7 +65,7 @@ object Executor extends org.apache.mesos.Executor {
   private[kafka] def startBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
     def runBroker0 {
       try {
-        server.start(optionMap(task))
+        server.start(Util.parseMap(task.getData.toStringUtf8))
 
         var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
         driver.sendStatusUpdate(status)
@@ -103,20 +101,6 @@ object Executor extends org.apache.mesos.Executor {
       .setMessage("" + stackTrace)
       .build
     )
-  }
-
-  private[kafka] def optionMap(taskInfo: TaskInfo): Map[String, String] = {
-    val buffer = new StringReader(taskInfo.getData.toStringUtf8)
-
-    val p: util.Properties = new util.Properties()
-    p.load(buffer)
-
-    import scala.collection.JavaConversions._
-    var props = new HashMap[String, String]()
-    for (k <- p.keySet())
-      props += ("" + k -> p.getProperty("" + k))
-
-    props
   }
 
   def main(args: Array[String]) {

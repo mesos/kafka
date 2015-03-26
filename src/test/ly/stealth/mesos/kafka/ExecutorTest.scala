@@ -19,22 +19,9 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import java.util
-import java.util.Properties
-import scala.collection.JavaConversions._
-import java.io.StringWriter
 import org.apache.mesos.Protos.TaskState
 
 class ExecutorTest extends MesosTestCase {
-  @Test
-  def optionMap {
-    val task = this.task(data = props(Util.parseMap("a=1,b=2")))
-    val read: Map[String, String] = Executor.optionMap(task)
-    assertEquals(2, read.size)
-    assertEquals("1", read.getOrElse("a", null))
-    assertEquals("2", read.getOrElse("b", null))
-  }
-
   @Test(timeout = 5000)
   def startBroker_success {
     Executor.startBroker(executorDriver, task())
@@ -69,7 +56,7 @@ class ExecutorTest extends MesosTestCase {
 
   @Test
   def stopBroker {
-    Executor.server.start(Map())
+    Executor.server.start()
     assertTrue(Executor.server.isStarted)
 
     Executor.stopBroker
@@ -87,24 +74,15 @@ class ExecutorTest extends MesosTestCase {
 
   @Test
   def killTasks {
-    Executor.server.start(Map())
+    Executor.server.start()
     Executor.killTask(executorDriver, taskId())
     assertFalse(Executor.server.isStarted)
   }
 
   @Test
   def shutdown {
-    Executor.server.start(Map())
+    Executor.server.start()
     Executor.shutdown(executorDriver)
     assertFalse(Executor.server.isStarted)
-  }
-
-  private def props(map: util.Map[String, String]): String = {
-    val props = new Properties()
-    for ((k, v) <- map) props.setProperty(k, v)
-
-    val buffer = new StringWriter()
-    props.store(buffer, null)
-    "" + buffer
   }
 }

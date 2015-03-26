@@ -147,9 +147,9 @@ object HttpServer {
         catch { case e: NumberFormatException => errors.add("Invalid heap") }
 
 
-      val options: String = request.getParameter("options")
-      if (options != null)
-        try { Util.parseMap(request.getParameter("options"), ';', '=') }
+      var options: util.Map[String, String] = null
+      if (request.getParameter("options") != null)
+        try { options = Util.parseMap(request.getParameter("options")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options") }
 
       val attributes: String = request.getParameter("attributes")
@@ -203,7 +203,7 @@ object HttpServer {
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
 
-        if (options != null) broker.options = if (options != "") options else null
+        if (options != null) broker.options = options
         if (attributes != null) broker.attributes = if (attributes != "") attributes else null
 
         if (failoverDelay != null) broker.failover.delay = failoverDelay
