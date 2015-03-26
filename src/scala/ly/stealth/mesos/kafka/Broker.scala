@@ -22,9 +22,9 @@ import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.{Resource, Offer}
-import java.util.{Date, UUID}
+import java.util.{Collections, Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
-import Util.{Wildcard, Period, Str}
+import Util.{Period, Str}
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -63,8 +63,8 @@ class Broker(_id: String = "0") {
 
   @volatile var task: Broker.Task = null
 
-  def matches(offer: Offer): Boolean = {
-    if (host != null && !new Wildcard(host).matches(offer.getHostname)) return false
+  def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): Boolean = {
+    if (host != null && !new Constraint(host).matches(offer.getHostname, otherAttributes("host"))) return false
 
     // check resources
     val offerResources = new util.HashMap[String, Resource]()
@@ -83,14 +83,14 @@ class Broker(_id: String = "0") {
 
     for ((name, value) <- attributeMap) {
       if (!offerAttributes.containsKey(name)) return false
-      if (!new Wildcard(value).matches(offerAttributes.get(name))) return false
+      if (!new Constraint(value).matches(offerAttributes.get(name), otherAttributes(name))) return false
     }
 
     true
   }
-  
-  def shouldStart(offer: Offer, now: Date = new Date()): Boolean = {
-    active && task == null && matches(offer) && !failover.isWaitingDelay(now) 
+
+  def shouldStart(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes, now: Date = new Date()): Boolean = {
+    active && task == null && matches(offer, otherAttributes) && !failover.isWaitingDelay(now)
   }
 
   def shouldStop: Boolean = !active
@@ -196,7 +196,7 @@ class Broker(_id: String = "0") {
 object Broker {
   def nextTaskId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
   def nextExecutorId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
-  
+
   def idFromTaskId(taskId: String): String = {
     val parts: Array[String] = taskId.split("-")
     if (parts.length < 2) throw new IllegalArgumentException(taskId)
@@ -241,7 +241,7 @@ object Broker {
       failures = 0
       failureTime = null
     }
-    
+
     def copy: Failover = {
       val failover = new Failover()
 
@@ -258,7 +258,7 @@ object Broker {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
-      
+
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
       if (node.contains("failureTime")) failureTime = new Date(node("failureTime").asInstanceOf[Number].longValue())
     }
@@ -272,16 +272,24 @@ object Broker {
 
       if (failures != 0) obj("failures") = failures
       if (failureTime != null) obj("failureTime") = failureTime.getTime
-      
+
       new JSONObject(obj.toMap)
     }
   }
 
-  class Task(_id: String = null, _host: String = null, _port: Int = -1, _running: Boolean = false) {
+  class Task(
+    _id: String = null,
+    _host: String = null,
+    _port: Int = -1,
+    _attributes: util.Map[String, String] = Collections.emptyMap(),
+    _running: Boolean = false
+  ) {
     var id: String = _id
     @volatile var running: Boolean = _running
+
     var host: String = _host
     var port: Int = _port
+    var attributes: util.Map[String, String] = _attributes
 
     def endpoint: String = host + ":" + port
 
@@ -290,8 +298,10 @@ object Broker {
 
       task.id = id
       task.running = running
+
       task.host = host
       task.port = port
+      task.attributes = new util.HashMap[String, String](attributes)
 
       task
     }
@@ -299,8 +309,10 @@ object Broker {
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]
       running = node("running").asInstanceOf[Boolean]
+
       host = node("host").asInstanceOf[String]
       port = node("port").asInstanceOf[Number].intValue()
+      attributes = node("attributes").asInstanceOf[Map[String, String]]
     }
 
     def toJson: JSONObject = {
@@ -308,10 +320,15 @@ object Broker {
 
       obj("id") = id
       obj("running") = running
+
       obj("host") = host
       obj("port") = port
+      obj("attributes") = new JSONObject(attributes.toMap)
 
       new JSONObject(obj.toMap)
     }
   }
+
+  type OtherAttributes = (String) => Array[String]
+  def NoAttributes: OtherAttributes = _ => Array()
 }

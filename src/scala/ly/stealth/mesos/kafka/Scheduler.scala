@@ -138,7 +138,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
     def startBroker(offer: Offer): Boolean = {
       for (broker <- cluster.getBrokers) {
-        if (broker.shouldStart(offer)) {
+        if (broker.shouldStart(offer, otherTasksAttributes)) {
           launchTask(broker, offer)
           return true
         }
@@ -222,6 +222,22 @@ object Scheduler extends org.apache.mesos.Scheduler {
     taskIds.add(id)
 
     logger.info("Launching task " + id + " by offer " + Str.id(offer.getId.getValue) + "\n" + Str.task(task_))
+  }
+
+  private[kafka] def otherTasksAttributes(name: String): Array[String] = {
+    def value(task: Broker.Task, name: String): String = {
+      if (name == "host") return task.host
+      task.attributes.get(name)
+    }
+
+    val values = new util.ArrayList[String]()
+    for (broker <- cluster.getBrokers)
+      if (broker.task != null) {
+        val v = value(broker.task, name)
+        if (v != null) values.add(v)
+      }
+
+    values.toArray(Array[String]())
   }
 
   private[kafka] def findBrokerPort(offer: Offer): Int = {

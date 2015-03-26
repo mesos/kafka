@@ -17,7 +17,6 @@
 
 package ly.stealth.mesos.kafka
 
-import java.util.regex.Pattern
 import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSON
@@ -114,43 +113,6 @@ object Util {
 
     override def hashCode: Int = _ms.asInstanceOf[Int]
     override def toString: String = _value + _unit
-  }
-
-
-  class Wildcard(s: String) {
-    private val _value: String = s
-    private var _pattern: Pattern = null
-    compilePattern()
-
-    private def compilePattern() {
-      var regex: String = "^"
-      var token: String = ""
-
-      for (c <- _value.toCharArray) {
-        if (c == '*' || c == '?') {
-          regex += Pattern.quote(token)
-          token = ""
-          regex += (if (c == '*') ".*" else ".")
-        } else
-          token += c
-      }
-
-      if (token != "") regex += Pattern.quote(token)
-      regex += "$"
-
-      _pattern = Pattern.compile(regex)
-    }
-
-    def matches(value: String): Boolean = _pattern.matcher(value).find()
-    def value: String = _value
-
-    override def equals(obj: scala.Any): Boolean = {
-      if (!obj.isInstanceOf[Wildcard]) return false
-      obj.asInstanceOf[Wildcard]._value == _value
-    }
-
-    override def hashCode: Int = _value.hashCode
-    override def toString: String = _value
   }
 
   object Str {

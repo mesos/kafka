@@ -19,7 +19,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.{Wildcard, Period}
+import ly.stealth.mesos.kafka.Util.Period
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
 import java.util
 
@@ -162,45 +162,5 @@ class UtilTest {
   def Period_toString {
     assertEquals("10ms", "" + new Period("10ms"))
     assertEquals("5h", "" + new Period("5h"))
-  }
-
-  // Wildcard
-  @Test
-  def Wildcard_matches() {
-    var wildcard: Wildcard = new Wildcard("1")
-    assertTrue(wildcard.matches("1"))
-    assertFalse(wildcard.matches("a1"))
-    assertFalse(wildcard.matches("1a"))
-
-    // ? char
-    wildcard = new Wildcard("?")
-    assertTrue(wildcard.matches("a"))
-    assertTrue(wildcard.matches("b"))
-    assertFalse(wildcard.matches(""))
-    assertFalse(wildcard.matches("ab"))
-
-    wildcard = new Wildcard("1?2")
-    assertTrue(wildcard.matches("1a2"))
-    assertTrue(wildcard.matches("1b2"))
-    assertFalse(wildcard.matches("1ab2"))
-
-    // * char
-    wildcard = new Wildcard("*")
-    assertTrue(wildcard.matches(""))
-    assertTrue(wildcard.matches("a"))
-    assertTrue(wildcard.matches("ab"))
-
-    wildcard = new Wildcard("1*2")
-    assertTrue(wildcard.matches("1a2"))
-    assertTrue(wildcard.matches("1b2"))
-    assertTrue(wildcard.matches("1ab2"))
-
-    // complex case
-    wildcard = new Wildcard("1?2*3")
-    assertTrue(wildcard.matches("1a23"))
-    assertTrue(wildcard.matches("1a2cd3"))
-    assertFalse(wildcard.matches("1a2cd"))
-    assertFalse(wildcard.matches("a2cd3"))
-    assertFalse(wildcard.matches("1ab2cd3"))
   }
 }
