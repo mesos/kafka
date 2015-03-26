@@ -46,6 +46,10 @@ class UtilTest {
     assertEquals("=", map.get("b"))
     assertEquals("\\", map.get("c"))
 
+    // open escaping
+    try { Util.parseMap("a=\\"); fail() }
+    catch { case e: IllegalArgumentException => }
+
     // null
     assertTrue(Util.parseMap(null).isEmpty)
   }

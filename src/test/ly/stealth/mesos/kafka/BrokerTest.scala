@@ -37,12 +37,6 @@ class BrokerTest extends MesosTestCase {
   }
 
   @Test
-  def attributeMap {
-    broker.attributes = "a:1;b:2"
-    assertEquals(broker.attributeMap, parseMap("a=1,b=2"))
-  }
-
-  @Test
   def offectiveOptions {
     // $var substitution
     broker.host = "host"
@@ -105,13 +99,13 @@ class BrokerTest extends MesosTestCase {
   @Test
   def matches_attributes {
     // pattern
-    broker.attributes = "rack:1-*"
+    broker.attributes = parseMap("rack=1-*")
     assertTrue(broker.matches(offer(attributes = "rack:1-1")))
     assertTrue(broker.matches(offer(attributes = "rack:1-2")))
     assertFalse(broker.matches(offer(attributes = "rack:2-1")))
 
     // #same
-    broker.attributes = "rack:#same"
+    broker.attributes = parseMap("rack=#same")
     assertTrue(broker.matches(offer(attributes = "rack:1")))
     assertTrue(broker.matches(offer(attributes = "rack:1"), _ => Array("1")))
     assertFalse(broker.matches(offer(attributes = "rack:2"), _ => Array("1")))
@@ -220,7 +214,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
 
-    broker.attributes = "a:1"
+    broker.attributes = parseMap("a=1")
     broker.options = parseMap("a=1")
 
     broker.failover.registerFailure(new Date(0))

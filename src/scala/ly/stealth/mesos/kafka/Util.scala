@@ -52,7 +52,7 @@ object Util {
         }
       }
 
-      if (escaped) throw new IllegalStateException("open escaping")
+      if (escaped) throw new IllegalArgumentException("open escaping")
       if (part != "") parts.add(part)
 
       parts.toArray(Array[String]())

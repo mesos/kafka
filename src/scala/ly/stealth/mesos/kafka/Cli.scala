@@ -307,7 +307,7 @@ object Cli {
     if (broker.host != null) printLine("host: " + broker.host, indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
 
-    if (broker.attributes != null) printLine("attributes: " + broker.attributes, indent)
+    if (!broker.attributes.isEmpty) printLine("attributes: " + Util.formatMap(broker.attributes), indent)
     if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
 
     var failover = "failover:"
