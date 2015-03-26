@@ -1,4 +1,5 @@
 apply plugin: 'scala'
+apply plugin: 'idea'
 
 version = '0.7'
 
