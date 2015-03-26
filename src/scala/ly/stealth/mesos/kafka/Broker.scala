@@ -40,10 +40,10 @@ class Broker(_id: String = "0") {
 
   var failover: Failover = new Failover()
 
-  def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ";", ":")
+  def attributeMap: util.Map[String, String] = Util.parseMap(attributes, ';', ':')
 
   def optionMap(overrides: util.Map[String, String] = null): util.Map[String, String] = {
-    val result = Util.parseMap(options, ";", "=")
+    val result = Util.parseMap(options, ';', '=')
 
     for ((k, v) <- result) {
       var nv = v

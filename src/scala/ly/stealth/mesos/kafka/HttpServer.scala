@@ -149,12 +149,12 @@ object HttpServer {
 
       val options: String = request.getParameter("options")
       if (options != null)
-        try { Util.parseMap(request.getParameter("options"), ";", "=") }
+        try { Util.parseMap(request.getParameter("options"), ';', '=') }
         catch { case e: IllegalArgumentException => errors.add("Invalid options") }
 
       val attributes: String = request.getParameter("attributes")
       if (attributes != null)
-        try { Util.parseMap(request.getParameter("attributes"), ";", ":") }
+        try { Util.parseMap(request.getParameter("attributes"), ';', ':') }
         catch { case e: IllegalArgumentException => errors.add("Invalid attributes") }
 
 

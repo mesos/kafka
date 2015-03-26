@@ -34,18 +34,64 @@ object Util {
   JSON.perThreadNumberParser = parseNumber
   private val jsonLock = new Object
 
-  def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
-    val result = new util.LinkedHashMap[String, String]()
-    if (s == null) return result
+  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '='): util.Map[String, String] = {
+    def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
+      val parts = new util.ArrayList[String]()
 
-    for (entry <- s.split(entrySep))
-      if (entry.trim() != "") {
-        val pair = entry.split(valueSep)
-        if (pair.length == 2) result.put(pair(0).trim(), pair(1).trim())
-        else throw new IllegalArgumentException(s)
+      var escaped = false
+      var part = ""
+      for (c <- s.toCharArray) {
+        if (c == '\\' && !escaped) escaped = true
+        else if (c == sep && !escaped) {
+          parts.add(part)
+          part = ""
+        } else {
+          if (escaped && !unescape) part += "\\"
+          part += c
+          escaped = false
+        }
       }
 
+      if (escaped) throw new IllegalStateException("open escaping")
+      if (part != "") parts.add(part)
+
+      parts.toArray(Array[String]())
+    }
+
+    val result = new util.HashMap[String, String]()
+    if (s == null) return result
+
+    for (entry <- splitEscaped(s, entrySep)) {
+      if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
+      val pair = splitEscaped(entry, valueSep, unescape = true)
+
+      if (pair.length == 2) result.put(pair(0).trim, pair(1).trim)
+      else result.put(pair(0).trim, null)
+    }
+
     result
+  }
+
+  def formatMap(map: util.Map[String, String], entrySep: Char = ',', valueSep: Char = '='): String = {
+    def escape(s: String): String = {
+      var result = ""
+
+      for (c <- s.toCharArray) {
+        if (c == entrySep || c == valueSep || c == '\\') result += "\\"
+        result += c
+      }
+
+      result
+    }
+
+    var s = ""
+    for ((k, v) <- map) {
+      if (!s.isEmpty) s += entrySep
+      s += escape(k)
+      if (v != null) s += valueSep + escape(v)
+    }
+
+    s
   }
 
   def parseJson(json: String): Map[String, Object] = {

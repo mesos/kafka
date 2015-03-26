@@ -26,23 +26,46 @@ import java.util
 class UtilTest {
   @Test
   def parseMap {
-    var map = Util.parseMap("a=1,b=2", ",", "=")
+    var map = Util.parseMap("a=1,b=2")
     assertEquals(2, map.size())
     assertEquals("1", map.get("a"))
     assertEquals("2", map.get("b"))
 
     // missing pair
-    map = Util.parseMap("a=1,,b=2", ",", "=")
-    assertEquals(2, map.size())
+    try { map = Util.parseMap("a=1,,b=2"); fail() }
+    catch { case e: IllegalArgumentException => }
 
     // missing value
-    try {
-      Util.parseMap("a=1,b,c=3", ",", "=")
-      fail()
-    } catch { case e: IllegalArgumentException => }
+    map = Util.parseMap("a=1,b,c=3")
+    assertNull(map.get("b"))
+
+    // escaping
+    map = Util.parseMap("a=\\,,b=\\=,c=\\\\")
+    assertEquals(3, map.size())
+    assertEquals(",", map.get("a"))
+    assertEquals("=", map.get("b"))
+    assertEquals("\\", map.get("c"))
 
     // null
-    assertTrue(Util.parseMap(null, ",", "=").isEmpty)
+    assertTrue(Util.parseMap(null).isEmpty)
+  }
+
+  @Test
+  def formatMap {
+    val map = new util.LinkedHashMap[String, String]()
+    map.put("a", "1")
+    map.put("b", "2")
+    assertEquals("a=1,b=2", Util.formatMap(map))
+
+    // null value
+    map.put("b", null)
+    assertEquals("a=1,b", Util.formatMap(map))
+
+    // escaping
+    map.put("a", ",")
+    map.put("b", "=")
+    map.put("c", "\\")
+    assertEquals("a=\\,,b=\\=,c=\\\\", Util.formatMap(map))
   }
 
   @Test
