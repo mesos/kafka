@@ -155,9 +155,9 @@ object HttpServer {
         try { options = Util.parseMap(request.getParameter("options")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
-      var attributes: util.Map[String, String] = null
+      var attributes: util.Map[String, Constraint] = null
       if (request.getParameter("attributes") != null)
-        try { attributes = Util.parseMap(request.getParameter("attributes")) }
+        try { attributes = Util.parseMap(request.getParameter("attributes")).mapValues(new Constraint(_)).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid attributes: " + e.getMessage) }
 
 

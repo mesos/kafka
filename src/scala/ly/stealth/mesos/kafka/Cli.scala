@@ -114,8 +114,8 @@ object Cli {
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
-    parser.accepts("options", "kafka options (a=1;b=2)").withRequiredArg()
-    parser.accepts("attributes", "slave attributes (rack:1;role:master)").withRequiredArg()
+    parser.accepts("options", "kafka options (a=1,b=2)").withRequiredArg()
+    parser.accepts("attributes", "slave attributes (rack=1*,role=master)").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])

@@ -73,7 +73,7 @@ object Util {
     result
   }
 
-  def formatMap(map: util.Map[String, String], entrySep: Char = ',', valueSep: Char = '='): String = {
+  def formatMap(map: util.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = {
     def escape(s: String): String = {
       var result = ""
 
@@ -89,7 +89,7 @@ object Util {
     for ((k, v) <- map) {
       if (!s.isEmpty) s += entrySep
       s += escape(k)
-      if (v != null) s += valueSep + escape(v)
+      if (v != null) s += valueSep + escape("" + v)
     }
 
     s

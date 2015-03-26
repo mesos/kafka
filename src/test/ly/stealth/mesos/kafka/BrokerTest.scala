@@ -21,6 +21,7 @@ import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
+import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
 import Util.parseMap
 
@@ -98,13 +99,13 @@ class BrokerTest extends MesosTestCase {
   @Test
   def matches_attributes {
     // pattern
-    broker.attributes = parseMap("rack=1-*")
+    broker.attributes = parseMap("rack=1-*").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(attributes = "rack:1-1")))
     assertTrue(broker.matches(offer(attributes = "rack:1-2")))
     assertFalse(broker.matches(offer(attributes = "rack:2-1")))
 
     // #same
-    broker.attributes = parseMap("rack=#same")
+    broker.attributes = parseMap("rack=#same").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(attributes = "rack:1")))
     assertTrue(broker.matches(offer(attributes = "rack:1"), _ => Array("1")))
     assertFalse(broker.matches(offer(attributes = "rack:2"), _ => Array("1")))
@@ -213,7 +214,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
 
-    broker.attributes = parseMap("a=1")
+    broker.attributes = parseMap("a=1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
 
     broker.failover.registerFailure(new Date(0))
