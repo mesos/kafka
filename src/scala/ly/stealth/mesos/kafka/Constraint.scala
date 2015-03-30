@@ -30,19 +30,18 @@ class Constraint(_value: String) {
     if (!_value.startsWith("#"))
       _condition = new Constraint.Pattern(_value)
     else {
-      if (_value == "#same") _condition = new Constraint.Same()
-      else if (_value == "#unique") _condition = new Constraint.Unique()
-      else if (_value.startsWith("#regex:")) _condition = new Constraint.Regex(_value.substring("#regex:".length))
-      else if (_value.startsWith("#group")) {
-        val tail = _value.substring("#group".length)
+      if (_value.startsWith("#same")) {
+        val tail = _value.substring("#same".length)
 
         var count: Int = 1
         if (tail.startsWith(":"))
           try { count = Integer.valueOf(tail.substring(1)) }
           catch { case e: NumberFormatException => throw new IllegalArgumentException(s"invalid condition ${_value}") }
 
-        _condition = new Constraint.Group(count)
+        _condition = new Constraint.Same(count)
       }
+      else if (_value == "#unique") _condition = new Constraint.Unique()
+      else if (_value.startsWith("#regex:")) _condition = new Constraint.Regex(_value.substring("#regex:".length))
       else throw new IllegalArgumentException("unsupported condition " + _value)
     }
   }
@@ -117,9 +116,19 @@ object Constraint {
     override def toString: String = _value
   }
 
-  class Same extends Condition {
-    def matches(value: String, values: Array[String]): Boolean = values.isEmpty || values(0) == value
-    override def toString: String = "#same"
+  class Same(_variants: Int) extends Condition {
+    def variants: Int = _variants
+
+    def matches(value: String, values: Array[String]): Boolean = {
+      if (values.length < _variants) return !values.contains(value)
+
+      val counts: Map[String, Int] = values.groupBy("" + _).mapValues(_.size)
+      val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
+
+      counts.getOrElse(value, 0) == minCount
+    }
+
+    override def toString: String = "#same" + (if (_variants > 1) ":" + _variants else "")
   }
 
   class Unique extends Condition {
@@ -137,25 +146,5 @@ object Constraint {
     
     def matches(value: String, values: Array[String] = Array()): Boolean = _pattern.matcher(value).find()
     override def toString: String = "#regex:" + _value
-  }
-
-  class Group(_groups: Int) extends Condition {
-    def groups: Int = _groups
-    
-    def matches(value: String, values: Array[String]): Boolean = {
-      val counts: Map[String, Int] = values.groupBy("" + _).mapValues(_.size)
-      val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
-
-      // implementation approach taken from
-      // https://github.com/mesosphere/marathon/blob/master/src/main/scala/mesosphere/mesos/Constraints.scala
-
-      // Return true if any of these are also true:
-      // a) this offer matches the smallest grouping when there are >= minimum groupings
-      // b) the constraint value from the offer is not yet in the grouping
-      val count = counts.getOrElse(value, 0)
-      count == 0 || (counts.size >= _groups && count == minCount)
-    }
-
-    override def toString: String = "#group" + (if (groups > 1) ":" + groups else "")
   }
 }

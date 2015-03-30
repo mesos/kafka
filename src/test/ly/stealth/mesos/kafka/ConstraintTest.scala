@@ -31,20 +31,19 @@ class ConstraintTest {
     val pattern = c("abc").asInstanceOf[Constraint.Pattern]
     assertEquals("abc", pattern.value)
 
-    // same | unique
-    assertEquals(classOf[Constraint.Same], c("#same").getClass)
-    assertEquals(classOf[Constraint.Unique], c("#unique").getClass)
+    // same
+    var same = c("#same").asInstanceOf[Constraint.Same]
+    assertEquals(1, same.variants)
 
+    same = c("#same:2").asInstanceOf[Constraint.Same]
+    assertEquals(2, same.variants)
+
+    // unique
+    assertEquals(classOf[Constraint.Unique], c("#unique").getClass)
+    
     // regex
     val regex = c("#regex:.").asInstanceOf[Constraint.Regex]
     assertEquals(".", regex.value)
-
-    // group
-    var group = c("#group").asInstanceOf[Constraint.Group]
-    assertEquals(1, group.groups)
-
-    group = c("#group:2").asInstanceOf[Constraint.Group]
-    assertEquals(2, group.groups)
 
     // unsupported
     try { c("#unsupported"); fail() }
@@ -68,8 +67,8 @@ class ConstraintTest {
   def _toString {
     assertEquals("", "" + new Constraint(""))
     assertEquals("abc", "" + new Constraint("abc"))
-    assertEquals("#group:2", "" + new Constraint("#group:2"))
     assertEquals("#same", "" + new Constraint("#same"))
+    assertEquals("#same:2", "" + new Constraint("#same:2"))
   }
 
   @Test
@@ -156,13 +155,22 @@ class ConstraintTest {
 
   @Test
   def Same_matches {
-    val same = new Constraint.Same()
+    var same = new Constraint.Same(1)
     assertTrue(same.matches("1", Array()))
     assertTrue(same.matches("1", Array("1")))
     assertTrue(same.matches("1", Array("1", "1")))
-
     assertFalse(same.matches("1", Array("2")))
-    assertFalse(same.matches("1", Array("2", "1")))
+
+    same = new Constraint.Same(2)
+    assertTrue(same.matches("1", Array()))
+    assertFalse(same.matches("1", Array("1")))
+    assertTrue(same.matches("2", Array("1")))
+
+    assertTrue(same.matches("1", Array("1", "2")))
+    assertTrue(same.matches("2", Array("1", "2")))
+
+    assertFalse(same.matches("1", Array("1", "1", "2")))
+    assertTrue(same.matches("2", Array("1", "1", "2")))
   }
 
   @Test
@@ -184,25 +192,5 @@ class ConstraintTest {
     assertFalse(regex.matches("12"))
     assertFalse(regex.matches("a1a2"))
     assertFalse(regex.matches("1a2a"))
-  }
-
-  @Test
-  def Group_matches {
-    var group = new Constraint.Group(1)
-    assertTrue(group.matches("1", Array()))
-    assertTrue(group.matches("1", Array("1")))
-    assertTrue(group.matches("1", Array("1", "1")))
-    assertTrue(group.matches("2", Array("1")))
-
-    group = new Constraint.Group(2)
-    assertTrue(group.matches("1", Array()))
-    assertFalse(group.matches("1", Array("1")))
-    assertTrue(group.matches("2", Array("1")))
-
-    assertTrue(group.matches("1", Array("1", "2")))
-    assertTrue(group.matches("2", Array("1", "2")))
-
-    assertFalse(group.matches("1", Array("1", "1", "2")))
-    assertTrue(group.matches("2", Array("1", "1", "2")))
   }
 }
