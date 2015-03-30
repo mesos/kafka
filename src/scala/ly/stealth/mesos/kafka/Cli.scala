@@ -109,13 +109,13 @@ object Cli {
 
   private def handleAddUpdateBroker(id: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
     val parser = new OptionParser()
-    parser.accepts("host", "slave hostname").withRequiredArg()
+    parser.accepts("host", "hostname constraint").withRequiredArg()
     parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
     parser.accepts("options", "kafka options (a=1,b=2)").withRequiredArg()
-    parser.accepts("attributes", "slave attributes (rack=1*,role=master)").withRequiredArg()
+    parser.accepts("attributes", "attributes constraints (rack=1*,role=master)").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
@@ -123,9 +123,15 @@ object Cli {
 
     if (help) {
       val command = if (add) "add" else "update"
-      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr>\n")
-      printIdExprExamples()
+      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
+
+      out.println()
+      printIdExprExamples()
+
+      out.println()
+      printConstraintExamples()
+
       if (!add) out.println("\nNote: use \"\" arg to unset the option")
       return
     }
@@ -207,10 +213,12 @@ object Cli {
 
     if (help) {
       val command = if (start) "start" else "stop"
-      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr>\n")
-      printIdExprExamples()
+      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
-      return 
+
+      out.println()
+      printIdExprExamples()
+      return
     }
 
     var options: OptionSet = null
@@ -251,9 +259,11 @@ object Cli {
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
-      out.println("Rebalance\nUsage: rebalance <id-expr>|status\n")
-      printIdExprExamples()
+      out.println("Rebalance\nUsage: rebalance <id-expr>|status [options]\n")
       parser.printHelpOn(out)
+
+      out.println()
+      printIdExprExamples()
       return
     }
 
@@ -332,7 +342,17 @@ object Cli {
     printLine("0..2   - brokers 0,1,2", 1)
     printLine("0,1..2 - brokers 0,1,2", 1)
     printLine("*      - any broker", 1)
-    printLine()
+  }
+
+  private def printConstraintExamples(): Unit = {
+    printLine("constraint examples:")
+    printLine("master     - value equals 'master'", 1)
+    printLine("!master    - value not equals 'master'", 1)
+    printLine("slave*     - value starts with 'slave'", 1)
+    printLine("#same      - all values are the same", 1)
+    printLine("#unique    - all values are unique", 1)
+    printLine("#regex:<r> - value matches specified regex", 1)
+    printLine("#group:<N> - values are grouped to N+ groups", 1)
   }
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
