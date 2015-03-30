@@ -100,15 +100,15 @@ class BrokerTest extends MesosTestCase {
   def matches_attributes {
     // pattern
     broker.attributes = parseMap("rack=1-*").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(attributes = "rack:1-1")))
-    assertTrue(broker.matches(offer(attributes = "rack:1-2")))
-    assertFalse(broker.matches(offer(attributes = "rack:2-1")))
+    assertTrue(broker.matches(offer(attributes = "rack=1-1")))
+    assertTrue(broker.matches(offer(attributes = "rack=1-2")))
+    assertFalse(broker.matches(offer(attributes = "rack=2-1")))
 
     // #same
     broker.attributes = parseMap("rack=#same").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(attributes = "rack:1")))
-    assertTrue(broker.matches(offer(attributes = "rack:1"), _ => Array("1")))
-    assertFalse(broker.matches(offer(attributes = "rack:2"), _ => Array("1")))
+    assertTrue(broker.matches(offer(attributes = "rack=1")))
+    assertTrue(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
+    assertFalse(broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
   }
 
   @Test

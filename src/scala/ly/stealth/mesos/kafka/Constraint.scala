@@ -120,11 +120,10 @@ object Constraint {
     def variants: Int = _variants
 
     def matches(value: String, values: Array[String]): Boolean = {
-      if (values.length < _variants) return !values.contains(value)
-
       val counts: Map[String, Int] = values.groupBy("" + _).mapValues(_.size)
-      val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
+      if (counts.size < _variants) return !counts.contains(value)
 
+      val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
       counts.getOrElse(value, 0) == minCount
     }
 

@@ -200,7 +200,20 @@ Adding brokers to the cluster
 ```
 # ./kafka-mesos.sh help add
 Add broker
-Usage: add <id-expr>
+Usage: add <id-expr> [options]
+
+Option              Description
+------              -----------
+--attributes        attributes constraints (rack=1*,
+                      role=master)
+--cpus <Double>     cpu amount (0.5, 1, 2)
+--failoverDelay     failover delay (10s, 5m, 3h)
+--failoverMaxDelay  max failover delay. See failoverDelay.
+--failoverMaxTries  max failover tries
+--heap <Long>       heap amount in Mb
+--host              hostname constraint
+--mem <Long>        mem amount in Mb
+--options           kafka options (a=1,b=2)
 
 id-expr examples:
   0      - broker 0
@@ -209,17 +222,14 @@ id-expr examples:
   0,1..2 - brokers 0,1,2
   *      - any broker
 
-Option              Description
-------              -----------
---attributes        slave attributes (rack:1;role:master)
---cpus <Double>     cpu amount (0.5, 1, 2)
---failoverDelay     failover delay (10s, 5m, 3h)
---failoverMaxDelay  max failover delay. See failoverDelay.
---failoverMaxTries  max failover tries
---heap <Long>       heap amount in Mb
---host              slave hostname
---mem <Long>        mem amount in Mb
---options           kafka options (a=1;b=2)
+constraint examples:
+  master     - value equals 'master'
+  !master    - value not equals 'master'
+  slave*     - value starts with 'slave'
+  #same      - all values are the same
+  #same:3    - all values are within 3 different variants
+  #unique    - all values are unique
+  #regex:<r> - value matches specified regex
 ```
 
 Updating broker configurations
@@ -228,7 +238,20 @@ Updating broker configurations
 ```
 # ./kafka-mesos.sh help update
 Update broker
-Usage: update <id-expr>
+Usage: update <id-expr> [options]
+
+Option              Description
+------              -----------
+--attributes        attributes constraints (rack=1*,
+                      role=master)
+--cpus <Double>     cpu amount (0.5, 1, 2)
+--failoverDelay     failover delay (10s, 5m, 3h)
+--failoverMaxDelay  max failover delay. See failoverDelay.
+--failoverMaxTries  max failover tries
+--heap <Long>       heap amount in Mb
+--host              hostname constraint
+--mem <Long>        mem amount in Mb
+--options           kafka options (a=1,b=2)
 
 id-expr examples:
   0      - broker 0
@@ -237,17 +260,14 @@ id-expr examples:
   0,1..2 - brokers 0,1,2
   *      - any broker
 
-Option              Description
-------              -----------
---attributes        slave attributes (rack:1;role:master)
---cpus <Double>     cpu amount (0.5, 1, 2)
---failoverDelay     failover delay (10s, 5m, 3h)
---failoverMaxDelay  max failover delay. See failoverDelay.
---failoverMaxTries  max failover tries
---heap <Long>       heap amount in Mb
---host              slave hostname
---mem <Long>        mem amount in Mb
---options           kafka options (a=1;b=2)
+constraint examples:
+  master     - value equals 'master'
+  !master    - value not equals 'master'
+  slave*     - value starts with 'slave'
+  #same      - all values are the same
+  #same:3    - all values are within 3 different variants
+  #unique    - all values are unique
+  #regex:<r> - value matches specified regex
 
 Note: use "" arg to unset the option
 ```
@@ -258,7 +278,11 @@ Starting brokers in the cluster
 ```
 # ./kafka-mesos.sh help start
 Start broker
-Usage: start <id-expr>
+Usage: start <id-expr> [options]
+
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
 
 id-expr examples:
   0      - broker 0
@@ -266,10 +290,6 @@ id-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
-
-Option     Description
-------     -----------
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
 ```
 
 Stopping brokers in the cluster
@@ -278,7 +298,11 @@ Stopping brokers in the cluster
 ```
 # ./kafka-mesos.sh help stop
 Stop broker
-Usage: stop <id-expr>
+Usage: stop <id-expr> [options]
+
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
 
 id-expr examples:
   0      - broker 0
@@ -286,10 +310,6 @@ id-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
-
-Option     Description
-------     -----------
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
 ```
 
 Removing brokers from the cluster
@@ -313,7 +333,13 @@ Rebalancing brokers in the cluster
 ```
 # ./kafka-mesos.sh help rebalance
 Rebalance
-Usage: rebalance <id-expr>|status
+Usage: rebalance <id-expr>|status [options]
+
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
+--topics   topics (comma-separated). Default -
+             all topics
 
 id-expr examples:
   0      - broker 0
@@ -321,12 +347,6 @@ id-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
-
-Option     Description
-------     -----------
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
---topics   topics (comma-separated). Default - all
-             topics
 ```
 
 Project Goals
@@ -342,4 +362,4 @@ Project Goals
 
 * scaling the cluster up and down with automatic, programmatic and manual options.
 
-* smart partition assignmnet via constraints visa vi roles, resources and attributes.
+* smart partition assignment via constraints visa vi roles, resources and attributes.

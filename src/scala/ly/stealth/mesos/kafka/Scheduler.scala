@@ -212,8 +212,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
 
+    val attributes = new util.LinkedHashMap[String, String]()
+    for (attribute <- offer.getAttributesList)
+      if (attribute.hasText) attributes.put(attribute.getName, attribute.getText.getValue)
+
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
-    broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer))
+    broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer), attributes)
     taskIds.add(id)
 
     logger.info("Launching task " + id + " by offer " + Str.id(offer.getId.getValue) + "\n" + Str.task(task_))

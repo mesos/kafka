@@ -164,6 +164,7 @@ class ConstraintTest {
     same = new Constraint.Same(2)
     assertTrue(same.matches("1", Array()))
     assertFalse(same.matches("1", Array("1")))
+    assertFalse(same.matches("1", Array("1", "1")))
     assertTrue(same.matches("2", Array("1")))
 
     assertTrue(same.matches("1", Array("1", "2")))

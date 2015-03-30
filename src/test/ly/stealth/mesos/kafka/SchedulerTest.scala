@@ -163,13 +163,14 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000))
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000), attributes = "a=1,b=2")
 
     Scheduler.launchTask(broker, offer)
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
     assertNotNull(broker.task)
     assertFalse(broker.task.running)
+    assertEquals(Util.parseMap("a=1,b=2"), broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)

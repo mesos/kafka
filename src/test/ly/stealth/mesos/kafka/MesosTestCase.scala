@@ -147,7 +147,7 @@ class MesosTestCase {
     }
 
     if (attributes != null) {
-      val map = Util.parseMap(attributes, ';', ':')
+      val map = Util.parseMap(attributes)
       for ((k, v) <- map) {
         val attribute = Attribute.newBuilder()
           .setType(Value.Type.TEXT)
