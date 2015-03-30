@@ -142,9 +142,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
       false
     }
 
-    for (offer <- offers) {
-      val started = startBroker(offer)
+    var accepted = false
+    for (offer <- offers.sortBy(_.getHostname)) {
+      val started = !accepted && startBroker(offer)
       if (!started) driver.declineOffer(offer.getId)
+      accepted |= started
     }
 
     for (id <- taskIds) {
