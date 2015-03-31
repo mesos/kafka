@@ -113,7 +113,7 @@ object Cli {
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
-    parser.accepts("options", "kafka options (a=1,b=2)").withRequiredArg()
+    parser.accepts("options", "kafka options (log.dirs=/tmp/kafka/$id,num.io.threads=16)").withRequiredArg()
     parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*)").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])

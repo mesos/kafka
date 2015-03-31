@@ -213,8 +213,8 @@ Option              Description
 --failoverMaxTries  max failover tries
 --heap <Long>       heap amount in Mb
 --mem <Long>        mem amount in Mb
---options           kafka options (a=1,b=2)
-
+--options           kafka options (log.dirs=/tmp/kafka/$id,
+                      num.io.threads=16)
 id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
@@ -251,8 +251,8 @@ Option              Description
 --failoverMaxTries  max failover tries
 --heap <Long>       heap amount in Mb
 --mem <Long>        mem amount in Mb
---options           kafka options (a=1,b=2)
-
+--options           kafka options (log.dirs=/tmp/kafka/$id,
+                      num.io.threads=16)
 id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
