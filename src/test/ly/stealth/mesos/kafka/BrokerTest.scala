@@ -72,24 +72,24 @@ class BrokerTest extends MesosTestCase {
     assertTrue(broker.matches(offer(hostname = "slave")))
 
     // token
-    broker.constraints = parseMap("hostname=master").mapValues(new Constraint(_))
+    broker.constraints = parseMap("hostname=like:master").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(hostname = "master")))
     assertFalse(broker.matches(offer(hostname = "slave")))
 
     // pattern
-    broker.constraints = parseMap("hostname=master*").mapValues(new Constraint(_))
+    broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(hostname = "master")))
     assertTrue(broker.matches(offer(hostname = "master-2")))
     assertFalse(broker.matches(offer(hostname = "slave")))
 
     // #same
-    broker.constraints = parseMap("hostname=#same").mapValues(new Constraint(_))
+    broker.constraints = parseMap("hostname=same").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(hostname = "master")))
     assertTrue(broker.matches(offer(hostname = "master"), _ => Array("master")))
     assertFalse(broker.matches(offer(hostname = "master"), _ => Array("slave")))
 
     // #unique
-    broker.constraints = parseMap("hostname=#unique").mapValues(new Constraint(_))
+    broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(hostname = "master")))
     assertFalse(broker.matches(offer(hostname = "master"), _ => Array("master")))
     assertTrue(broker.matches(offer(hostname = "master"), _ => Array("slave")))
@@ -98,13 +98,13 @@ class BrokerTest extends MesosTestCase {
   @Test
   def matches_attributes {
     // pattern
-    broker.constraints = parseMap("rack=1-*").mapValues(new Constraint(_))
+    broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(attributes = "rack=1-1")))
     assertTrue(broker.matches(offer(attributes = "rack=1-2")))
     assertFalse(broker.matches(offer(attributes = "rack=2-1")))
 
     // #same
-    broker.constraints = parseMap("rack=#same").mapValues(new Constraint(_))
+    broker.constraints = parseMap("rack=same").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(attributes = "rack=1")))
     assertTrue(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
     assertFalse(broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
@@ -212,7 +212,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
 
-    broker.constraints = parseMap("a=1").mapValues(new Constraint(_))
+    broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
 
     broker.failover.registerFailure(new Date(0))
