@@ -25,9 +25,10 @@ import org.apache.mesos.{ExecutorDriver, SchedulerDriver}
 import java.util
 import org.junit.{Ignore, After, Before}
 import org.apache.log4j.BasicConfigurator
-import java.io.File
+import java.io.{FileWriter, File}
 import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicBoolean
+import scala.util.parsing.json.JSON
 
 @Ignore
 class MesosTestCase {
@@ -36,22 +37,44 @@ class MesosTestCase {
 
   @Before
   def before {
+    def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
+    JSON.globalNumberParser = parseNumber
+    JSON.perThreadNumberParser = parseNumber
+
     BasicConfigurator.configure()
 
     Cluster.stateFile = File.createTempFile(getClass.getSimpleName, null)
     Cluster.stateFile.delete()
+
     Scheduler.cluster.clear()
+    Scheduler.cluster.rebalancer = new TestRebalancer()
 
     schedulerDriver = _schedulerDriver
     Scheduler.registered(schedulerDriver, frameworkId(), master())
 
     executorDriver = _executorDriver
     Executor.server = new TestBrokerServer()
+
+    def createTempFile(name: String, content: String): File = {
+      val file = File.createTempFile(getClass.getSimpleName, name)
+
+      val writer = new FileWriter(file)
+      try { writer.write(content) }
+      finally { writer.close(); }
+
+      file.deleteOnExit()
+      file
+    }
+
+    HttpServer.jar = createTempFile("executor.jar", "executor")
+    HttpServer.kafkaDist = createTempFile("kafka.tgz", "kafka")
   }
 
   @After
   def after {
     Scheduler.disconnected(schedulerDriver)
+
+    Scheduler.cluster.rebalancer = new Rebalancer()
 
     Cluster.stateFile.delete()
     Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
@@ -70,13 +93,13 @@ class MesosTestCase {
     id: String = "" + UUID.randomUUID(),
     ip: Int = LOCALHOST_IP,
     port: Int = 5050,
-    host: String = "master"
+    hostname: String = "master"
   ): MasterInfo = {
     MasterInfo.newBuilder()
     .setId(id)
     .setIp(ip)
     .setPort(port)
-    .setHostname(host)
+    .setHostname(hostname)
     .build()
   }
 
@@ -84,7 +107,7 @@ class MesosTestCase {
     id: String = "" + UUID.randomUUID(),
     frameworkId: String = "" + UUID.randomUUID(),
     slaveId: String = "" + UUID.randomUUID(),
-    host: String = "host",
+    hostname: String = "host",
     cpus: Double = 0,
     mem: Long = 0,
     ports: Pair[Int, Int] = null,
@@ -95,7 +118,7 @@ class MesosTestCase {
       .setFrameworkId(FrameworkID.newBuilder().setValue(frameworkId))
       .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
 
-    builder.setHostname(host)
+    builder.setHostname(hostname)
 
     val cpusResource = Resource.newBuilder()
       .setName("cpus")
@@ -124,7 +147,7 @@ class MesosTestCase {
     }
 
     if (attributes != null) {
-      val map = Util.parseMap(attributes, ";", ":")
+      val map = Util.parseMap(attributes)
       for ((k, v) <- map) {
         val attribute = Attribute.newBuilder()
           .setType(Value.Type.TEXT)
@@ -275,11 +298,11 @@ class MesosTestCase {
 class TestBrokerServer extends BrokerServer {
   var failOnStart: Boolean = false
   private val started: AtomicBoolean = new AtomicBoolean(false)
-  var props: Map[String, String] = null
+  var props: util.Map[String, String] = null
 
   def isStarted: Boolean = started.get()
 
-  def start(props: Map[String, String]): Unit = {
+  def start(props: util.Map[String, String]): Unit = {
     if (failOnStart) throw new RuntimeException("failOnStart")
     started.set(true)
     this.props = props
@@ -296,4 +319,18 @@ class TestBrokerServer extends BrokerServer {
         started.wait()
     }
   }
+}
+
+class TestRebalancer extends Rebalancer {
+  var _running: Boolean = false
+  var _failOnStart: Boolean = false
+
+  override def running: Boolean = _running
+
+  override def start(_ids: util.List[String], _topics: util.List[String]): Unit = {
+    if (_failOnStart) throw new Rebalancer.Exception("failOnStart")
+    _running = true
+  }
+
+  override def state: String = if (running) "running" else ""
 }

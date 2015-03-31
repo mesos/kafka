@@ -34,7 +34,7 @@ object Config {
   def schedulerPort: Int = new URI(schedulerUrl).getPort
   load()
 
-  private def load(): Unit = {
+  private[kafka] def load(): Unit = {
     val configPath = System.getProperty("config")
     val file = new File(if (configPath != null) configPath else "kafka-mesos.properties")
     if (!file.exists()) throw new IllegalStateException("File " + file + " not found")

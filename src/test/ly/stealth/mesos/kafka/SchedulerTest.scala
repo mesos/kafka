@@ -22,8 +22,7 @@ import scala.collection.JavaConversions._
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.{TaskState, Resource}
-import java.util.{Date, Properties}
-import java.io.StringReader
+import java.util.Date
 
 class SchedulerTest extends MesosTestCase {
   @Test
@@ -43,7 +42,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def newTask {
     val broker = new Broker("1")
-    broker.options = "a=1"
+    broker.options = Util.parseMap("a=1")
     broker.cpus = 0.5
     broker.mem = 256
 
@@ -74,13 +73,12 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(1000, range.getEnd)
 
     // options
-    val options = new Properties()
-    options.load(new StringReader(task.getData.toStringUtf8))
-    assertEquals(broker.id, options.getProperty("broker.id"))
-    assertEquals("" + 1000, options.getProperty("port"))
+    val options = Util.parseMap(task.getData.toStringUtf8)
+    assertEquals(broker.id, options.get("broker.id"))
+    assertEquals("" + 1000, options.get("port"))
 
-    assertEquals("kafka-logs", options.getProperty("log.dirs"))
-    assertEquals("1", options.getProperty("a"))
+    assertEquals("kafka-logs", options.get("log.dirs"))
+    assertEquals("1", options.get("a"))
   }
 
   @Test
@@ -165,17 +163,31 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000))
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000), attributes = "a=1,b=2")
 
     Scheduler.launchTask(broker, offer)
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
     assertNotNull(broker.task)
     assertFalse(broker.task.running)
+    assertEquals(Util.parseMap("a=1,b=2"), broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
     assertTrue(Scheduler.taskIds.contains(broker.task.id))
+  }
+
+  @Test
+  def otherTasksAttributes {
+    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
+    broker0.task = new Broker.Task(_hostname = "host0", _attributes = Util.parseMap("a=1,b=2"))
+
+    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
+    broker1.task = new Broker.Task(_hostname = "host1", _attributes = Util.parseMap("b=3"))
+
+    assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("hostname").asInstanceOf[Array[AnyRef]])
+    assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])
+    assertArrayEquals(Array[AnyRef]("2", "3"), Scheduler.otherTasksAttributes("b").asInstanceOf[Array[AnyRef]])
   }
 
   @Test

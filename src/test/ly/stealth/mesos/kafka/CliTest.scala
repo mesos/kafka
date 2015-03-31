@@ -30,7 +30,7 @@ class CliTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.schedulerUrl = "http://localhost:7000"
+    Config.schedulerUrl = "http://localhost:8000"
     HttpServer.start(resolveDeps = false)
     Cli.out = new PrintStream(out, true)
   }
@@ -94,7 +94,7 @@ class CliTest extends MesosTestCase {
 
     assertEquals(new Period("10s"), broker.failover.delay)
     assertEquals(new Period("20s"), broker.failover.maxDelay)
-    assertEquals("log.dirs=/tmp/kafka-logs", broker.options)
+    assertEquals(Util.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
   }
 
   @Test
@@ -128,6 +128,33 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
+  def start_stop_timeout {
+    val broker = Scheduler.cluster.addBroker(new Broker("0"))
+    try { exec("start 0 --timeout=1ms"); fail() }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    assertTrue(broker.active)
+
+    broker.task = new Broker.Task("id", "host", 1000, _running = true)
+    try { exec("stop 0 --timeout=1ms"); fail() }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    assertFalse(broker.active)
+  }
+
+  @Test
+  def rebalance {
+    val cluster: Cluster = Scheduler.cluster
+    val rebalancer: Rebalancer = cluster.rebalancer
+
+    cluster.addBroker(new Broker("0"))
+    cluster.addBroker(new Broker("1"))
+    assertFalse(rebalancer.running)
+
+    exec("rebalance *")
+    assertTrue(rebalancer.running)
+    assertOutContains("Rebalance started")
+  }
+
+  @Test
   def usage_errors {
     // no command
     try { exec(""); fail() }
@@ -135,7 +162,7 @@ class CliTest extends MesosTestCase {
 
     // no id
     try { exec("add"); fail()  }
-    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("id required")) }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("argument required")) }
 
     // invalid command
     try { exec("unsupported 0"); fail()  }

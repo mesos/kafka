@@ -17,60 +17,42 @@
 
 package ly.stealth.mesos.kafka
 
-import org.junit.Test
+import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
+import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Task, Failover}
+import Util.parseMap
 
 class BrokerTest extends MesosTestCase {
-  @Test
-  def attributeMap {
-    val broker = new Broker()
-    broker.attributes = "a:1;b:2"
-    assertEquals(broker.attributeMap, Util.parseMap("a=1,b=2"))
+  var broker: Broker = null
+
+  @Before
+  override def before {
+    super.before
+    broker = new Broker("0")
+    broker.cpus = 0
+    broker.mem = 0
   }
 
   @Test
-  def optionMap {
-    val broker = new Broker("id")
-
+  def offectiveOptions {
     // $var substitution
-    broker.host = "host"
-    broker.options = "a=$id;b=2;c=$host"
-    assertEquals(broker.optionMap(), Util.parseMap("a=id,b=2,c=host,log.dirs=kafka-logs"))
+    broker.options = parseMap("a=$id,b=2")
+    assertEquals(parseMap("a=0,b=2,log.dirs=kafka-logs"), broker.effectiveOptions())
 
     // log.dirs override
-    broker.options = "log.dirs=logs"
-    assertEquals(broker.optionMap(), Util.parseMap("log.dirs=logs"))
+    broker.options = parseMap("log.dirs=logs")
+    assertEquals(parseMap("log.dirs=logs"), broker.effectiveOptions(parseMap("log.dirs=logs")))
 
     // option override
-    broker.options = "a=1;log.dirs=logs"
-    assertEquals(broker.optionMap(Util.parseMap("a=2")), Util.parseMap("a=2,log.dirs=logs"))
+    broker.options = parseMap("a=1,log.dirs=logs")
+    assertEquals(parseMap("a=2,log.dirs=logs"), broker.effectiveOptions(parseMap("a=2")))
   }
 
   @Test
   def matches {
-    val broker = new Broker()
-    broker.host = null
-    broker.cpus = 0
-    broker.mem = 0
-
-    // host
-    assertTrue(broker.matches(offer(host = "master")))
-    assertTrue(broker.matches(offer(host = "slave")))
-
-    broker.host = "master"
-    assertTrue(broker.matches(offer(host = "master")))
-    assertFalse(broker.matches(offer(host = "slave")))
-
-    broker.host = "master*"
-    assertTrue(broker.matches(offer(host = "master")))
-    assertTrue(broker.matches(offer(host = "master-2")))
-    assertFalse(broker.matches(offer(host = "slave")))
-
-    broker.host = null
-
     // cpus
     broker.cpus = 0.5
     assertTrue(broker.matches(offer(cpus = 0.5)))
@@ -82,17 +64,54 @@ class BrokerTest extends MesosTestCase {
     assertTrue(broker.matches(offer(mem = 100)))
     assertFalse(broker.matches(offer(mem = 99)))
     broker.mem = 0
+  }
 
-    // attributes
-    broker.attributes = "rack:1-*"
-    assertTrue(broker.matches(offer(attributes = "rack:1-1")))
-    assertTrue(broker.matches(offer(attributes = "rack:1-2")))
-    assertFalse(broker.matches(offer(attributes = "rack:2-1")))
+  @Test
+  def matches_hostname {
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "slave")))
+
+    // token
+    broker.constraints = parseMap("hostname=like:master").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertFalse(broker.matches(offer(hostname = "slave")))
+
+    // like
+    broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "master-2")))
+    assertFalse(broker.matches(offer(hostname = "slave")))
+
+    // unique
+    broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("slave")))
+
+    // groupBy
+    broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("slave")))
+  }
+
+  @Test
+  def matches_attributes {
+    // like
+    broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(attributes = "rack=1-1")))
+    assertTrue(broker.matches(offer(attributes = "rack=1-2")))
+    assertFalse(broker.matches(offer(attributes = "rack=2-1")))
+
+    // groupBy
+    broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(attributes = "rack=1")))
+    assertTrue(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
+    assertFalse(broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
   }
 
   @Test
   def shouldStart {
-    val broker = new Broker()
     val offer = this.offer(cpus = broker.cpus, mem = broker.mem.toInt)
 
     // active
@@ -119,24 +138,21 @@ class BrokerTest extends MesosTestCase {
     broker.failover.registerFailure(now)
     assertTrue(broker.failover.isWaitingDelay(now))
 
-    assertFalse(broker.shouldStart(offer, now))
-    assertTrue(broker.shouldStart(offer, new Date(now.getTime + broker.failover.delay.ms)))
+    assertFalse(broker.shouldStart(offer, now = now))
+    assertTrue(broker.shouldStart(offer, now = new Date(now.getTime + broker.failover.delay.ms)))
     broker.failover.resetFailures()
-    assertTrue(broker.shouldStart(offer, now))
+    assertTrue(broker.shouldStart(offer, now = now))
   }
 
   @Test
   def shouldStop {
-    val broker = new Broker()
     assertTrue(broker.shouldStop)
-
     broker.active = true
     assertFalse(broker.shouldStop)
   }
 
   @Test
   def state {
-    val broker = new Broker()
     assertEquals("stopped", broker.state())
 
     broker.task = new Task()
@@ -162,11 +178,9 @@ class BrokerTest extends MesosTestCase {
     assertTrue(state, state.startsWith("starting 2"))
   }
 
-  @Test
-  def waitForState {
-    val broker = new Broker()
-
-    def scheduleStateSwitch(running: Boolean, delay: Long) {
+  @Test(timeout = 5000)
+  def waitFor {
+    def deferStateSwitch(running: Boolean, delay: Long) {
       new Thread() {
         override def run() {
           setName(classOf[BrokerTest].getSimpleName + "-scheduleState")
@@ -181,28 +195,25 @@ class BrokerTest extends MesosTestCase {
       }.start()
     }
 
-    scheduleStateSwitch(running = true, 100)
-    assertTrue(broker.waitForState(running = true, 200))
+    deferStateSwitch(running = true, 100)
+    assertTrue(broker.waitFor(running = true, new Period("200ms")))
 
-    scheduleStateSwitch(running = false, 100)
-    assertTrue(broker.waitForState(running = false, 200))
+    deferStateSwitch(running = false, 100)
+    assertTrue(broker.waitFor(running = false, new Period("200ms")))
 
     // timeout
-    assertFalse(broker.waitForState(running = true, 50))
+    assertFalse(broker.waitFor(running = true, new Period("50ms")))
   }
 
   @Test
   def toJson_fromJson {
-    val broker = new Broker("1")
     broker.active = true
-
-    broker.host = "host"
     broker.cpus = 0.5
     broker.mem = 128
     broker.heap = 128
 
-    broker.attributes = "a:1"
-    broker.options = "a=1"
+    broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
+    broker.options = parseMap("a=1")
 
     broker.failover.registerFailure(new Date(0))
     broker.task = new Task("1", "host", 9092)
@@ -314,7 +325,7 @@ class BrokerTest extends MesosTestCase {
   // Task
   @Test
   def Task_toJson_fromJson {
-    val task = new Task("id", "host", 9092)
+    val task = new Task("id", "host", 9092, parseMap("a=1,b=2"))
     task.running = true
 
     val read: Task = new Task()
@@ -332,12 +343,11 @@ object BrokerTest {
     assertEquals(expected.id, actual.id)
     assertEquals(expected.active, actual.active)
 
-    assertEquals(expected.host, actual.host)
     assertEquals(expected.cpus, actual.cpus, 0.001)
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
 
-    assertEquals(expected.attributes, actual.attributes)
+    assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)
 
     assertFailoverEquals(expected.failover, actual.failover)
@@ -360,8 +370,10 @@ object BrokerTest {
 
     assertEquals(expected.id, actual.id)
     assertEquals(expected.running, actual.running)
-    assertEquals(expected.host, actual.host)
+
+    assertEquals(expected.hostname, actual.hostname)
     assertEquals(expected.port, actual.port)
+    assertEquals(expected.attributes, actual.attributes)
   }
 
   private def checkNulls(expected: Object, actual: Object): Boolean = {

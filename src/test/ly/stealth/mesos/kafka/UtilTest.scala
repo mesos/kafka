@@ -19,30 +19,57 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.{Wildcard, Period}
+import ly.stealth.mesos.kafka.Util.Period
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
 import java.util
 
 class UtilTest {
   @Test
   def parseMap {
-    var map = Util.parseMap("a=1,b=2", ",", "=")
+    var map = Util.parseMap("a=1,b=2")
     assertEquals(2, map.size())
     assertEquals("1", map.get("a"))
     assertEquals("2", map.get("b"))
 
     // missing pair
-    map = Util.parseMap("a=1,,b=2", ",", "=")
-    assertEquals(2, map.size())
+    try { map = Util.parseMap("a=1,,b=2"); fail() }
+    catch { case e: IllegalArgumentException => }
 
     // missing value
-    try {
-      Util.parseMap("a=1,b,c=3", ",", "=")
-      fail()
-    } catch { case e: IllegalArgumentException => }
+    try { Util.parseMap("a=1,b,c=3"); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // escaping
+    map = Util.parseMap("a=\\,,b=\\=,c=\\\\")
+    assertEquals(3, map.size())
+    assertEquals(",", map.get("a"))
+    assertEquals("=", map.get("b"))
+    assertEquals("\\", map.get("c"))
+
+    // open escaping
+    try { Util.parseMap("a=\\"); fail() }
+    catch { case e: IllegalArgumentException => }
 
     // null
-    assertTrue(Util.parseMap(null, ",", "=").isEmpty)
+    assertTrue(Util.parseMap(null).isEmpty)
+  }
+
+  @Test
+  def formatMap {
+    val map = new util.LinkedHashMap[String, String]()
+    map.put("a", "1")
+    map.put("b", "2")
+    assertEquals("a=1,b=2", Util.formatMap(map))
+
+    // null value
+    map.put("b", null)
+    assertEquals("a=1,b", Util.formatMap(map))
+
+    // escaping
+    map.put("a", ",")
+    map.put("b", "=")
+    map.put("c", "\\")
+    assertEquals("a=\\,,b=\\=,c=\\\\", Util.formatMap(map))
   }
 
   @Test
@@ -85,6 +112,9 @@ class UtilTest {
       fail()
     } catch { case e: IllegalArgumentException => }
 
+    // zero without units
+    new Period("0")
+
     // no units
     try {
       new Period("1")
@@ -118,6 +148,7 @@ class UtilTest {
 
   @Test
   def Period_ms {
+    assertEquals(0, new Period("0").ms)
     assertEquals(1, new Period("1ms").ms)
     assertEquals(10, new Period("10ms").ms)
 
@@ -140,6 +171,7 @@ class UtilTest {
 
   @Test
   def Period_value {
+    assertEquals(0, new Period("0").value)
     assertEquals(10, new Period("10ms").value)
     assertEquals(50, new Period("50h").value)
     assertEquals(20, new Period("20d").value)
@@ -147,6 +179,7 @@ class UtilTest {
 
   @Test
   def Period_unit {
+    assertEquals("ms", new Period("0").unit)
     assertEquals("ms", new Period("10ms").unit)
     assertEquals("h", new Period("50h").unit)
     assertEquals("d", new Period("20d").unit)
@@ -156,45 +189,5 @@ class UtilTest {
   def Period_toString {
     assertEquals("10ms", "" + new Period("10ms"))
     assertEquals("5h", "" + new Period("5h"))
-  }
-
-  // Wildcard
-  @Test
-  def Wildcard_matches() {
-    var wildcard: Wildcard = new Wildcard("1")
-    assertTrue(wildcard.matches("1"))
-    assertFalse(wildcard.matches("a1"))
-    assertFalse(wildcard.matches("1a"))
-
-    // ? char
-    wildcard = new Wildcard("?")
-    assertTrue(wildcard.matches("a"))
-    assertTrue(wildcard.matches("b"))
-    assertFalse(wildcard.matches(""))
-    assertFalse(wildcard.matches("ab"))
-
-    wildcard = new Wildcard("1?2")
-    assertTrue(wildcard.matches("1a2"))
-    assertTrue(wildcard.matches("1b2"))
-    assertFalse(wildcard.matches("1ab2"))
-
-    // * char
-    wildcard = new Wildcard("*")
-    assertTrue(wildcard.matches(""))
-    assertTrue(wildcard.matches("a"))
-    assertTrue(wildcard.matches("ab"))
-
-    wildcard = new Wildcard("1*2")
-    assertTrue(wildcard.matches("1a2"))
-    assertTrue(wildcard.matches("1b2"))
-    assertTrue(wildcard.matches("1ab2"))
-
-    // complex case
-    wildcard = new Wildcard("1?2*3")
-    assertTrue(wildcard.matches("1a23"))
-    assertTrue(wildcard.matches("1a2cd3"))
-    assertFalse(wildcard.matches("1a2cd"))
-    assertFalse(wildcard.matches("a2cd3"))
-    assertFalse(wildcard.matches("1ab2cd3"))
   }
 }

@@ -17,7 +17,6 @@
 
 package ly.stealth.mesos.kafka
 
-import java.util.regex.Pattern
 import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSON
@@ -28,24 +27,80 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.Protos
 
 object Util {
-  def parseMap(s: String, entrySep: String = ",", valueSep: String = "="): util.LinkedHashMap[String, String] = {
+  Class.forName(kafka.utils.Json.getClass.getName) // init class
+  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toLong
+
+  JSON.globalNumberParser = parseNumber
+  JSON.perThreadNumberParser = parseNumber
+  private val jsonLock = new Object
+
+  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '='): util.Map[String, String] = {
+    def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
+      val parts = new util.ArrayList[String]()
+
+      var escaped = false
+      var part = ""
+      for (c <- s.toCharArray) {
+        if (c == '\\' && !escaped) escaped = true
+        else if (c == sep && !escaped) {
+          parts.add(part)
+          part = ""
+        } else {
+          if (escaped && !unescape) part += "\\"
+          part += c
+          escaped = false
+        }
+      }
+
+      if (escaped) throw new IllegalArgumentException("open escaping")
+      if (part != "") parts.add(part)
+
+      parts.toArray(Array[String]())
+    }
+
     val result = new util.LinkedHashMap[String, String]()
     if (s == null) return result
 
-    for (entry <- s.split(entrySep))
-      if (entry.trim() != "") {
-        val pair = entry.split(valueSep)
-        if (pair.length == 2) result.put(pair(0).trim(), pair(1).trim())
-        else throw new IllegalArgumentException(s)
-      }
+    for (entry <- splitEscaped(s, entrySep)) {
+      if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
+
+      val pair = splitEscaped(entry, valueSep, unescape = true)
+      if (pair.length < 2) throw new IllegalArgumentException(s)
+
+      result.put(pair(0).trim, pair(1).trim)
+    }
 
     result
   }
 
+  def formatMap(map: util.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = {
+    def escape(s: String): String = {
+      var result = ""
+
+      for (c <- s.toCharArray) {
+        if (c == entrySep || c == valueSep || c == '\\') result += "\\"
+        result += c
+      }
+
+      result
+    }
+
+    var s = ""
+    for ((k, v) <- map) {
+      if (!s.isEmpty) s += entrySep
+      s += escape(k)
+      if (v != null) s += valueSep + escape("" + v)
+    }
+
+    s
+  }
+
   def parseJson(json: String): Map[String, Object] = {
-    val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
-    if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
-    node
+    jsonLock synchronized {
+      val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
+      if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
+      node
+    }
   }
 
   def copyAndClose(in: InputStream, out: OutputStream): Unit = {
@@ -77,10 +132,13 @@ object Util {
 
       var unitIdx = s.length - 1
       if (s.endsWith("ms")) unitIdx -= 1
+      if (s == "0") unitIdx = 1
 
       try { _value = java.lang.Long.valueOf(s.substring(0, unitIdx)) }
       catch { case e: IllegalArgumentException => throw new IllegalArgumentException(s) }
+
       _unit = s.substring(unitIdx)
+      if (s == "0") _unit = "ms"
 
       _ms = value
       if (_unit == "ms") _ms *= 1
@@ -104,43 +162,6 @@ object Util {
     override def toString: String = _value + _unit
   }
 
-
-  class Wildcard(s: String) {
-    private val _value: String = s
-    private var _pattern: Pattern = null
-    compilePattern()
-
-    private def compilePattern() {
-      var regex: String = "^"
-      var token: String = ""
-
-      for (c <- _value.toCharArray) {
-        if (c == '*' || c == '?') {
-          regex += Pattern.quote(token)
-          token = ""
-          regex += (if (c == '*') ".*" else ".")
-        } else
-          token += c
-      }
-
-      if (token != "") regex += Pattern.quote(token)
-      regex += "$"
-
-      _pattern = Pattern.compile(regex)
-    }
-
-    def matches(value: String): Boolean = _pattern.matcher(value).find()
-    def value: String = _value
-
-    override def equals(obj: scala.Any): Boolean = {
-      if (!obj.isInstanceOf[Wildcard]) return false
-      obj.asInstanceOf[Wildcard]._value == _value
-    }
-
-    override def hashCode: Int = _value.hashCode
-    override def toString: String = _value
-  }
-
   object Str {
     def dateTime(date: Date): String = {
       new SimpleDateFormat("yyyy-MM-dd hh:mm:ssX").format(date)
@@ -151,7 +172,7 @@ object Util {
 
       s += id(framework.getId.getValue)
       s += " name: " + framework.getName
-      s += " host: " + framework.getHostname
+      s += " hostname: " + framework.getHostname
       s += " failover_timeout: " + framework.getFailoverTimeout
 
       s
@@ -162,7 +183,7 @@ object Util {
 
       s += id(master.getId)
       s += " pid:" + master.getPid
-      s += " host:" + master.getHostname
+      s += " hostname:" + master.getHostname
 
       s
     }
@@ -171,7 +192,7 @@ object Util {
       var s = ""
 
       s += id(slave.getId.getValue)
-      s += " host:" + slave.getHostname
+      s += " hostname:" + slave.getHostname
       s += " port:" + slave.getPort
       s += " " + resources(slave.getResourcesList)
 

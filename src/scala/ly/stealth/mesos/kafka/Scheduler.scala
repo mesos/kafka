@@ -22,8 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.{Date, Properties}
-import java.io.StringWriter
+import java.util.Date
 import scala.collection.JavaConversions._
 import Util.Str
 
@@ -65,12 +64,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "zookeeper.connect" -> Config.kafkaZkConnect
       )
 
-      val p: Properties = new Properties()
-      p.putAll(broker.optionMap(overrides))
-
-      val buffer: StringWriter = new StringWriter()
-      p.store(buffer, "")
-      ByteString.copyFromUtf8("" + buffer)
+      val options = Util.formatMap(broker.effectiveOptions(overrides))
+      ByteString.copyFromUtf8(options)
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
@@ -138,7 +133,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
     def startBroker(offer: Offer): Boolean = {
       for (broker <- cluster.getBrokers) {
-        if (broker.shouldStart(offer)) {
+        if (broker.shouldStart(offer, otherTasksAttributes)) {
           launchTask(broker, offer)
           return true
         }
@@ -217,11 +212,31 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
 
+    val attributes = new util.LinkedHashMap[String, String]()
+    for (attribute <- offer.getAttributesList)
+      if (attribute.hasText) attributes.put(attribute.getName, attribute.getText.getValue)
+
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
-    broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer))
+    broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer), attributes)
     taskIds.add(id)
 
     logger.info("Launching task " + id + " by offer " + Str.id(offer.getId.getValue) + "\n" + Str.task(task_))
+  }
+
+  private[kafka] def otherTasksAttributes(name: String): Array[String] = {
+    def value(task: Broker.Task, name: String): String = {
+      if (name == "hostname") return task.hostname
+      task.attributes.get(name)
+    }
+
+    val values = new util.ArrayList[String]()
+    for (broker <- cluster.getBrokers)
+      if (broker.task != null) {
+        val v = value(broker.task, name)
+        if (v != null) values.add(v)
+      }
+
+    values.toArray(Array[String]())
   }
 
   private[kafka] def findBrokerPort(offer: Offer): Int = {
@@ -263,6 +278,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def initLogging() {
+    System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
     BasicConfigurator.resetConfiguration()
 
     val root = Logger.getRootLogger
@@ -275,5 +291,49 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
     root.addAppender(new ConsoleAppender(layout))
+  }
+
+  class JettyLog4jLogger extends org.eclipse.jetty.util.log.Logger {
+    private var logger: Logger = Logger.getLogger("Jetty")
+
+    def this(logger: Logger) {
+      this()
+      this.logger = logger
+    }
+
+    def isDebugEnabled: Boolean = logger.isDebugEnabled
+    def setDebugEnabled(enabled: Boolean) = logger.setLevel(if (enabled) Level.DEBUG else Level.INFO)
+
+    def getName: String = logger.getName
+    def getLogger(name: String): org.eclipse.jetty.util.log.Logger = new JettyLog4jLogger(Logger.getLogger(name))
+
+    def info(s: String, args: AnyRef*) = logger.info(format(s, args))
+    def info(s: String, t: Throwable) = logger.info(s, t)
+    def info(t: Throwable) = logger.info("", t)
+
+    def debug(s: String, args: AnyRef*) = logger.debug(format(s, args))
+    def debug(s: String, t: Throwable) = logger.debug(s, t)
+
+    def debug(t: Throwable) = logger.debug("", t)
+    def warn(s: String, args: AnyRef*) = logger.warn(format(s, args))
+
+    def warn(s: String, t: Throwable) = logger.warn(s, t)
+    def warn(s: String) = logger.warn(s)
+    def warn(t: Throwable) = logger.warn("", t)
+
+    def ignore(t: Throwable) = logger.info("Ignored", t)
+  }
+
+  private def format(s: String, args: AnyRef*): String = {
+    var result: String = ""
+    var i: Int = 0
+
+    for (token <- s.split("\\{\\}")) {
+      result += token
+      if (args.length > i) result += args(i)
+      i += 1
+    }
+
+    result
   }
 }
