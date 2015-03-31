@@ -114,7 +114,7 @@ object Cli {
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
     parser.accepts("options", "kafka options (a=1,b=2)").withRequiredArg()
-    parser.accepts("constraints", "constraints (hostname=master,rack=1*)").withRequiredArg()
+    parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*)").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
@@ -328,6 +328,7 @@ object Cli {
       printLine("id: " + broker.task.id, indent + 1)
       printLine("running: " + task.running, indent + 1)
       printLine("endpoint: " + task.endpoint, indent + 1)
+      if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
     }
   }
 
@@ -346,8 +347,10 @@ object Cli {
     printLine("unlike:master   - value not equals 'master'", 1)
     printLine("like:slave.*    - value starts with 'slave'", 1)
     printLine("unique          - all values are unique", 1)
+    printLine("cluster         - all values are the same", 1)
+    printLine("cluster:master  - value equals 'master'", 1)
     printLine("groupBy         - all values are the same", 1)
-    printLine("groupBy:3       - all values are within 3 different variants", 1)
+    printLine("groupBy:3       - all values are within 3 different groups", 1)
   }
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)

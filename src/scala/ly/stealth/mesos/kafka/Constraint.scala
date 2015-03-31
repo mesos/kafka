@@ -37,12 +37,12 @@ class Constraint(_value: String) {
     } else if (_value.startsWith("groupBy")) {
       val tail = _value.substring("groupBy".length)
 
-      var count: Int = 1
+      var groups: Int = 1
       if (tail.startsWith(":"))
-        try { count = Integer.valueOf(tail.substring(1)) }
+        try { groups = Integer.valueOf(tail.substring(1)) }
         catch { case e: NumberFormatException => throw new IllegalArgumentException(s"invalid condition ${_value}") }
 
-      _condition = new Constraint.GroupBy(count)
+      _condition = new Constraint.GroupBy(groups)
     }
     else throw new IllegalArgumentException("unsupported condition " + _value)
   }
@@ -91,17 +91,17 @@ object Constraint {
     override def toString: String = "cluster" + (if (_value != null) ":" + _value else "")
   }
 
-  class GroupBy(_variants: Int) extends Condition {
-    def variants: Int = _variants
+  class GroupBy(_groups: Int = 1) extends Condition {
+    def groups: Int = _groups
 
     def matches(value: String, values: Array[String]): Boolean = {
       val counts: Map[String, Int] = values.groupBy("" + _).mapValues(_.size)
-      if (counts.size < _variants) return !counts.contains(value)
+      if (counts.size < _groups) return !counts.contains(value)
 
       val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
       counts.getOrElse(value, 0) == minCount
     }
 
-    override def toString: String = "groupBy" + (if (_variants > 1) ":" + _variants else "")
+    override def toString: String = "groupBy" + (if (_groups > 1) ":" + _groups else "")
   }
 }

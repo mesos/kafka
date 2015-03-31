@@ -107,6 +107,7 @@ cluster:
       id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
       running: true
       endpoint: 172.16.25.62:31000
+      attributes: rack=r1
 ```
 
 Great!!! Now lets produce and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
@@ -204,14 +205,13 @@ Usage: add <id-expr> [options]
 
 Option              Description
 ------              -----------
---attributes        attributes constraints (rack=1*,
-                      role=master)
+--constraints       constraints (hostname=like:master,
+                      rack=like:1.*)
 --cpus <Double>     cpu amount (0.5, 1, 2)
 --failoverDelay     failover delay (10s, 5m, 3h)
 --failoverMaxDelay  max failover delay. See failoverDelay.
 --failoverMaxTries  max failover tries
 --heap <Long>       heap amount in Mb
---host              hostname constraint
 --mem <Long>        mem amount in Mb
 --options           kafka options (a=1,b=2)
 
@@ -223,13 +223,14 @@ id-expr examples:
   *      - any broker
 
 constraint examples:
-  master     - value equals 'master'
-  !master    - value not equals 'master'
-  slave*     - value starts with 'slave'
-  #same      - all values are the same
-  #same:3    - all values are within 3 different variants
-  #unique    - all values are unique
-  #regex:<r> - value matches specified regex
+  like:master     - value equals 'master'
+  unlike:master   - value not equals 'master'
+  like:slave.*    - value starts with 'slave'
+  unique          - all values are unique
+  cluster         - all values are the same
+  cluster:master  - value equals 'master'
+  groupBy         - all values are the same
+  groupBy:3       - all values are within 3 different groups
 ```
 
 Updating broker configurations
@@ -242,14 +243,13 @@ Usage: update <id-expr> [options]
 
 Option              Description
 ------              -----------
---attributes        attributes constraints (rack=1*,
-                      role=master)
+--constraints       constraints (hostname=like:master,
+                      rack=like:1.*)
 --cpus <Double>     cpu amount (0.5, 1, 2)
 --failoverDelay     failover delay (10s, 5m, 3h)
 --failoverMaxDelay  max failover delay. See failoverDelay.
 --failoverMaxTries  max failover tries
 --heap <Long>       heap amount in Mb
---host              hostname constraint
 --mem <Long>        mem amount in Mb
 --options           kafka options (a=1,b=2)
 
@@ -261,13 +261,14 @@ id-expr examples:
   *      - any broker
 
 constraint examples:
-  master     - value equals 'master'
-  !master    - value not equals 'master'
-  slave*     - value starts with 'slave'
-  #same      - all values are the same
-  #same:3    - all values are within 3 different variants
-  #unique    - all values are unique
-  #regex:<r> - value matches specified regex
+  like:master     - value equals 'master'
+  unlike:master   - value not equals 'master'
+  like:slave.*    - value starts with 'slave'
+  unique          - all values are unique
+  cluster         - all values are the same
+  cluster:master  - value equals 'master'
+  groupBy         - all values are the same
+  groupBy:3       - all values are within 3 different groups
 
 Note: use "" arg to unset the option
 ```

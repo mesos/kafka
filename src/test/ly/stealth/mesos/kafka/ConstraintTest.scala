@@ -45,10 +45,10 @@ class ConstraintTest {
 
     // groupBy
     var groupBy = c("groupBy").asInstanceOf[Constraint.GroupBy]
-    assertEquals(1, groupBy.variants)
+    assertEquals(1, groupBy.groups)
 
     groupBy = c("groupBy:2").asInstanceOf[Constraint.GroupBy]
-    assertEquals(2, groupBy.variants)
+    assertEquals(2, groupBy.groups)
 
     // unsupported
     try { c("unsupported"); fail() }
@@ -134,7 +134,7 @@ class ConstraintTest {
 
   @Test
   def GroupBy_matches {
-    var groupBy = new Constraint.GroupBy(1)
+    var groupBy = new Constraint.GroupBy()
     assertTrue(groupBy.matches("1", Array()))
     assertTrue(groupBy.matches("1", Array("1")))
     assertTrue(groupBy.matches("1", Array("1", "1")))
