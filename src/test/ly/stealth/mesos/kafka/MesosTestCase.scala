@@ -93,13 +93,13 @@ class MesosTestCase {
     id: String = "" + UUID.randomUUID(),
     ip: Int = LOCALHOST_IP,
     port: Int = 5050,
-    host: String = "master"
+    hostname: String = "master"
   ): MasterInfo = {
     MasterInfo.newBuilder()
     .setId(id)
     .setIp(ip)
     .setPort(port)
-    .setHostname(host)
+    .setHostname(hostname)
     .build()
   }
 
@@ -107,7 +107,7 @@ class MesosTestCase {
     id: String = "" + UUID.randomUUID(),
     frameworkId: String = "" + UUID.randomUUID(),
     slaveId: String = "" + UUID.randomUUID(),
-    host: String = "host",
+    hostname: String = "host",
     cpus: Double = 0,
     mem: Long = 0,
     ports: Pair[Int, Int] = null,
@@ -118,7 +118,7 @@ class MesosTestCase {
       .setFrameworkId(FrameworkID.newBuilder().setValue(frameworkId))
       .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
 
-    builder.setHostname(host)
+    builder.setHostname(hostname)
 
     val cpusResource = Resource.newBuilder()
       .setName("cpus")

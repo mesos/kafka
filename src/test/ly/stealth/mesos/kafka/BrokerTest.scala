@@ -32,7 +32,6 @@ class BrokerTest extends MesosTestCase {
   override def before {
     super.before
     broker = new Broker("0")
-    broker.host = null
     broker.cpus = 0
     broker.mem = 0
   }
@@ -68,32 +67,32 @@ class BrokerTest extends MesosTestCase {
   }
 
   @Test
-  def matches_host {
-    assertTrue(broker.matches(offer(host = "master")))
-    assertTrue(broker.matches(offer(host = "slave")))
+  def matches_hostname {
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "slave")))
 
     // token
-    broker.host = new Constraint("master")
-    assertTrue(broker.matches(offer(host = "master")))
-    assertFalse(broker.matches(offer(host = "slave")))
+    broker.constraints = parseMap("hostname=master").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertFalse(broker.matches(offer(hostname = "slave")))
 
     // pattern
-    broker.host = new Constraint("master*")
-    assertTrue(broker.matches(offer(host = "master")))
-    assertTrue(broker.matches(offer(host = "master-2")))
-    assertFalse(broker.matches(offer(host = "slave")))
+    broker.constraints = parseMap("hostname=master*").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "master-2")))
+    assertFalse(broker.matches(offer(hostname = "slave")))
 
     // #same
-    broker.host = new Constraint("#same")
-    assertTrue(broker.matches(offer(host = "master")))
-    assertTrue(broker.matches(offer(host = "master"), _ => Array("master")))
-    assertFalse(broker.matches(offer(host = "master"), _ => Array("slave")))
+    broker.constraints = parseMap("hostname=#same").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("slave")))
 
     // #unique
-    broker.host = new Constraint("#unique")
-    assertTrue(broker.matches(offer(host = "master")))
-    assertFalse(broker.matches(offer(host = "master"), _ => Array("master")))
-    assertTrue(broker.matches(offer(host = "master"), _ => Array("slave")))
+    broker.constraints = parseMap("hostname=#unique").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("slave")))
   }
 
   @Test
@@ -209,7 +208,6 @@ class BrokerTest extends MesosTestCase {
   @Test
   def toJson_fromJson {
     broker.active = true
-    broker.host = new Constraint("host")
     broker.cpus = 0.5
     broker.mem = 128
     broker.heap = 128
@@ -345,7 +343,6 @@ object BrokerTest {
     assertEquals(expected.id, actual.id)
     assertEquals(expected.active, actual.active)
 
-    assertEquals(expected.host, actual.host)
     assertEquals(expected.cpus, actual.cpus, 0.001)
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
@@ -374,7 +371,7 @@ object BrokerTest {
     assertEquals(expected.id, actual.id)
     assertEquals(expected.running, actual.running)
 
-    assertEquals(expected.host, actual.host)
+    assertEquals(expected.hostname, actual.hostname)
     assertEquals(expected.port, actual.port)
     assertEquals(expected.attributes, actual.attributes)
   }

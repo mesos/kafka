@@ -172,7 +172,7 @@ object Util {
 
       s += id(framework.getId.getValue)
       s += " name: " + framework.getName
-      s += " host: " + framework.getHostname
+      s += " hostname: " + framework.getHostname
       s += " failover_timeout: " + framework.getFailoverTimeout
 
       s
@@ -183,7 +183,7 @@ object Util {
 
       s += id(master.getId)
       s += " pid:" + master.getPid
-      s += " host:" + master.getHostname
+      s += " hostname:" + master.getHostname
 
       s
     }
@@ -192,7 +192,7 @@ object Util {
       var s = ""
 
       s += id(slave.getId.getValue)
-      s += " host:" + slave.getHostname
+      s += " hostname:" + slave.getHostname
       s += " port:" + slave.getPort
       s += " " + resources(slave.getResourcesList)
 

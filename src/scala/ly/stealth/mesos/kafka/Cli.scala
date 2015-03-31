@@ -109,13 +109,12 @@ object Cli {
 
   private def handleAddUpdateBroker(id: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
     val parser = new OptionParser()
-    parser.accepts("host", "hostname constraint").withRequiredArg()
     parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
     parser.accepts("options", "kafka options (a=1,b=2)").withRequiredArg()
-    parser.accepts("constraints", "constraints (rack=1*,role=master)").withRequiredArg()
+    parser.accepts("constraints", "constraints (hostname=master,rack=1*)").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
@@ -145,7 +144,6 @@ object Cli {
         throw new Error(e.getMessage)
     }
 
-    val host = options.valueOf("host").asInstanceOf[String]
     val cpus = options.valueOf("cpus").asInstanceOf[java.lang.Double]
     val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
     val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
@@ -159,7 +157,7 @@ object Cli {
 
     val params = new util.LinkedHashMap[String, String]
     params.put("id", id)
-    if (host != null) params.put("host", host)
+
     if (cpus != null) params.put("cpus", "" + cpus)
     if (mem != null) params.put("mem", "" + mem)
     if (heap != null) params.put("heap", "" + heap)
@@ -313,8 +311,6 @@ object Cli {
     printLine("id: " + broker.id, indent)
     printLine("active: " + broker.active, indent)
     printLine("state: " + broker.state(), indent)
-
-    if (broker.host != null) printLine("host: " + broker.host, indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
 
     if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)

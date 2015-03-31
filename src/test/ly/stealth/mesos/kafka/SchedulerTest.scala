@@ -180,12 +180,12 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def otherTasksAttributes {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
-    broker0.task = new Broker.Task(_host = "host0", _attributes = Util.parseMap("a=1,b=2"))
+    broker0.task = new Broker.Task(_hostname = "host0", _attributes = Util.parseMap("a=1,b=2"))
 
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
-    broker1.task = new Broker.Task(_host = "host1", _attributes = Util.parseMap("b=3"))
+    broker1.task = new Broker.Task(_hostname = "host1", _attributes = Util.parseMap("b=3"))
 
-    assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("host").asInstanceOf[Array[AnyRef]])
+    assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("hostname").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("2", "3"), Scheduler.otherTasksAttributes("b").asInstanceOf[Array[AnyRef]])
   }

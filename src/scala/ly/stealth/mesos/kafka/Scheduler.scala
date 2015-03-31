@@ -225,7 +225,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[kafka] def otherTasksAttributes(name: String): Array[String] = {
     def value(task: Broker.Task, name: String): String = {
-      if (name == "host") return task.host
+      if (name == "hostname") return task.hostname
       task.attributes.get(name)
     }
 

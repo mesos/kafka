@@ -30,7 +30,6 @@ class Broker(_id: String = "0") {
   var id: String = _id
   @volatile var active: Boolean = false
 
-  var host: Constraint = null
   var cpus: Double = 0.5
   var mem: Long = 128
   var heap: Long = 128
@@ -57,8 +56,6 @@ class Broker(_id: String = "0") {
   @volatile var task: Broker.Task = null
 
   def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): Boolean = {
-    if (host != null && !host.matches(offer.getHostname, otherAttributes("host"))) return false
-
     // check resources
     val offerResources = new util.HashMap[String, Resource]()
     for (resource <- offer.getResourcesList) offerResources.put(resource.getName, resource)
@@ -71,6 +68,8 @@ class Broker(_id: String = "0") {
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
+    offerAttributes.put("hostname", offer.getHostname)
+
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
@@ -131,7 +130,6 @@ class Broker(_id: String = "0") {
     id = node("id").asInstanceOf[String]
     active = node("active").asInstanceOf[Boolean]
 
-    if (node.contains("host")) host = new Constraint(node("host").asInstanceOf[String])
     cpus = node("cpus").asInstanceOf[Number].doubleValue()
     mem = node("mem").asInstanceOf[Number].longValue()
     heap = node("heap").asInstanceOf[Number].longValue()
@@ -153,7 +151,6 @@ class Broker(_id: String = "0") {
     obj("id") = id
     obj("active") = active
 
-    if (host != null) obj("host") = "" + host
     obj("cpus") = cpus
     obj("mem") = mem
     obj("heap") = heap
@@ -242,7 +239,7 @@ object Broker {
 
   class Task(
     _id: String = null,
-    _host: String = null,
+    _hostname: String = null,
     _port: Int = -1,
     _attributes: util.Map[String, String] = Collections.emptyMap(),
     _running: Boolean = false
@@ -250,17 +247,17 @@ object Broker {
     var id: String = _id
     @volatile var running: Boolean = _running
 
-    var host: String = _host
+    var hostname: String = _hostname
     var port: Int = _port
     var attributes: util.Map[String, String] = _attributes
 
-    def endpoint: String = host + ":" + port
+    def endpoint: String = hostname + ":" + port
 
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]
       running = node("running").asInstanceOf[Boolean]
 
-      host = node("host").asInstanceOf[String]
+      hostname = node("hostname").asInstanceOf[String]
       port = node("port").asInstanceOf[Number].intValue()
       attributes = node("attributes").asInstanceOf[Map[String, String]]
     }
@@ -271,7 +268,7 @@ object Broker {
       obj("id") = id
       obj("running") = running
 
-      obj("host") = host
+      obj("hostname") = hostname
       obj("port") = port
       obj("attributes") = new JSONObject(attributes.toMap)
 
