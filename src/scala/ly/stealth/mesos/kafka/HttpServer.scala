@@ -155,10 +155,10 @@ object HttpServer {
         try { options = Util.parseMap(request.getParameter("options")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
-      var attributes: util.Map[String, Constraint] = null
-      if (request.getParameter("attributes") != null)
-        try { attributes = Util.parseMap(request.getParameter("attributes")).mapValues(new Constraint(_)).view.force }
-        catch { case e: IllegalArgumentException => errors.add("Invalid attributes: " + e.getMessage) }
+      var constraints: util.Map[String, Constraint] = null
+      if (request.getParameter("constraints") != null)
+        try { constraints = Util.parseMap(request.getParameter("constraints")).mapValues(new Constraint(_)).view.force }
+        catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
 
 
       var failoverDelay: Period = null
@@ -207,7 +207,7 @@ object HttpServer {
         if (heap != null) broker.heap = heap
 
         if (options != null) broker.options = options
-        if (attributes != null) broker.attributes = attributes
+        if (constraints != null) broker.constraints = constraints
 
         if (failoverDelay != null) broker.failover.delay = failoverDelay
         if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay

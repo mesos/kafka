@@ -35,7 +35,7 @@ class Broker(_id: String = "0") {
   var mem: Long = 128
   var heap: Long = 128
 
-  var attributes: util.Map[String, Constraint] = new util.LinkedHashMap()
+  var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
 
   var failover: Failover = new Failover()
@@ -74,7 +74,7 @@ class Broker(_id: String = "0") {
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
-    for ((name, constraint) <- attributes) {
+    for ((name, constraint) <- constraints) {
       if (!offerAttributes.containsKey(name)) return false
       if (!constraint.matches(offerAttributes.get(name), otherAttributes(name))) return false
     }
@@ -136,7 +136,8 @@ class Broker(_id: String = "0") {
     mem = node("mem").asInstanceOf[Number].longValue()
     heap = node("heap").asInstanceOf[Number].longValue()
 
-    if (node.contains("attributes")) attributes = Util.parseMap(node("attributes").asInstanceOf[String]).mapValues(new Constraint(_)).view.force
+    if (node.contains("constraints")) constraints = Util.parseMap(node("constraints").asInstanceOf[String])
+                                                    .mapValues(new Constraint(_)).view.force
     if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
 
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
@@ -157,7 +158,7 @@ class Broker(_id: String = "0") {
     obj("mem") = mem
     obj("heap") = heap
 
-    if (!attributes.isEmpty) obj("attributes") = Util.formatMap(attributes)
+    if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
     if (!options.isEmpty) obj("options") = Util.formatMap(options)
 
     obj("failover") = failover.toJson

@@ -115,7 +115,7 @@ object Cli {
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
     parser.accepts("options", "kafka options (a=1,b=2)").withRequiredArg()
-    parser.accepts("attributes", "attributes constraints (rack=1*,role=master)").withRequiredArg()
+    parser.accepts("constraints", "constraints (rack=1*,role=master)").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
@@ -151,7 +151,7 @@ object Cli {
     val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
 
     val options_ = options.valueOf("options").asInstanceOf[String]
-    val attributes = options.valueOf("attributes").asInstanceOf[String]
+    val constraints = options.valueOf("constraints").asInstanceOf[String]
 
     val failoverDelay = options.valueOf("failoverDelay").asInstanceOf[String]
     val failoverMaxDelay = options.valueOf("failoverMaxDelay").asInstanceOf[String]
@@ -165,7 +165,7 @@ object Cli {
     if (heap != null) params.put("heap", "" + heap)
 
     if (options_ != null) params.put("options", options_)
-    if (attributes != null) params.put("attributes", attributes)
+    if (constraints != null) params.put("constraints", constraints)
 
     if (failoverDelay != null) params.put("failoverDelay", failoverDelay)
     if (failoverMaxDelay != null) params.put("failoverMaxDelay", failoverMaxDelay)
@@ -317,7 +317,7 @@ object Cli {
     if (broker.host != null) printLine("host: " + broker.host, indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap, indent)
 
-    if (!broker.attributes.isEmpty) printLine("attributes: " + Util.formatMap(broker.attributes), indent)
+    if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
     if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
 
     var failover = "failover:"
