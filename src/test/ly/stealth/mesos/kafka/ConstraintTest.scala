@@ -36,6 +36,13 @@ class ConstraintTest {
     // unique
     assertEquals(classOf[Constraint.Unique], c("unique").getClass)
 
+    // cluster
+    var cluster = c("cluster").asInstanceOf[Constraint.Cluster]
+    assertNull(cluster.value)
+
+    cluster = c("cluster:123").asInstanceOf[Constraint.Cluster]
+    assertEquals("123", cluster.value)
+
     // groupBy
     var groupBy = c("groupBy").asInstanceOf[Constraint.GroupBy]
     assertEquals(1, groupBy.variants)
@@ -58,6 +65,12 @@ class ConstraintTest {
     assertFalse(new Constraint("like:a.*").matches("bc"))
 
     assertTrue(new Constraint("unique").matches("a", Array()))
+    assertFalse(new Constraint("unique").matches("a", Array("a")))
+
+    assertTrue(new Constraint("cluster").matches("a", Array()))
+    assertFalse(new Constraint("cluster").matches("b", Array("a")))
+
+    assertTrue(new Constraint("groupBy").matches("a", Array("a")))
     assertFalse(new Constraint("groupBy").matches("a", Array("b")))
   }
 
@@ -90,6 +103,36 @@ class ConstraintTest {
   }
 
   @Test
+  def Unique_matches {
+    val unique = new Constraint.Unique()
+    assertTrue(unique.matches("1", Array()))
+    assertTrue(unique.matches("2", Array("1")))
+    assertTrue(unique.matches("3", Array("1", "2")))
+
+    assertFalse(unique.matches("1", Array("1", "2")))
+    assertFalse(unique.matches("2", Array("1", "2")))
+  }
+
+  @Test
+  def Cluster_matches {
+    var cluster = new Constraint.Cluster()
+    assertTrue(cluster.matches("1", Array()))
+    assertTrue(cluster.matches("2", Array()))
+
+    assertTrue(cluster.matches("1", Array("1")))
+    assertTrue(cluster.matches("1", Array("1", "1")))
+    assertFalse(cluster.matches("2", Array("1")))
+
+    cluster = new Constraint.Cluster("1")
+    assertTrue(cluster.matches("1", Array()))
+    assertFalse(cluster.matches("2", Array()))
+
+    assertTrue(cluster.matches("1", Array("1")))
+    assertTrue(cluster.matches("1", Array("1", "1")))
+    assertFalse(cluster.matches("2", Array("1")))
+  }
+
+  @Test
   def GroupBy_matches {
     var groupBy = new Constraint.GroupBy(1)
     assertTrue(groupBy.matches("1", Array()))
@@ -108,16 +151,5 @@ class ConstraintTest {
 
     assertFalse(groupBy.matches("1", Array("1", "1", "2")))
     assertTrue(groupBy.matches("2", Array("1", "1", "2")))
-  }
-
-  @Test
-  def Unique_matches {
-    val unique = new Constraint.Unique()
-    assertTrue(unique.matches("1", Array()))
-    assertTrue(unique.matches("2", Array("1")))
-    assertTrue(unique.matches("3", Array("1", "2")))
-
-    assertFalse(unique.matches("1", Array("1", "2")))
-    assertFalse(unique.matches("2", Array("1", "2")))
   }
 }

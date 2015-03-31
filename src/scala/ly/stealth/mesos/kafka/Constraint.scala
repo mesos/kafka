@@ -30,7 +30,11 @@ class Constraint(_value: String) {
     if (_value.startsWith("like:")) _condition = new Constraint.Like(_value.substring("like:".length))
     else if (_value.startsWith("unlike:")) _condition = new Constraint.Like(_value.substring("unlike:".length), _negated = true)
     else if (_value == "unique") _condition = new Constraint.Unique()
-    else if (_value.startsWith("groupBy")) {
+    else if (_value.startsWith("cluster")) {
+      val tail = _value.substring("cluster".length)
+      val value = if (tail.startsWith(":")) tail.substring(1) else null
+      _condition = new Constraint.Cluster(value)
+    } else if (_value.startsWith("groupBy")) {
       val tail = _value.substring("groupBy".length)
 
       var count: Int = 1
@@ -74,6 +78,19 @@ object Constraint {
     override def toString: String = s"$name:$regex"
   }
 
+  class Unique extends Condition {
+    def matches(value: String, values: Array[String]): Boolean = !values.contains(value)
+    override def toString: String = "unique"
+  }
+
+  class Cluster(_value: String = null) extends Condition {
+    def value: String = _value
+
+    def matches(value: String, values: Array[String]): Boolean =
+      if (_value != null) value == _value else values.isEmpty || values(0) == value
+    override def toString: String = "cluster" + (if (_value != null) ":" + _value else "")
+  }
+
   class GroupBy(_variants: Int) extends Condition {
     def variants: Int = _variants
 
@@ -86,10 +103,5 @@ object Constraint {
     }
 
     override def toString: String = "groupBy" + (if (_variants > 1) ":" + _variants else "")
-  }
-
-  class Unique extends Condition {
-    def matches(value: String, values: Array[String]): Boolean = !values.contains(value)
-    override def toString: String = "unique"
   }
 }
