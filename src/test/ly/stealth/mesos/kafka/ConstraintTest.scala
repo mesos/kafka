@@ -33,15 +33,15 @@ class ConstraintTest {
     like = c("unlike:1").asInstanceOf[Constraint.Like]
     assertEquals("1", like.regex)
 
-    // same
-    var same = c("same").asInstanceOf[Constraint.Same]
-    assertEquals(1, same.variants)
-
-    same = c("same:2").asInstanceOf[Constraint.Same]
-    assertEquals(2, same.variants)
-
     // unique
     assertEquals(classOf[Constraint.Unique], c("unique").getClass)
+
+    // groupBy
+    var groupBy = c("groupBy").asInstanceOf[Constraint.GroupBy]
+    assertEquals(1, groupBy.variants)
+
+    groupBy = c("groupBy:2").asInstanceOf[Constraint.GroupBy]
+    assertEquals(2, groupBy.variants)
 
     // unsupported
     try { c("unsupported"); fail() }
@@ -58,14 +58,14 @@ class ConstraintTest {
     assertFalse(new Constraint("like:a.*").matches("bc"))
 
     assertTrue(new Constraint("unique").matches("a", Array()))
-    assertFalse(new Constraint("same").matches("a", Array("b")))
+    assertFalse(new Constraint("groupBy").matches("a", Array("b")))
   }
 
   @Test
   def _toString {
     assertEquals("like:abc", "" + new Constraint("like:abc"))
-    assertEquals("same", "" + new Constraint("same"))
-    assertEquals("same:2", "" + new Constraint("same:2"))
+    assertEquals("groupBy", "" + new Constraint("groupBy"))
+    assertEquals("groupBy:2", "" + new Constraint("groupBy:2"))
   }
 
   @Test
@@ -90,24 +90,24 @@ class ConstraintTest {
   }
 
   @Test
-  def Same_matches {
-    var same = new Constraint.Same(1)
-    assertTrue(same.matches("1", Array()))
-    assertTrue(same.matches("1", Array("1")))
-    assertTrue(same.matches("1", Array("1", "1")))
-    assertFalse(same.matches("1", Array("2")))
+  def GroupBy_matches {
+    var groupBy = new Constraint.GroupBy(1)
+    assertTrue(groupBy.matches("1", Array()))
+    assertTrue(groupBy.matches("1", Array("1")))
+    assertTrue(groupBy.matches("1", Array("1", "1")))
+    assertFalse(groupBy.matches("1", Array("2")))
 
-    same = new Constraint.Same(2)
-    assertTrue(same.matches("1", Array()))
-    assertFalse(same.matches("1", Array("1")))
-    assertFalse(same.matches("1", Array("1", "1")))
-    assertTrue(same.matches("2", Array("1")))
+    groupBy = new Constraint.GroupBy(2)
+    assertTrue(groupBy.matches("1", Array()))
+    assertFalse(groupBy.matches("1", Array("1")))
+    assertFalse(groupBy.matches("1", Array("1", "1")))
+    assertTrue(groupBy.matches("2", Array("1")))
 
-    assertTrue(same.matches("1", Array("1", "2")))
-    assertTrue(same.matches("2", Array("1", "2")))
+    assertTrue(groupBy.matches("1", Array("1", "2")))
+    assertTrue(groupBy.matches("2", Array("1", "2")))
 
-    assertFalse(same.matches("1", Array("1", "1", "2")))
-    assertTrue(same.matches("2", Array("1", "1", "2")))
+    assertFalse(groupBy.matches("1", Array("1", "1", "2")))
+    assertTrue(groupBy.matches("2", Array("1", "1", "2")))
   }
 
   @Test

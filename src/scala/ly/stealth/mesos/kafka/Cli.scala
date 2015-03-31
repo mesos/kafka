@@ -345,9 +345,9 @@ object Cli {
     printLine("like:master     - value equals 'master'", 1)
     printLine("unlike:master   - value not equals 'master'", 1)
     printLine("like:slave.*    - value starts with 'slave'", 1)
-    printLine("same      - all values are the same", 1)
-    printLine("same:3    - all values are within 3 different variants", 1)
-    printLine("unique    - all values are unique", 1)
+    printLine("unique          - all values are unique", 1)
+    printLine("groupBy         - all values are the same", 1)
+    printLine("groupBy:3       - all values are within 3 different variants", 1)
   }
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)

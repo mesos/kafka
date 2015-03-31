@@ -76,35 +76,35 @@ class BrokerTest extends MesosTestCase {
     assertTrue(broker.matches(offer(hostname = "master")))
     assertFalse(broker.matches(offer(hostname = "slave")))
 
-    // pattern
+    // like
     broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(hostname = "master")))
     assertTrue(broker.matches(offer(hostname = "master-2")))
     assertFalse(broker.matches(offer(hostname = "slave")))
 
-    // #same
-    broker.constraints = parseMap("hostname=same").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(hostname = "master")))
-    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("master")))
-    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("slave")))
-
-    // #unique
+    // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(hostname = "master")))
     assertFalse(broker.matches(offer(hostname = "master"), _ => Array("master")))
     assertTrue(broker.matches(offer(hostname = "master"), _ => Array("slave")))
+
+    // groupBy
+    broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
+    assertTrue(broker.matches(offer(hostname = "master")))
+    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("slave")))
   }
 
   @Test
   def matches_attributes {
-    // pattern
+    // like
     broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(attributes = "rack=1-1")))
     assertTrue(broker.matches(offer(attributes = "rack=1-2")))
     assertFalse(broker.matches(offer(attributes = "rack=2-1")))
 
-    // #same
-    broker.constraints = parseMap("rack=same").mapValues(new Constraint(_))
+    // groupBy
+    broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
     assertTrue(broker.matches(offer(attributes = "rack=1")))
     assertTrue(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
     assertFalse(broker.matches(offer(attributes = "rack=2"), _ => Array("1")))

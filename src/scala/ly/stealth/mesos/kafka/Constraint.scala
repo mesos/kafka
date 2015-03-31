@@ -29,17 +29,17 @@ class Constraint(_value: String) {
   private def parse: Unit = {
     if (_value.startsWith("like:")) _condition = new Constraint.Like(_value.substring("like:".length))
     else if (_value.startsWith("unlike:")) _condition = new Constraint.Like(_value.substring("unlike:".length), _negated = true)
-    else if (_value.startsWith("same")) {
-      val tail = _value.substring("same".length)
+    else if (_value == "unique") _condition = new Constraint.Unique()
+    else if (_value.startsWith("groupBy")) {
+      val tail = _value.substring("groupBy".length)
 
       var count: Int = 1
       if (tail.startsWith(":"))
         try { count = Integer.valueOf(tail.substring(1)) }
         catch { case e: NumberFormatException => throw new IllegalArgumentException(s"invalid condition ${_value}") }
 
-      _condition = new Constraint.Same(count)
+      _condition = new Constraint.GroupBy(count)
     }
-    else if (_value == "unique") _condition = new Constraint.Unique()
     else throw new IllegalArgumentException("unsupported condition " + _value)
   }
 
@@ -74,7 +74,7 @@ object Constraint {
     override def toString: String = s"$name:$regex"
   }
 
-  class Same(_variants: Int) extends Condition {
+  class GroupBy(_variants: Int) extends Condition {
     def variants: Int = _variants
 
     def matches(value: String, values: Array[String]): Boolean = {
@@ -85,7 +85,7 @@ object Constraint {
       counts.getOrElse(value, 0) == minCount
     }
 
-    override def toString: String = "same" + (if (_variants > 1) ":" + _variants else "")
+    override def toString: String = "groupBy" + (if (_variants > 1) ":" + _variants else "")
   }
 
   class Unique extends Condition {
