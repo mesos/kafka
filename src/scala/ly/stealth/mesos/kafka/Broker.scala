@@ -22,9 +22,10 @@ import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.{Resource, Offer}
-import java.util.{Collections, Date, UUID}
+import java.util.{TimeZone, Collections, Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
 import Util.{Period, Str}
+import java.text.SimpleDateFormat
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -214,13 +215,19 @@ object Broker {
       failureTime = null
     }
 
+    def dateFormat: SimpleDateFormat = {
+      val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+      format.setTimeZone(TimeZone.getTimeZone("UTC-0"))
+      format
+    }
+
     def fromJson(node: Map[String, Object]): Unit = {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
 
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
-      if (node.contains("failureTime")) failureTime = new Date(node("failureTime").asInstanceOf[Number].longValue())
+      if (node.contains("failureTime")) failureTime = dateFormat.parse(node("failureTime").asInstanceOf[String])
     }
 
     def toJson: JSONObject = {
@@ -231,7 +238,7 @@ object Broker {
       if (maxTries != null) obj("maxTries") = maxTries
 
       if (failures != 0) obj("failures") = failures
-      if (failureTime != null) obj("failureTime") = failureTime.getTime
+      if (failureTime != null) obj("failureTime") = dateFormat.format(failureTime)
 
       new JSONObject(obj.toMap)
     }

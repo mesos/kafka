@@ -28,7 +28,7 @@ import org.apache.mesos.Protos
 
 object Util {
   Class.forName(kafka.utils.Json.getClass.getName) // init class
-  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toLong
+  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
 
   JSON.globalNumberParser = parseNumber
   JSON.perThreadNumberParser = parseNumber
