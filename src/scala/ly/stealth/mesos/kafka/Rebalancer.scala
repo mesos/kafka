@@ -43,17 +43,14 @@ class Rebalancer {
     finally { zkClient.close() }
   }
 
-  def start(_ids: util.List[String], _topics: util.List[String]): Unit = {
+  def start(_ids: util.List[String], _topics: util.Map[String, Integer]): Unit = {
     val zkClient = newZkClient
     try {
       val ids: util.List[Int] = _ids.map(Integer.parseInt)
+      val topics: Map[String, Integer] = getTopicsToReassign(zkClient, _topics)
 
-      val allTopics = ZkUtils.getAllTopics(zkClient)
-      val topics: Seq[String] = if (_topics == null) allTopics else _topics.intersect(allTopics)
-      if (topics.isEmpty) throw new Rebalancer.Exception("no topics found")
-
-      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
-      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, assignment)
+      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics.keys.toSeq)
+      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, topics, assignment)
 
       reassignPartitions(zkClient, reassignment)
       this.reassignment = reassignment
@@ -105,13 +102,30 @@ class Rebalancer {
     matches
   }
 
-  private def getReassignments(brokerIds: Seq[Int], assignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, Seq[Int]] = {
+  private def getTopicsToReassign(zkClient: ZkClient, _topics: util.Map[String, Integer]): util.Map[String, Integer] = {
+    val allTopics: util.List[String] = ZkUtils.getAllTopics(zkClient)
+
+    val topics: util.Map[String, Integer] = new util.LinkedHashMap()
+    if (_topics != null) topics.putAll(_topics)
+    else for (topic <- allTopics) topics.put(topic, null)
+
+    topics.keySet().retainAll(allTopics)
+    if (topics.isEmpty) throw new Rebalancer.Exception("no topics found")
+
+    topics
+  }
+
+  private def getReassignments(brokerIds: Seq[Int], topics: util.Map[String, Integer], assignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, Seq[Int]] = {
     var reassignment : Map[TopicAndPartition, Seq[Int]] = new mutable.HashMap[TopicAndPartition, List[Int]]()
 
     val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
     byTopic.foreach { entry =>
-      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, entry._2.size, entry._2.head._2.size)
-      reassignment ++= assignedReplicas.map(replicaEntry => TopicAndPartition(entry._1, replicaEntry._1) -> replicaEntry._2)
+      val topic = entry._1
+      val replicationFactor: Int = if (topics.get(topic) != null) topics.get(topic) else entry._2.head._2.size
+      val partitions: Int = entry._2.size
+    
+      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, replicationFactor)
+      reassignment ++= assignedReplicas.map(replicaEntry => TopicAndPartition(topic, replicaEntry._1) -> replicaEntry._2)
     }
 
     reassignment.toMap

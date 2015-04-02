@@ -304,9 +304,11 @@ object HttpServer {
 
       if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
 
-      var topics: util.List[String] = null
+      var topics: util.Map[String, Integer] = null
       if (request.getParameter("topics") != null)
-        topics = request.getParameter("topics").split(",").map(_.trim).filter(!_.isEmpty).toList
+        try { topics = Util.parseMap(request.getParameter("topics"), ',', ':', nullValues = true)
+          .mapValues(v => if (v != null) Integer.valueOf(v) else null).view.force
+        } catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
       if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
 
       var timeout: Period = new Period("0")

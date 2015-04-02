@@ -253,7 +253,7 @@ object Cli {
 
   private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
     val parser = new OptionParser()
-    parser.accepts("topics", "topics (comma-separated). Default - all topics").withRequiredArg().ofType(classOf[String])
+    parser.accepts("topics", "topics with optional replication-factor (t1:3,t2). Default - all topics").withRequiredArg().ofType(classOf[String])
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {

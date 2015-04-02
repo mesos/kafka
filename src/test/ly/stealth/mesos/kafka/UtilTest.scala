@@ -35,8 +35,12 @@ class UtilTest {
     try { map = Util.parseMap("a=1,,b=2"); fail() }
     catch { case e: IllegalArgumentException => }
 
-    // missing value
-    try { Util.parseMap("a=1,b,c=3"); fail() }
+    // null value
+    map = Util.parseMap("a=1,b,c=3", nullValues = true)
+    assertEquals(3, map.size())
+    assertNull(map.get("b"))
+
+    try { Util.parseMap("a=1,b,c=3") }
     catch { case e: IllegalArgumentException => }
 
     // escaping
