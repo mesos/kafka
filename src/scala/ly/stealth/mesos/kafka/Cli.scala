@@ -114,7 +114,7 @@ object Cli {
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
     parser.accepts("options", "kafka options (log.dirs=/tmp/kafka/$id,num.io.threads=16)").withRequiredArg()
-    parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*)").withRequiredArg()
+    parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*). See below.").withRequiredArg()
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
@@ -253,12 +253,15 @@ object Cli {
 
   private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
     val parser = new OptionParser()
-    parser.accepts("topics", "topics with optional replication-factor (t1:3,t2). Default - all topics").withRequiredArg().ofType(classOf[String])
+    parser.accepts("topics", "<topic-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       out.println("Rebalance\nUsage: rebalance <id-expr>|status [options]\n")
       parser.printHelpOn(out)
+
+      out.println()
+      printTopicExprExamples()
 
       out.println()
       printIdExprExamples()
@@ -351,6 +354,17 @@ object Cli {
     printLine("cluster:master  - value equals 'master'", 1)
     printLine("groupBy         - all values are the same", 1)
     printLine("groupBy:3       - all values are within 3 different groups", 1)
+  }
+
+  private def printTopicExprExamples(): Unit = {
+    printLine("topic-expr examples:")
+    printLine("t0        - topic t0 with default RF (replication-factor)", 1)
+    printLine("t0,t1     - topics t0, t1 with default RF", 1)
+    printLine("t0:3      - topic t0 with RF=3", 1)
+    printLine("t0,t1:2   - topic t0 with default RF, topic t1 with RF=2", 1)
+    printLine("*         - all topics with default RF", 1)
+    printLine("*:2       - all topics with RF=2", 1)
+    printLine("t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1", 1)
   }
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)

@@ -23,6 +23,7 @@ import java.io.File
 import org.I0Itec.zkclient.{ZkServer, ZkClient, IDefaultNameSpace}
 import kafka.utils.{ZKStringSerializer, ZkUtils}
 import java.util
+import java.util.Collections
 
 class RebalancerTest extends MesosTestCase {
   var rebalancer: Rebalancer = null
@@ -73,16 +74,10 @@ class RebalancerTest extends MesosTestCase {
 
     createTopic("topic", Map[Int, Seq[Int]](0 -> Seq(0), 1 -> Seq(0)))
     assertFalse(rebalancer.running)
-    rebalancer.start(util.Arrays.asList("0", "1"), null)
+    rebalancer.start(util.Arrays.asList("0", "1"), Collections.singletonMap("topic", 2))
 
     assertTrue(rebalancer.running)
     assertFalse(rebalancer.state.isEmpty)
-  }
-
-  @Test
-  def start_no_topics {
-    try { rebalancer.start(util.Arrays.asList("0", "1"), null); fail() }
-    catch { case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("no topics")) }
   }
 
   @Test
@@ -90,10 +85,33 @@ class RebalancerTest extends MesosTestCase {
     createTopic("topic", Map[Int, Seq[Int]](0 -> Seq(0), 1 -> Seq(0)))
     ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, "")
 
-    try { rebalancer.start(util.Arrays.asList("0", "1"), null); fail() }
+    try { rebalancer.start(util.Arrays.asList("0", "1"), Collections.singletonMap("t1", 2)); fail() }
     catch { case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("in progress")) }
   }
 
+  @Test
+  def expandTopics {
+    createTopic("t1", Map(1 -> List(0)))
+    createTopic("t2", Map(1 -> List(0, 1)))
+    createTopic("t3", Map(1 -> List(0, 1, 2)))
+
+    // topic lists
+    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(rebalancer.expandTopics("t1,t2,t3")))
+    assertEquals("t1=1,t3=3", Util.formatMap(rebalancer.expandTopics("t1,t3")))
+    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(rebalancer.expandTopics("t0,t1,t2,t3,t4")))
+
+    // topic lists with rf
+    assertEquals("t1=1,t3=1", Util.formatMap(rebalancer.expandTopics("t1,t3:1")))
+
+    // wildcard
+    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(rebalancer.expandTopics("*")))
+    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(rebalancer.expandTopics("t1,t2,*")))
+
+    // wildcard with rf
+    assertEquals("t1=3,t2=3,t3=3", Util.formatMap(rebalancer.expandTopics("*:3")))
+    assertEquals("t1=3,t2=3,t3=3", Util.formatMap(rebalancer.expandTopics("t1,*:3")))
+    assertEquals("t1=1,t2=3,t3=3", Util.formatMap(rebalancer.expandTopics("t1:1,*:3")))
+  }
 
   private def createTopic(name: String, assignment: Map[Int, Seq[Int]]) {
     val json: String = ZkUtils.replicaAssignmentZkData(assignment.map(e => "" + e._1 -> e._2))
