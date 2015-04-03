@@ -37,18 +37,14 @@ class BrokerTest extends MesosTestCase {
   }
 
   @Test
-  def offectiveOptions {
-    // $var substitution
+  def options {
+    // $id substitution
     broker.options = parseMap("a=$id,b=2")
-    assertEquals(parseMap("a=0,b=2,log.dirs=kafka-logs"), broker.effectiveOptions())
+    assertEquals(parseMap("a=0,b=2"), broker.options())
 
-    // log.dirs override
-    broker.options = parseMap("log.dirs=logs")
-    assertEquals(parseMap("log.dirs=logs"), broker.effectiveOptions(parseMap("log.dirs=logs")))
-
-    // option override
-    broker.options = parseMap("a=1,log.dirs=logs")
-    assertEquals(parseMap("a=2,log.dirs=logs"), broker.effectiveOptions(parseMap("a=2")))
+    // defaults
+    broker.options = parseMap("a=2")
+    assertEquals(parseMap("a=2,b=1"), broker.options(parseMap("a=2,b=1")))
   }
 
   @Test

@@ -40,16 +40,13 @@ class Broker(_id: String = "0") {
 
   var failover: Failover = new Failover()
 
-  def effectiveOptions(overrides: util.Map[String, String] = null): util.Map[String, String] = {
-    val result = new util.LinkedHashMap[String, String](options)
-
+  def options(defaults: util.Map[String, String] = null): util.Map[String, String] = {
+    val result = new util.LinkedHashMap[String, String]()
+    if (defaults != null) result.putAll(defaults)
+    
+    result.putAll(options)
     for ((k, v) <- result)
       result.put(k, v.replace("$id", id))
-
-    if (overrides != null) result.putAll(overrides)
-
-    if (!result.containsKey("log.dirs"))
-      result.put("log.dirs", "kafka-logs")
 
     result
   }

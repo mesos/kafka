@@ -46,7 +46,7 @@ class SchedulerTest extends MesosTestCase {
     broker.cpus = 0.5
     broker.mem = 256
 
-    val offer = this.offer(slaveId = "slave", ports = Pair(1000, 1000))
+    val offer = this.offer(slaveId = "slave", hostname = "host", ports = Pair(1000, 1000))
 
     val task = Scheduler.newTask(broker, offer)
     assertEquals("slave", task.getSlaveId.getValue)
@@ -76,8 +76,11 @@ class SchedulerTest extends MesosTestCase {
     val options = Util.parseMap(task.getData.toStringUtf8)
     assertEquals(broker.id, options.get("broker.id"))
     assertEquals("" + 1000, options.get("port"))
+    assertEquals(Config.kafkaZkConnect, options.get("zookeeper.connect"))
 
     assertEquals("kafka-logs", options.get("log.dirs"))
+    assertEquals(offer.getHostname, options.get("host.name"))
+
     assertEquals("1", options.get("a"))
   }
 

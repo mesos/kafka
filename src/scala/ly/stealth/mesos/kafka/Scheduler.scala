@@ -57,13 +57,16 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val port = findBrokerPort(offer)
 
     def taskData: ByteString = {
-      val overrides: Map[String, String] = Map(
+      val defaults: Map[String, String] = Map(
         "broker.id" -> broker.id,
         "port" -> ("" + port),
-        "zookeeper.connect" -> Config.kafkaZkConnect
+        "log.dirs" -> "kafka-logs",
+
+        "zookeeper.connect" -> Config.kafkaZkConnect,
+        "host.name" -> offer.getHostname
       )
 
-      val options = Util.formatMap(broker.effectiveOptions(overrides))
+      val options = Util.formatMap(broker.options(defaults))
       ByteString.copyFromUtf8(options)
     }
 
