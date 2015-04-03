@@ -33,7 +33,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
   cluster.load(clearTasks = true)
 
   private var driver: SchedulerDriver = null
-  private[kafka] val taskIds: util.List[String] = new util.concurrent.CopyOnWriteArrayList[String]()
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jar.getName
@@ -147,12 +146,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (!started) driver.declineOffer(offer.getId)
     }
 
-    for (id <- taskIds) {
-      val broker = cluster.getBroker(Broker.idFromTaskId(id))
-
-      if (broker == null || broker.shouldStop) {
-        logger.info("Killing task " + id)
-        driver.killTask(TaskID.newBuilder.setValue(id).build)
+    for (broker <- cluster.getBrokers) {
+      if (broker.shouldStop) {
+        logger.info(s"Stopping broker ${broker.id}: killing task ${broker.task.id}")
+        driver.killTask(TaskID.newBuilder.setValue(broker.task.id).build)
       }
     }
 
@@ -176,16 +173,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
-    if (broker == null) return
-
-    if (broker.task != null) broker.task.running = true
+    broker.task.running = true
     broker.failover.resetFailures()
   }
 
   private[kafka] def onBrokerStopped(broker: Broker, status: TaskStatus, now: Date = new Date()): Unit = {
-    taskIds.remove(status.getTaskId.getValue)
-    if (broker == null) return
-
     broker.task = null
     val failed = broker.active && status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
 
@@ -218,9 +210,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
     broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, findBrokerPort(offer), attributes)
-    taskIds.add(id)
 
-    logger.info("Launching task " + id + " by offer " + Str.id(offer.getId.getValue) + "\n" + Str.task(task_))
+    logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${Str.id(offer.getId.getValue)}\n ${Str.task(task_)}")
   }
 
   def forciblyStopBroker(broker: Broker): Unit = {

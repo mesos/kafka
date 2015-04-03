@@ -86,7 +86,7 @@ class Broker(_id: String = "0") {
     active && task == null && matches(offer, otherAttributes) && !failover.isWaitingDelay(now)
   }
 
-  def shouldStop: Boolean = !active
+  def shouldStop: Boolean = task != null && !active
 
   def state(now: Date = new Date()): String = {
     if (active) {

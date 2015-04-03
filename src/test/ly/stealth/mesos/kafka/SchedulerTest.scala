@@ -174,7 +174,6 @@ class SchedulerTest extends MesosTestCase {
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
-    assertTrue(Scheduler.taskIds.contains(broker.task.id))
   }
 
   @Test

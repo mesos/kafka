@@ -146,7 +146,11 @@ class BrokerTest extends MesosTestCase {
 
   @Test
   def shouldStop {
+    assertFalse(broker.shouldStop)
+
+    broker.task = new Broker.Task()
     assertTrue(broker.shouldStop)
+
     broker.active = true
     assertFalse(broker.shouldStop)
   }
