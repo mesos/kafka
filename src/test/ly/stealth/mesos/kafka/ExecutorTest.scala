@@ -75,10 +75,12 @@ class ExecutorTest extends MesosTestCase {
     assertTrue(Executor.server.isStarted)
   }
 
-  @Test
-  def killTasks {
+  @Test(timeout = 5000)
+  def killTask {
     Executor.server.start()
     Executor.killTask(executorDriver, taskId())
+
+    Executor.server.waitFor()
     assertFalse(Executor.server.isStarted)
   }
 

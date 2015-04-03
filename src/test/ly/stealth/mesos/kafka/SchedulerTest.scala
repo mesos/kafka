@@ -99,6 +99,7 @@ class SchedulerTest extends MesosTestCase {
     // broker !active
     broker.active = false
     Scheduler.syncBrokers(util.Arrays.asList())
+    assertTrue(broker.task.stopping)
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertEquals(1, schedulerDriver.killedTasks.size())
   }
@@ -170,6 +171,7 @@ class SchedulerTest extends MesosTestCase {
 
     assertNotNull(broker.task)
     assertFalse(broker.task.running)
+    assertFalse(broker.task.stopping)
     assertEquals(Util.parseMap("a=1,b=2"), broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)

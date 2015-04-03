@@ -86,7 +86,7 @@ class Broker(_id: String = "0") {
     active && task == null && matches(offer, otherAttributes) && !failover.isWaitingDelay(now)
   }
 
-  def shouldStop: Boolean = task != null && !active
+  def shouldStop: Boolean = task != null && !task.stopping && !active
 
   def state(now: Date = new Date()): String = {
     if (active) {
@@ -251,7 +251,8 @@ object Broker {
     _hostname: String = null,
     _port: Int = -1,
     _attributes: util.Map[String, String] = Collections.emptyMap(),
-    _running: Boolean = false
+    _running: Boolean = false,
+    _stopping: Boolean = false
   ) {
     var id: String = _id
     var slaveId: String = _slaveId
@@ -262,6 +263,7 @@ object Broker {
     var attributes: util.Map[String, String] = _attributes
 
     @volatile var running: Boolean = _running
+    @volatile var stopping: Boolean = _stopping
 
     def endpoint: String = hostname + ":" + port
 
@@ -275,6 +277,7 @@ object Broker {
       attributes = node("attributes").asInstanceOf[Map[String, String]]
 
       running = node("running").asInstanceOf[Boolean]
+      stopping = node("stopping").asInstanceOf[Boolean]
     }
 
     def toJson: JSONObject = {
@@ -289,6 +292,7 @@ object Broker {
       obj("attributes") = new JSONObject(attributes.toMap)
 
       obj("running") = running
+      obj("stopping") = stopping
 
       new JSONObject(obj.toMap)
     }

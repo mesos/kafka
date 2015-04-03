@@ -46,7 +46,7 @@ object Executor extends org.apache.mesos.Executor {
 
   def killTask(driver: ExecutorDriver, id: TaskID): Unit = {
     logger.info("[killTask] " + id.getValue)
-    stopExecutor(driver)
+    stopExecutor(driver, async = true)
   }
 
   def frameworkMessage(driver: ExecutorDriver, data: Array[Byte]): Unit = {
@@ -91,14 +91,21 @@ object Executor extends org.apache.mesos.Executor {
     }.start()
   }
 
-  @volatile var stopping: Boolean = false
-  private[kafka] def stopExecutor(driver: ExecutorDriver): Unit = {
-    if (!stopping) {
-      stopping = true
+  private[kafka] def stopExecutor(driver: ExecutorDriver, async: Boolean = false): Unit = {
+    def stop0 {
       if (server.isStarted) server.stop()
       driver.stop()
-      stopping = false
     }
+
+    if (async)
+      new Thread() {
+        override def run(): Unit = {
+          setName("ExecutorStopper")
+          stop0
+        }
+      }.start()
+    else
+      stop0
   }
 
   private[kafka] def handleMessage(driver: ExecutorDriver, message: String): Unit = {

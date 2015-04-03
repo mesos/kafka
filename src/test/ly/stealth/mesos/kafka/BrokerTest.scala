@@ -331,6 +331,7 @@ class BrokerTest extends MesosTestCase {
   def Task_toJson_fromJson {
     val task = new Task("id", "slave", "executor", "host", 9092, parseMap("a=1,b=2"))
     task.running = true
+    task.stopping = true
 
     val read: Task = new Task()
     read.fromJson(Util.parseJson("" + task.toJson))
@@ -381,6 +382,7 @@ object BrokerTest {
     assertEquals(expected.attributes, actual.attributes)
 
     assertEquals(expected.running, actual.running)
+    assertEquals(expected.stopping, actual.stopping)
   }
 
   private def checkNulls(expected: Object, actual: Object): Boolean = {

@@ -266,7 +266,7 @@ object HttpServer {
       for (id <- ids) {
         val broker = cluster.getBroker(id)
         if (broker == null) { response.sendError(400, "broker " + id + " not found"); return }
-        if (broker.active == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " active"); return }
+        if (!force && broker.active == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " active"); return }
         brokers.add(broker)
       }
 

@@ -150,6 +150,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (broker.shouldStop) {
         logger.info(s"Stopping broker ${broker.id}: killing task ${broker.task.id}")
         driver.killTask(TaskID.newBuilder.setValue(broker.task.id).build)
+        broker.task.stopping = true
       }
     }
 
@@ -184,7 +185,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (failed) {
       broker.failover.registerFailure(now)
 
-      var msg = "Broker " + broker.id + " failed to start " + broker.failover.failures
+      var msg = s"Broker ${broker.id} failed to start ${broker.failover.failures}"
       if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
 
       if (!broker.failover.isMaxTriesExceeded) {
@@ -216,6 +217,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def forciblyStopBroker(broker: Broker): Unit = {
     if (driver != null && broker.task != null) {
+      logger.info(s"Stopping broker ${broker.id} forcibly: sending 'stop' message")
+
       driver.sendFrameworkMessage(
         ExecutorID.newBuilder().setValue(broker.task.executorId).build(),
         SlaveID.newBuilder().setValue(broker.task.slaveId).build(),
