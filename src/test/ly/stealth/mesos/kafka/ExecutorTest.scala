@@ -19,7 +19,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import org.apache.mesos.Protos.TaskState
+import org.apache.mesos.Protos.{Status, TaskState}
 
 class ExecutorTest extends MesosTestCase {
   @Test(timeout = 5000)
@@ -55,14 +55,17 @@ class ExecutorTest extends MesosTestCase {
   }
 
   @Test
-  def stopBroker {
+  def stopExecutor {
     Executor.server.start()
     assertTrue(Executor.server.isStarted)
+    assertEquals(Status.DRIVER_RUNNING, executorDriver.status)
 
-    Executor.stopBroker
+    Executor.stopExecutor(executorDriver)
     assertFalse(Executor.server.isStarted)
+    assertEquals(Status.DRIVER_STOPPED, executorDriver.status)
 
-    Executor.stopBroker // no error
+    Executor.stopExecutor(executorDriver) // no error
+    assertEquals(Status.DRIVER_STOPPED, executorDriver.status)
   }
 
   @Test(timeout = 5000)

@@ -46,16 +46,17 @@ object Executor extends org.apache.mesos.Executor {
 
   def killTask(driver: ExecutorDriver, id: TaskID): Unit = {
     logger.info("[killTask] " + id.getValue)
-    stopBroker
+    stopExecutor(driver)
   }
 
   def frameworkMessage(driver: ExecutorDriver, data: Array[Byte]): Unit = {
     logger.info("[frameworkMessage] " + new String(data))
+    handleMessage(driver, new String(data))
   }
 
   def shutdown(driver: ExecutorDriver): Unit = {
     logger.info("[shutdown]")
-    stopBroker
+    stopExecutor(driver)
   }
 
   def error(driver: ExecutorDriver, message: String): Unit = {
@@ -78,7 +79,7 @@ object Executor extends org.apache.mesos.Executor {
           logger.warn("", t)
           sendTaskFailed(driver, task, t)
       } finally {
-        stopBroker
+        stopExecutor(driver)
       }
     }
 
@@ -89,8 +90,20 @@ object Executor extends org.apache.mesos.Executor {
       }
     }.start()
   }
-  
-  private[kafka] def stopBroker: Unit = { if (server.isStarted) server.stop() }
+
+  @volatile var stopping: Boolean = false
+  private[kafka] def stopExecutor(driver: ExecutorDriver): Unit = {
+    if (!stopping) {
+      stopping = true
+      if (server.isStarted) server.stop()
+      driver.stop()
+      stopping = false
+    }
+  }
+
+  private[kafka] def handleMessage(driver: ExecutorDriver, message: String): Unit = {
+    if (message == "stop") driver.stop()
+  }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {
     val stackTrace = new StringWriter()

@@ -265,15 +265,27 @@ class MesosTestCase {
     private val _statusUpdates: util.List[TaskStatus] = new util.concurrent.CopyOnWriteArrayList[TaskStatus]()
     def statusUpdates: util.List[TaskStatus] = util.Collections.unmodifiableList(_statusUpdates)
 
-    def start(): Status = throw new UnsupportedOperationException
+    def start(): Status = {
+      status = Status.DRIVER_RUNNING
+      status
+    }
 
-    def stop(): Status = throw new UnsupportedOperationException
+    def stop(): Status = {
+      status = Status.DRIVER_STOPPED
+      status
+    }
 
-    def abort(): Status = throw new UnsupportedOperationException
+    def abort(): Status = {
+      status = Status.DRIVER_ABORTED
+      status
+    }
 
-    def join(): Status = throw new UnsupportedOperationException
+    def join(): Status = { status }
 
-    def run(): Status = throw new UnsupportedOperationException
+    def run(): Status = {
+      status = Status.DRIVER_RUNNING
+      status
+    }
 
     def sendStatusUpdate(status: TaskStatus): Status = {
       _statusUpdates.synchronized {
