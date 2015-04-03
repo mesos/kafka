@@ -187,7 +187,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (broker == null) return
 
     broker.task = null
-    val failed = status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
+    val failed = broker.active && status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
 
     if (failed) {
       broker.failover.registerFailure(now)
@@ -217,10 +217,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (attribute.hasText) attributes.put(attribute.getName, attribute.getText.getValue)
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
-    broker.task = new Broker.Task(id, offer.getHostname, findBrokerPort(offer), attributes)
+    broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, findBrokerPort(offer), attributes)
     taskIds.add(id)
 
     logger.info("Launching task " + id + " by offer " + Str.id(offer.getId.getValue) + "\n" + Str.task(task_))
+  }
+
+  def forciblyStopBroker(broker: Broker): Unit = {
+    if (driver != null && broker.task != null) {
+      driver.sendFrameworkMessage(
+        ExecutorID.newBuilder().setValue(broker.task.executorId).build(),
+        SlaveID.newBuilder().setValue(broker.task.slaveId).build(),
+        "stop".getBytes
+      )
+    }
   }
 
   private[kafka] def otherTasksAttributes(name: String): Array[String] = {

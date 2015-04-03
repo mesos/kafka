@@ -208,6 +208,7 @@ object Cli {
   private def handleStartStopBroker(id: String, args: Array[String], start: Boolean, help: Boolean = false): Unit = {
     val parser = new OptionParser()
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
+    if (!start) parser.accepts("force", "forcibly stop").withOptionalArg().ofType(classOf[String])
 
     if (help) {
       val command = if (start) "start" else "stop"
@@ -230,10 +231,12 @@ object Cli {
 
     val command: String = if (start) "start" else "stop"
     val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+    val force: Boolean = options.has("force")
 
     val params = new util.LinkedHashMap[String, String]()
     params.put("id", id)
     if (timeout != null) params.put("timeout", timeout)
+    if (force) params.put("force", null)
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + command, params) }

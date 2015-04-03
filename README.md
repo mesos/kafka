@@ -321,6 +321,7 @@ Usage: stop <id-expr> [options]
 Option     Description
 ------     -----------
 --timeout  timeout (30s, 1m, 1h). 0s - no timeout
+--force    forcibly stop
 
 id-expr examples:
   0      - broker 0

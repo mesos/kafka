@@ -246,38 +246,49 @@ object Broker {
 
   class Task(
     _id: String = null,
+    _slaveId: String = null,
+    _executorId: String = null,
     _hostname: String = null,
     _port: Int = -1,
     _attributes: util.Map[String, String] = Collections.emptyMap(),
     _running: Boolean = false
   ) {
     var id: String = _id
-    @volatile var running: Boolean = _running
+    var slaveId: String = _slaveId
+    var executorId: String = _executorId
 
     var hostname: String = _hostname
     var port: Int = _port
     var attributes: util.Map[String, String] = _attributes
 
+    @volatile var running: Boolean = _running
+
     def endpoint: String = hostname + ":" + port
 
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]
-      running = node("running").asInstanceOf[Boolean]
+      slaveId = node("slaveId").asInstanceOf[String]
+      executorId = node("executorId").asInstanceOf[String]
 
       hostname = node("hostname").asInstanceOf[String]
       port = node("port").asInstanceOf[Number].intValue()
       attributes = node("attributes").asInstanceOf[Map[String, String]]
+
+      running = node("running").asInstanceOf[Boolean]
     }
 
     def toJson: JSONObject = {
       val obj = new collection.mutable.LinkedHashMap[String, Any]()
 
       obj("id") = id
-      obj("running") = running
+      obj("slaveId") = slaveId
+      obj("executorId") = executorId
 
       obj("hostname") = hostname
       obj("port") = port
       obj("attributes") = new JSONObject(attributes.toMap)
+
+      obj("running") = running
 
       new JSONObject(obj.toMap)
     }
