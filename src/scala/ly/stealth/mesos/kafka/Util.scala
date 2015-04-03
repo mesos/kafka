@@ -28,13 +28,13 @@ import org.apache.mesos.Protos
 
 object Util {
   Class.forName(kafka.utils.Json.getClass.getName) // init class
-  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toLong
+  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
 
   JSON.globalNumberParser = parseNumber
   JSON.perThreadNumberParser = parseNumber
   private val jsonLock = new Object
 
-  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '='): util.Map[String, String] = {
+  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): util.Map[String, String] = {
     def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
       val parts = new util.ArrayList[String]()
 
@@ -65,9 +65,11 @@ object Util {
       if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
 
       val pair = splitEscaped(entry, valueSep, unescape = true)
-      if (pair.length < 2) throw new IllegalArgumentException(s)
+      val key: String = pair(0).trim
+      val value: String = if (pair.length > 1) pair(1).trim else null
 
-      result.put(pair(0).trim, pair(1).trim)
+      if (value == null && !nullValues) throw new IllegalArgumentException(s)
+      result.put(key, value)
     }
 
     result

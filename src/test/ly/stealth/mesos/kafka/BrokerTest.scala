@@ -215,7 +215,7 @@ class BrokerTest extends MesosTestCase {
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
 
-    broker.failover.registerFailure(new Date(0))
+    broker.failover.registerFailure(new Date())
     broker.task = new Task("1", "host", 9092)
 
     val read: Broker = new Broker()
