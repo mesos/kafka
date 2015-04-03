@@ -34,7 +34,7 @@ object Util {
   JSON.perThreadNumberParser = parseNumber
   private val jsonLock = new Object
 
-  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = false): util.Map[String, String] = {
+  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): util.Map[String, String] = {
     def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
       val parts = new util.ArrayList[String]()
 

@@ -147,12 +147,12 @@ object HttpServer {
 
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
-        try { options = Util.parseMap(request.getParameter("options")) }
+        try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
       var constraints: util.Map[String, Constraint] = null
       if (request.getParameter("constraints") != null)
-        try { constraints = Util.parseMap(request.getParameter("constraints")).mapValues(new Constraint(_)).view.force }
+        try { constraints = Util.parseMap(request.getParameter("constraints"), nullValues = false).mapValues(new Constraint(_)).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
 
 

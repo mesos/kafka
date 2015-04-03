@@ -36,11 +36,11 @@ class UtilTest {
     catch { case e: IllegalArgumentException => }
 
     // null value
-    map = Util.parseMap("a=1,b,c=3", nullValues = true)
+    map = Util.parseMap("a=1,b,c=3")
     assertEquals(3, map.size())
     assertNull(map.get("b"))
 
-    try { Util.parseMap("a=1,b,c=3") }
+    try { Util.parseMap("a=1,b,c=3", nullValues = false) }
     catch { case e: IllegalArgumentException => }
 
     // escaping
