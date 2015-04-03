@@ -51,13 +51,14 @@ class KafkaServer extends BrokerServer {
 
     logger.info("Stopping KafkaServer")
     server.getClass.getMethod("shutdown").invoke(server)
-    waitFor()
 
+    waitFor()
     server = null
   }
 
   def waitFor(): Unit = {
-    server.getClass.getMethod("awaitShutdown").invoke(server)
+    if (server != null)
+      server.getClass.getMethod("awaitShutdown").invoke(server)
   }
 }
 
