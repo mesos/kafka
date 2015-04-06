@@ -345,4 +345,6 @@ class TestRebalancer extends Rebalancer {
   }
 
   override def state: String = if (running) "running" else ""
+
+  override def expandTopics(expr: String): util.Map[String, Integer] = Util.parseMap(expr).mapValues(Integer.valueOf)
 }
