@@ -50,7 +50,7 @@ class Rebalancer {
     if (topics.isEmpty) throw new Rebalancer.Exception("no topics")
     for ((topic, rf) <- topics) if (rf == null) throw new Rebalancer.Exception(s"no rf for topic $topic")
 
-    logger.info(s"Starting rebalancing topics ${Util.formatMap(topics, valueSep = ':')} on brokers ${_ids.mkString(",")}")
+    logger.info(s"Starting rebalance for topics ${Util.formatMap(topics, valueSep = ':')} on brokers ${_ids.mkString(",")}")
     val zkClient = newZkClient
     try {
       val ids: util.List[Int] = _ids.map(Integer.parseInt)
