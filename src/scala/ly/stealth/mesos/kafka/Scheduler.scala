@@ -284,6 +284,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(Config.mesosUser)
+    frameworkBuilder.setId(FrameworkID.newBuilder().setValue(Config.frameworkId))
     frameworkBuilder.setName("Kafka Mesos")
     frameworkBuilder.setFailoverTimeout(Config.failoverTimeout)
     frameworkBuilder.setCheckpoint(true)
@@ -304,7 +305,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     System.exit(status)
   }
 
-  def initLogging() {
+  private def initLogging() {
     System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
     BasicConfigurator.resetConfiguration()
 
