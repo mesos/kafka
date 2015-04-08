@@ -166,7 +166,7 @@ object Util {
 
   object Str {
     def dateTime(date: Date): String = {
-      new SimpleDateFormat("yyyy-MM-dd hh:mm:ssX").format(date)
+      new SimpleDateFormat("yyyy-MM-dd HH:mm:ssX").format(date)
     }
 
     def framework(framework: FrameworkInfo): String = {

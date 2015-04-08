@@ -22,7 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.Date
+import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import Util.Str
 
@@ -88,11 +88,13 @@ object Scheduler extends org.apache.mesos.Scheduler {
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
     logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
     this.driver = driver
+    reconcileTasks()
   }
 
   def reregistered(driver: SchedulerDriver, master: MasterInfo): Unit = {
     logger.info("[reregistered] master:" + Str.master(master))
     this.driver = driver
+    reconcileTasks()
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
@@ -151,7 +153,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (broker.shouldStop) {
         logger.info(s"Stopping broker ${broker.id}: killing task ${broker.task.id}")
         driver.killTask(TaskID.newBuilder.setValue(broker.task.id).build)
-        broker.task.stopping = true
+        broker.task.state = Broker.State.STOPPING
       }
     }
 
@@ -175,7 +177,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
-    broker.task.running = true
+    broker.task.state = Broker.State.RUNNING
     broker.failover.resetFailures()
   }
 
@@ -231,6 +233,16 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "stop".getBytes
       )
     }
+  }
+
+  private[kafka] def reconcileTasks(): Unit = {
+    for (broker <- cluster.getBrokers)
+      if (broker.task != null) {
+        logger.info(s"Reconciling state of broker ${broker.id}, task ${broker.task.id}")
+        broker.task.state = Broker.State.RECONCILING
+      }
+
+    driver.reconcileTasks(Collections.emptyList())
   }
 
   private[kafka] def otherTasksAttributes(name: String): Array[String] = {

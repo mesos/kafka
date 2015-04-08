@@ -201,7 +201,8 @@ class MesosTestCase {
     
     val launchedTasks: util.List[TaskInfo] = new util.ArrayList[TaskInfo]()
     val killedTasks: util.List[String] = new util.ArrayList[String]()
-    
+    val reconciledTasks: util.List[String] = new util.ArrayList[String]()
+
     def declineOffer(id: OfferID): Status = {
       declinedOffers.add(id.getValue)
       status
@@ -251,7 +252,10 @@ class MesosTestCase {
 
     def join(): Status = throw new UnsupportedOperationException
 
-    def reconcileTasks(statuses: util.Collection[TaskStatus]): Status = throw new UnsupportedOperationException
+    def reconcileTasks(statuses: util.Collection[TaskStatus]): Status = {
+      reconciledTasks.addAll(statuses.map(_.getTaskId.getValue))
+      status
+    }
 
     def reviveOffers(): Status = throw new UnsupportedOperationException
 

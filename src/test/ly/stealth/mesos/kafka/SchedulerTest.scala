@@ -111,11 +111,11 @@ class SchedulerTest extends MesosTestCase {
   def onBrokerStatus {
     val broker = Scheduler.cluster.addBroker(new Broker())
     broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host", 9092)
-    assertFalse(broker.task.running)
+    assertEquals(Broker.State.STARTING, broker.task.state)
 
     // broker started
     Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING))
-    assertTrue(broker.task.running)
+    assertEquals(Broker.State.RUNNING, broker.task.state)
 
     // broker finished
     Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_FINISHED))
@@ -127,16 +127,16 @@ class SchedulerTest extends MesosTestCase {
   def onBrokerStarted {
     val broker = Scheduler.cluster.addBroker(new Broker())
     broker.task = new Broker.Task("task")
-    assertFalse(broker.task.running)
+    assertEquals(Broker.State.STARTING, broker.task.state)
 
     Scheduler.onBrokerStarted(broker, taskStatus(state = TaskState.TASK_RUNNING))
-    assertTrue(broker.task.running)
+    assertEquals(Broker.State.RUNNING, broker.task.state)
   }
 
   @Test
   def onBrokerStopped {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    val task = new Broker.Task("task", _running = true)
+    val task = new Broker.Task("task", _state = Broker.State.RUNNING)
 
     // finished
     broker.task = task
@@ -173,12 +173,27 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
     assertNotNull(broker.task)
-    assertFalse(broker.task.running)
-    assertFalse(broker.task.stopping)
+    assertEquals(Broker.State.STARTING, broker.task.state)
     assertEquals(Util.parseMap("a=1,b=2"), broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
+  }
+
+  @Test
+  def reconcileTasks {
+    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
+
+    val broker1 = Scheduler.cluster.addBroker(new Broker("0"))
+    broker1.task = new Broker.Task(_id = "1", _state = Broker.State.RUNNING)
+
+    val broker2 = Scheduler.cluster.addBroker(new Broker("0"))
+    broker2.task = new Broker.Task(_id = "2", _state = Broker.State.STARTING)
+
+    Scheduler.reconcileTasks()
+    assertNull(broker0.task)
+    assertEquals(Broker.State.RECONCILING, broker1.task.state)
+    assertEquals(Broker.State.RECONCILING, broker2.task.state)
   }
 
   @Test

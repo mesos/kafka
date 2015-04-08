@@ -22,7 +22,7 @@ import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
 import java.util.Date
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Broker.{Task, Failover}
+import ly.stealth.mesos.kafka.Broker.{State, Task, Failover}
 import Util.parseMap
 
 class BrokerTest extends MesosTestCase {
@@ -155,7 +155,7 @@ class BrokerTest extends MesosTestCase {
   def state {
     assertEquals("stopped", broker.state())
 
-    broker.task = new Task()
+    broker.task = new Task(_state = State.STOPPING)
     assertEquals("stopping", broker.state())
 
     broker.task = null
@@ -165,7 +165,7 @@ class BrokerTest extends MesosTestCase {
     broker.task = new Task()
     assertEquals("starting", broker.state())
 
-    broker.task.running = true
+    broker.task.state = State.RUNNING
     assertEquals("running", broker.state())
 
     broker.task = null
@@ -180,29 +180,26 @@ class BrokerTest extends MesosTestCase {
 
   @Test(timeout = 5000)
   def waitFor {
-    def deferStateSwitch(running: Boolean, delay: Long) {
+    def deferStateSwitch(state: String, delay: Long) {
       new Thread() {
         override def run() {
           setName(classOf[BrokerTest].getSimpleName + "-scheduleState")
           Thread.sleep(delay)
 
-          if (running) {
-            broker.task = new Task()
-            broker.task.running = running
-          } else
-            broker.task = null
+          if (state != null) broker.task = new Task(_state = state)
+          else broker.task = null
         }
       }.start()
     }
 
-    deferStateSwitch(running = true, 100)
-    assertTrue(broker.waitFor(running = true, new Period("200ms")))
+    deferStateSwitch(Broker.State.RUNNING, 100)
+    assertTrue(broker.waitFor(State.RUNNING, new Period("200ms")))
 
-    deferStateSwitch(running = false, 100)
-    assertTrue(broker.waitFor(running = false, new Period("200ms")))
+    deferStateSwitch(null, 100)
+    assertTrue(broker.waitFor(null, new Period("200ms")))
 
     // timeout
-    assertFalse(broker.waitFor(running = true, new Period("50ms")))
+    assertFalse(broker.waitFor(State.RUNNING, new Period("50ms")))
   }
 
   @Test
@@ -325,9 +322,7 @@ class BrokerTest extends MesosTestCase {
   // Task
   @Test
   def Task_toJson_fromJson {
-    val task = new Task("id", "slave", "executor", "host", 9092, parseMap("a=1,b=2"))
-    task.running = true
-    task.stopping = true
+    val task = new Task("id", "slave", "executor", "host", 9092, parseMap("a=1,b=2"), State.RUNNING)
 
     val read: Task = new Task()
     read.fromJson(Util.parseJson("" + task.toJson))
@@ -377,8 +372,7 @@ object BrokerTest {
     assertEquals(expected.port, actual.port)
     assertEquals(expected.attributes, actual.attributes)
 
-    assertEquals(expected.running, actual.running)
-    assertEquals(expected.stopping, actual.stopping)
+    assertEquals(expected.state, actual.state)
   }
 
   private def checkNulls(expected: Object, actual: Object): Boolean = {
