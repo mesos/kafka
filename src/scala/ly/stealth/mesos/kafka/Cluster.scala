@@ -48,12 +48,7 @@ class Cluster {
   def removeBroker(broker: Broker): Unit = brokers.remove(broker)
 
   def clear(): Unit = brokers.clear()
-
-  def load(clearTasks: Boolean) {
-    Cluster.storage.load(this)
-    if (clearTasks) brokers.foreach(_.task = null)
-  }
-
+  def load() = Cluster.storage.load(this)
   def save() = Cluster.storage.save(this)
 
   def expandIds(expr: String): util.List[String] = {

@@ -202,6 +202,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
+  private def onShutdown() {
+    cluster.getBrokers.foreach(_.task = null)
+    cluster.save()
+  }
+
   private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
     val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
@@ -261,7 +266,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def main(args: Array[String]) {
     initLogging()
-    cluster.load(clearTasks = true)
+    cluster.load()
 
     HttpServer.start()
 
@@ -275,7 +280,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() = {
-        if (driver != null) driver.stop()
+        if (driver != null) {
+          driver.stop()
+          Scheduler.onShutdown()
+        }
         HttpServer.stop()
       }
     })

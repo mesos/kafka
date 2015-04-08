@@ -60,7 +60,7 @@ class ClusterTest extends MesosTestCase {
     cluster.save()
 
     val read = new Cluster()
-    read.load(clearTasks = false)
+    read.load()
     assertEquals(2, read.getBrokers.size())
   }
 
