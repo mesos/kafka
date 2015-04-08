@@ -29,6 +29,7 @@ import java.io.{FileWriter, File}
 import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.parsing.json.JSON
+import ly.stealth.mesos.kafka.Cluster.FsStorage
 
 @Ignore
 class MesosTestCase {
@@ -43,8 +44,9 @@ class MesosTestCase {
 
     BasicConfigurator.configure()
 
-    Cluster.stateFile = File.createTempFile(getClass.getSimpleName, null)
-    Cluster.stateFile.delete()
+    val storageFile = File.createTempFile(getClass.getSimpleName, null)
+    storageFile.delete()
+    Cluster.storage = new FsStorage(storageFile)
 
     Scheduler.cluster.clear()
     Scheduler.cluster.rebalancer = new TestRebalancer()
@@ -76,8 +78,9 @@ class MesosTestCase {
 
     Scheduler.cluster.rebalancer = new Rebalancer()
 
-    Cluster.stateFile.delete()
-    Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
+    val storage = Cluster.storage.asInstanceOf[FsStorage]
+    storage.file.delete()
+    Cluster.storage = new FsStorage(FsStorage.DEFAULT_FILE)
 
     Executor.server.stop()
     Executor.server = new KafkaServer()
