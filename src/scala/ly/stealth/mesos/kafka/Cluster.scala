@@ -113,10 +113,9 @@ class Cluster {
 }
 
 object Cluster {
-  var storage: Storage = newStorage
+  var storage: Storage = newStorage(Config.clusterStorage)
 
-  def newStorage: Storage = {
-    val s = Config.storage
+  def newStorage(s: String): Storage = {
     if (s.startsWith("file:")) return new FsStorage(new File(s.substring("file:".length)))
     else if (s.startsWith("zk:")) return new ZkStorage(s.substring("zk:".length))
     throw new IllegalStateException("Unsupported storage " + s)

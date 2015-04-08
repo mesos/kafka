@@ -30,8 +30,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   val cluster: Cluster = new Cluster()
-  cluster.load(clearTasks = true)
-
   private var driver: SchedulerDriver = null
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
@@ -263,6 +261,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def main(args: Array[String]) {
     initLogging()
+    cluster.load(clearTasks = true)
+
     HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
