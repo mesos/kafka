@@ -30,8 +30,11 @@ import kafka.admin._
 import kafka.common.TopicAndPartition
 import kafka.utils.{ZkUtils, ZKStringSerializer}
 import ly.stealth.mesos.kafka.Util.Period
+import org.apache.log4j.Logger
 
 class Rebalancer {
+  private val logger: Logger = Logger.getLogger(this.getClass)
+
   @volatile private var assignment: Map[TopicAndPartition, Seq[Int]] = null
   @volatile private var reassignment: Map[TopicAndPartition, Seq[Int]] = null
 
@@ -47,6 +50,7 @@ class Rebalancer {
     if (topics.isEmpty) throw new Rebalancer.Exception("no topics")
     for ((topic, rf) <- topics) if (rf == null) throw new Rebalancer.Exception(s"no rf for topic $topic")
 
+    logger.info(s"Starting rebalance for topics ${Util.formatMap(topics, valueSep = ':')} on brokers ${_ids.mkString(",")}")
     val zkClient = newZkClient
     try {
       val ids: util.List[Int] = _ids.map(Integer.parseInt)

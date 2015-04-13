@@ -20,6 +20,7 @@ package ly.stealth.mesos.kafka
 import org.junit.{Before, Test}
 import java.util
 import org.junit.Assert._
+import ly.stealth.mesos.kafka.Broker.State
 
 class ClusterTest extends MesosTestCase {
   var cluster: Cluster = new Cluster()
@@ -60,15 +61,14 @@ class ClusterTest extends MesosTestCase {
     cluster.save()
 
     val read = new Cluster()
-    read.load(clearTasks = false)
+    read.load()
     assertEquals(2, read.getBrokers.size())
   }
 
   @Test
   def toJson_fromJson {
     val broker0 = cluster.addBroker(new Broker("0"))
-    broker0.task = new Broker.Task("1", "slave", "executor", "host", 9092)
-    broker0.task.running = true
+    broker0.task = new Broker.Task("1", "slave", "executor", "host", 9092, _state = State.RUNNING)
     cluster.addBroker(new Broker("1"))
 
     val read = new Cluster()

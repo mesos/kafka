@@ -83,12 +83,12 @@ class Broker(_id: String = "0") {
     active && task == null && matches(offer, otherAttributes) && !failover.isWaitingDelay(now)
   }
 
-  def shouldStop: Boolean = task != null && !task.stopping && !active
-
+  def shouldStop: Boolean = !active && task != null && !task.stopping
+  
   def state(now: Date = new Date()): String = {
-    if (active) {
-      if (task != null && task.running) return "running"
+    if (task != null && !task.starting) return task.state
 
+    if (active) {
       if (failover.isWaitingDelay(now)) {
         var s = "failed " + failover.failures
         if (failover.maxTries != null) s += "/" + failover.maxTries
@@ -107,12 +107,11 @@ class Broker(_id: String = "0") {
       return "starting"
     }
 
-    if (task != null) return "stopping"
     "stopped"
   }
 
-  def waitFor(running: Boolean, timeout: Period): Boolean = {
-    def matches: Boolean = if (running) task != null && task.running else task == null
+  def waitFor(state: String, timeout: Period): Boolean = {
+    def matches: Boolean = if (state != null) task != null && task.state == state else task == null
 
     var t = timeout.ms
     while (t > 0 && !matches) {
@@ -248,8 +247,7 @@ object Broker {
     _hostname: String = null,
     _port: Int = -1,
     _attributes: util.Map[String, String] = Collections.emptyMap(),
-    _running: Boolean = false,
-    _stopping: Boolean = false
+    _state: String = State.STARTING
   ) {
     var id: String = _id
     var slaveId: String = _slaveId
@@ -259,8 +257,11 @@ object Broker {
     var port: Int = _port
     var attributes: util.Map[String, String] = _attributes
 
-    @volatile var running: Boolean = _running
-    @volatile var stopping: Boolean = _stopping
+    @volatile var state: String = _state
+    def starting: Boolean = state == State.STARTING
+    def running: Boolean = state == State.RUNNING
+    def stopping: Boolean = state == State.STOPPING
+    def reconciling: Boolean = state == State.RECONCILING
 
     def endpoint: String = hostname + ":" + port
 
@@ -273,8 +274,7 @@ object Broker {
       port = node("port").asInstanceOf[Number].intValue()
       attributes = node("attributes").asInstanceOf[Map[String, String]]
 
-      running = node("running").asInstanceOf[Boolean]
-      stopping = node("stopping").asInstanceOf[Boolean]
+      state = node("state").asInstanceOf[String]
     }
 
     def toJson: JSONObject = {
@@ -288,11 +288,18 @@ object Broker {
       obj("port") = port
       obj("attributes") = new JSONObject(attributes.toMap)
 
-      obj("running") = running
-      obj("stopping") = stopping
+      obj("state") = state
 
       new JSONObject(obj.toMap)
     }
+  }
+
+  object State {
+    val STOPPED = "stopped"
+    val STARTING = "starting"
+    val RUNNING = "running"
+    val RECONCILING = "reconciling"
+    val STOPPING = "stopping"
   }
 
   type OtherAttributes = (String) => Array[String]

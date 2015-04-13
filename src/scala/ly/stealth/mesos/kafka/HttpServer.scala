@@ -28,6 +28,7 @@ import scala.collection.JavaConversions._
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
 import ly.stealth.mesos.kafka.Util.Period
+import ly.stealth.mesos.kafka.Broker.State
 
 object HttpServer {
   var jar: File = null
@@ -281,7 +282,7 @@ object HttpServer {
         if (timeout.ms == 0) return "scheduled"
 
         for (broker <- brokers)
-          if (!broker.waitFor(running = start, timeout))
+          if (!broker.waitFor(if (start) State.RUNNING else null, timeout))
             return "timeout"
 
         if (start) "started" else "stopped"

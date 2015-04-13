@@ -29,6 +29,7 @@ import java.io.{FileWriter, File}
 import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.parsing.json.JSON
+import ly.stealth.mesos.kafka.Cluster.FsStorage
 
 @Ignore
 class MesosTestCase {
@@ -43,8 +44,9 @@ class MesosTestCase {
 
     BasicConfigurator.configure()
 
-    Cluster.stateFile = File.createTempFile(getClass.getSimpleName, null)
-    Cluster.stateFile.delete()
+    val storageFile = File.createTempFile(getClass.getSimpleName, null)
+    storageFile.delete()
+    Cluster.storage = new FsStorage(storageFile)
 
     Scheduler.cluster.clear()
     Scheduler.cluster.rebalancer = new TestRebalancer()
@@ -76,8 +78,9 @@ class MesosTestCase {
 
     Scheduler.cluster.rebalancer = new Rebalancer()
 
-    Cluster.stateFile.delete()
-    Cluster.stateFile = Cluster.DEFAULT_STATE_FILE
+    val storage = Cluster.storage.asInstanceOf[FsStorage]
+    storage.file.delete()
+    Cluster.storage = new FsStorage(FsStorage.DEFAULT_FILE)
 
     Executor.server.stop()
     Executor.server = new KafkaServer()
@@ -198,7 +201,8 @@ class MesosTestCase {
     
     val launchedTasks: util.List[TaskInfo] = new util.ArrayList[TaskInfo]()
     val killedTasks: util.List[String] = new util.ArrayList[String]()
-    
+    val reconciledTasks: util.List[String] = new util.ArrayList[String]()
+
     def declineOffer(id: OfferID): Status = {
       declinedOffers.add(id.getValue)
       status
@@ -248,7 +252,10 @@ class MesosTestCase {
 
     def join(): Status = throw new UnsupportedOperationException
 
-    def reconcileTasks(statuses: util.Collection[TaskStatus]): Status = throw new UnsupportedOperationException
+    def reconcileTasks(statuses: util.Collection[TaskStatus]): Status = {
+      reconciledTasks.addAll(statuses.map(_.getTaskId.getValue))
+      status
+    }
 
     def reviveOffers(): Status = throw new UnsupportedOperationException
 
@@ -346,5 +353,6 @@ class TestRebalancer extends Rebalancer {
 
   override def state: String = if (running) "running" else ""
 
-  override def expandTopics(expr: String): util.Map[String, Integer] = Util.parseMap(expr).mapValues(Integer.valueOf)
+  override def expandTopics(expr: String): util.Map[String, Integer] = Util.parseMap(expr)
+    .mapValues(v => if (v != null) Integer.valueOf(v) else null).view.force
 }
