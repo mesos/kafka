@@ -87,6 +87,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
     logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
+    cluster.frameworkId = Some(id)
+    cluster.save()
     this.driver = driver
     reconcileTasks()
   }
@@ -284,7 +286,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(Config.mesosUser)
-    frameworkBuilder.setId(FrameworkID.newBuilder().setValue(Config.frameworkId))
+    cluster.frameworkId.map(fwId => frameworkBuilder.setId(fwId))
     frameworkBuilder.setName("Kafka Mesos")
     frameworkBuilder.setFailoverTimeout(Config.failoverTimeout)
     frameworkBuilder.setCheckpoint(true)
