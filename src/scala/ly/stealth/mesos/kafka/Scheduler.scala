@@ -22,7 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.{Collections, Date}
+import java.util.Date
 import scala.collection.JavaConversions._
 import Util.Str
 
@@ -87,8 +87,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
     logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
-    cluster.frameworkId = Some(id)
+
+    cluster.frameworkId = id.getValue
     cluster.save()
+
     this.driver = driver
     reconcileTasks()
   }
@@ -206,11 +208,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def onShutdown() {
-    cluster.getBrokers.foreach(_.task = null)
-    cluster.save()
-  }
-
   private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
     val task_ = newTask(broker, offer)
     val id = task_.getTaskId.getValue
@@ -238,13 +235,21 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def reconcileTasks(): Unit = {
+    val statuses = new util.ArrayList[TaskStatus]
+
     for (broker <- cluster.getBrokers)
       if (broker.task != null) {
         logger.info(s"Reconciling state of broker ${broker.id}, task ${broker.task.id}")
         broker.task.state = Broker.State.RECONCILING
+
+        statuses.add(TaskStatus.newBuilder()
+          .setTaskId(TaskID.newBuilder().setValue(broker.task.id))
+          .setState(TaskState.TASK_STAGING)
+          .build()
+        )
       }
 
-    driver.reconcileTasks(Collections.emptyList())
+    driver.reconcileTasks(statuses)
   }
 
   private[kafka] def otherTasksAttributes(name: String): Array[String] = {
@@ -287,7 +292,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(if (Config.mesosUser != null) Config.mesosUser else "")
-    cluster.frameworkId.map(fwId => frameworkBuilder.setId(fwId))
+    if (cluster.frameworkId != null) frameworkBuilder.setId(FrameworkID.newBuilder().setValue(cluster.frameworkId))
     frameworkBuilder.setName("Kafka Mesos")
     frameworkBuilder.setFailoverTimeout(Config.mesosFrameworkTimeout.ms / 1000)
     frameworkBuilder.setCheckpoint(true)
@@ -295,13 +300,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.mesosConnect)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
-      override def run() = {
-        if (driver != null) {
-          driver.stop()
-          Scheduler.onShutdown()
-        }
-        HttpServer.stop()
-      }
+      override def run() = HttpServer.stop()
     })
 
     val status = if (driver.run eq Status.DRIVER_STOPPED) 0 else 1

@@ -18,8 +18,6 @@
 package ly.stealth.mesos.kafka
 
 import java.util
-import org.apache.mesos.Protos.FrameworkID
-
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -33,7 +31,7 @@ import org.I0Itec.zkclient.exception.ZkNodeExistsException
 class Cluster {
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
   private[kafka] var rebalancer: Rebalancer = new Rebalancer()
-  private[kafka] var frameworkId: Option[FrameworkID] = None
+  private[kafka] var frameworkId: String = null
 
   def getBrokers:util.List[Broker] = Collections.unmodifiableList(brokers)
 
@@ -96,9 +94,8 @@ class Cluster {
       }
     }
 
-    if (root.contains("frameworkId")) {
-      frameworkId = Some(FrameworkID.newBuilder().setValue(root("frameworkId").asInstanceOf[String]).build())
-    }
+    if (root.contains("frameworkId"))
+      frameworkId = root("frameworkId").asInstanceOf[String]
   }
 
   def toJson: JSONObject = {
@@ -111,10 +108,7 @@ class Cluster {
       obj("brokers") = new JSONArray(brokerNodes.toList)
     }
 
-    frameworkId.map { id =>
-      obj("frameworkId") = id.getValue
-    }
-
+    if (frameworkId != null) obj("frameworkId") = frameworkId
     new JSONObject(obj.toMap)
   }
 }
