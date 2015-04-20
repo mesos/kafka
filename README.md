@@ -1,7 +1,7 @@
 Kafka Mesos Framework
 ======================
 
-This is an *ALPHA* version. More features will be continued to be added until we cut a stable beta build to release candidate against.
+This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 
 [Installation](#installation)    
 [Configuration](#configuration)    
