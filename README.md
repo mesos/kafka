@@ -11,7 +11,7 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 [Typical Operations](#typical-operations)
 * [Changing the location of data stored](#changing-the-location-of-data-stored)
 * [Starting 3 brokers](#starting-3-brokers)
-* [Flushing scheduler state](#flusing-scheduler-state)
+* [High Availability Scheduler State](#high-availability-scheduler-state)
 * [Failed Broker Recovery](#failed-broker-recovery)
 
 
@@ -186,13 +186,13 @@ Broker 1 started
 Broker 2 started
 ```
 
-Flushing scheduler state
+High Availability Scheduler State
 -------------------------
+The scheduler supports storing the state of the cluster in Zookeeper. It currently shares a znode within the mesos ensemble. To turn this on in properties 
 
-Currently state is held in a local json file where the scheduler runs.
-This will eventually be a plugable interface so you can store it some place else also for HA.
-
-    # rm -f kafka-mesos.json
+```
+clusterStorage=zk:/kafka-mesos
+```
 
 Failed Broker Recovery
 ------------------------
@@ -401,7 +401,7 @@ Starting a broker
 Stopping a broker
 
 ```
-# curl"http://localhost:7000/api/brokers/stop?id=0"
+# curl "http://localhost:7000/api/brokers/stop?id=0"
 {"success" : true, "ids" : "0"}
 ```
 
