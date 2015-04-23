@@ -57,4 +57,12 @@ object Config {
     kafkaZkConnect = props.getProperty("kafka-zk-connect")
     schedulerUrl = props.getProperty("scheduler-url")
   }
+
+  override def toString: String = {
+    s"""
+      |debug: $debug, cluster-storage: $clusterStorage
+      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<system>" else mesosUser}, framework-timeout=$mesosFrameworkTimeout
+      |kafka-zk-connect: $kafkaZkConnect, scheduler-url: $schedulerUrl
+    """.stripMargin.trim
+  }
 }

@@ -280,8 +280,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def main(args: Array[String]) {
     initLogging()
-    cluster.load()
+    logger.info(s"Starting ${getClass.getSimpleName}:\n$Config")
 
+    cluster.load()
     HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
