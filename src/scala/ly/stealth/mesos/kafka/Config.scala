@@ -27,11 +27,10 @@ object Config {
 
   var mesosConnect: String = null
   var mesosUser: String = null
+  var mesosFrameworkTimeout: Int = 24 * 3600
 
   var kafkaZkConnect: String = null
   var schedulerUrl: String = null
-
-  var failoverTimeout: Int = 60
 
   def schedulerPort: Int = new URI(schedulerUrl).getPort
   load()
@@ -52,10 +51,9 @@ object Config {
 
     mesosConnect = props.getProperty("mesos.connect")
     mesosUser = props.getProperty("mesos.user")
+    if (props.contains("mesos.framework.timeout")) mesosFrameworkTimeout = Integer.parseInt(props.getProperty("mesos.framework.timeout"))
 
     kafkaZkConnect = props.getProperty("kafka.zk.connect")
     schedulerUrl = props.getProperty("scheduler.url")
-
-    failoverTimeout = Integer.parseInt(props.getProperty("failoverTimeout"))
   }
 }

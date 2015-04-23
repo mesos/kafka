@@ -100,10 +100,12 @@ object Cli {
         | - zk://master:2181,master2:2181/mesos""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos.user",
-      """Mesos user to run tasks.
-        | Leave blank to use your current system user.""".stripMargin)
+    parser.accepts("mesos.user", "Mesos user to run tasks. Leave blank to use your current system user")
       .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("mesos.framework.timeout", "Kafka-Mesos framework timeout in seconds")
+      .withRequiredArg().ofType(classOf[Integer])
+
 
     parser.accepts("kafka.zk.connect",
       """Kafka zookeeper.connect. Examples:
@@ -111,6 +113,8 @@ object Cli {
         | - master:2181,master2:2181""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
+    parser.accepts("scheduler.url", "Scheduler url. Example: http://master:7000")
+      .withRequiredArg().ofType(classOf[String])
 
     var options: OptionSet = null
     try { options = parser.parse(args: _*) }
@@ -127,11 +131,18 @@ object Cli {
 
     val mesosUser = options.valueOf("mesos.user").asInstanceOf[String]
     if (mesosUser != null) Config.mesosUser = mesosUser
-    else if (Config.mesosUser == null) throw new Error("Undefined mesos.user")
+
+    val mesosFrameworkTimeout = options.valueOf("mesos.framework.timeout").asInstanceOf[Integer]
+    if (mesosFrameworkTimeout != null) Config.mesosFrameworkTimeout = mesosFrameworkTimeout
+
 
     val kafkaZkConnect = options.valueOf("kafka.zk.connect").asInstanceOf[String]
     if (kafkaZkConnect != null) Config.kafkaZkConnect = kafkaZkConnect
     else if (Config.kafkaZkConnect == null) throw new Error("Undefined kafka.zk.connect")
+
+    val schedulerUrl = options.valueOf("scheduler.url").asInstanceOf[String]
+    if (schedulerUrl != null) Config.schedulerUrl = schedulerUrl
+    else if (Config.schedulerUrl == null) throw new Error("Undefined scheduler.url")
 
     Scheduler.main(new Array[String](0))
   }
