@@ -91,6 +91,15 @@ object Cli {
 
   private def handleScheduler(args: Array[String]): Unit = {
     val parser = new OptionParser()
+    parser.accepts("debug", "Debug mode").withRequiredArg().ofType(classOf[java.lang.Boolean])
+
+    parser.accepts("cluster.storage",
+      """Storage for cluster state. Examples:
+        | - file:kafka-mesos.json
+        | - zk:/kafka-mesos""".stripMargin)
+      .withRequiredArg().ofType(classOf[String])
+
+
     parser.accepts("mesos.connect",
       """Master connection settings. Examples:
         | - master:5050
@@ -124,6 +133,13 @@ object Cli {
         out.println()
         throw new Error(e.getMessage)
     }
+
+    val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
+    if (debug != null) Config.debug = debug
+
+    val clusterStorage = options.valueOf("cluster.storage").asInstanceOf[String]
+    if (clusterStorage != null) Config.clusterStorage = clusterStorage
+
 
     val mesosConnect = options.valueOf("mesos.connect").asInstanceOf[String]
     if (mesosConnect != null) Config.mesosConnect = mesosConnect

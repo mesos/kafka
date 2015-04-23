@@ -23,7 +23,7 @@ import java.net.URI
 
 object Config {
   var debug: Boolean = false
-  var clusterStorage: String = null
+  var clusterStorage: String = "file:kafka-mesos.json"
 
   var mesosConnect: String = null
   var mesosUser: String = null
@@ -47,7 +47,7 @@ object Config {
     stream.close()
 
     debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
-    clusterStorage = props.getProperty("clusterStorage", "file:kafka-mesos.json")
+    if (props.contains("cluster.storage")) clusterStorage = props.getProperty("cluster.storage")
 
     mesosConnect = props.getProperty("mesos.connect")
     mesosUser = props.getProperty("mesos.user")
