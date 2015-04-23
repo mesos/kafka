@@ -278,7 +278,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     throw new IllegalArgumentException("No port range in offer " + Str.offer(offer))
   }
 
-  def main(args: Array[String]) {
+  def start() {
     initLogging()
     logger.info(s"Starting ${getClass.getSimpleName}:\n$Config")
 

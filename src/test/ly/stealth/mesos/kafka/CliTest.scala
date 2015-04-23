@@ -87,9 +87,9 @@ class CliTest extends MesosTestCase {
   def update {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
 
-    exec("update 0 --failoverDelay=10s --failoverMaxDelay=20s --options=log.dirs=/tmp/kafka-logs")
+    exec("update 0 --failover-delay=10s --failover-max-delay=20s --options=log.dirs=/tmp/kafka-logs")
     assertOutContains("Broker updated")
-    assertOutContains("delay:10s, maxDelay:20s")
+    assertOutContains("delay:10s, max-delay:20s")
     assertOutContains("options: log.dirs=/tmp/kafka-logs")
 
     assertEquals(new Period("10s"), broker.failover.delay)

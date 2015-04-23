@@ -54,8 +54,6 @@ class RebalancerTest extends MesosTestCase {
   @After
   override def after {
     super.after
-
-    Config.load()
     zkServer.shutdown()
 
     def delete(dir: File) {

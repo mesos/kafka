@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import joptsimple.{OptionException, OptionSet, OptionParser}
 import java.net.{HttpURLConnection, URLEncoder, URL}
 import scala.io.Source
-import java.io.{PrintStream, IOException}
+import java.io.{File, PrintStream, IOException}
 import java.util
 import scala.collection.JavaConversions._
 import java.util.Collections
@@ -128,8 +128,10 @@ object Cli {
     parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000")
       .withRequiredArg().ofType(classOf[String])
 
+    val configArg = parser.nonOptions()
+
     if (help) {
-      out.println("Start scheduler \nUsage: scheduler [options]\n")
+      out.println("Start scheduler \nUsage: scheduler [options] [config.properties]\n")
       parser.printHelpOn(out)
       return
     }
@@ -141,6 +143,17 @@ object Cli {
         parser.printHelpOn(out)
         out.println()
         throw new Error(e.getMessage)
+    }
+
+    var configFile = if (options.valueOf(configArg) != null) new File(options.valueOf(configArg)) else null
+    if (configFile != null && !configFile.exists()) throw new Error(s"config-file $configFile not found")
+
+    val defaultConfigFile = new File("kafka-mesos.properties")
+    if (configFile == null && defaultConfigFile.exists()) configFile = defaultConfigFile
+
+    if (configFile != null) {
+      out.println("Loading config from " + configFile)
+      Config.load(configFile)
     }
 
     val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
@@ -171,7 +184,7 @@ object Cli {
     if (schedulerUrl != null) Config.schedulerUrl = schedulerUrl
     else if (Config.schedulerUrl == null) throw new Error("Undefined scheduler-url")
 
-    Scheduler.main(new Array[String](0))
+    Scheduler.start()
   }
 
   private def handleStatus(help: Boolean = false): Unit = {

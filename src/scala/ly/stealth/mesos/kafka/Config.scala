@@ -33,29 +33,27 @@ object Config {
   var kafkaZkConnect: String = null
   var schedulerUrl: String = null
 
-  def schedulerPort: Int = new URI(schedulerUrl).getPort
-  load()
+  def schedulerPort: Int = {
+    val port = new URI(schedulerUrl).getPort
+    if (port == -1) 80 else port
+  }
 
-  private[kafka] def load(): Unit = {
-    val configPath = System.getProperty("config")
-    val file = new File(if (configPath != null) configPath else "kafka-mesos.properties")
-    if (!file.exists()) return
-
+  private[kafka] def load(file: File): Unit = {
     val props: Properties = new Properties()
     val stream: FileInputStream = new FileInputStream(file)
 
     props.load(stream)
     stream.close()
 
-    debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
-    if (props.contains("cluster-storage")) clusterStorage = props.getProperty("cluster-storage")
+    if (props.containsKey("debug")) debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
+    if (props.containsKey("cluster-storage")) clusterStorage = props.getProperty("cluster-storage")
 
-    mesosConnect = props.getProperty("mesos-connect")
-    mesosUser = props.getProperty("mesos-user")
-    if (props.contains("mesos-framework-timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos-framework-timeout"))
+    if (props.containsKey("mesos-connect")) mesosConnect = props.getProperty("mesos-connect")
+    if (props.containsKey("mesos-user")) mesosUser = props.getProperty("mesos-user")
+    if (props.containsKey("mesos-framework-timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos-framework-timeout"))
 
-    kafkaZkConnect = props.getProperty("kafka-zk-connect")
-    schedulerUrl = props.getProperty("scheduler-url")
+    if (props.containsKey("kafka-zk-connect")) kafkaZkConnect = props.getProperty("kafka-zk-connect")
+    if (props.containsKey("scheduler-url")) schedulerUrl = props.getProperty("scheduler-url")
   }
 
   override def toString: String = {
