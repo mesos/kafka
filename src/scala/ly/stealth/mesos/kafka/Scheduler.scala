@@ -288,7 +288,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setUser(if (Config.mesosUser != null) Config.mesosUser else "")
     cluster.frameworkId.map(fwId => frameworkBuilder.setId(fwId))
     frameworkBuilder.setName("Kafka Mesos")
-    frameworkBuilder.setFailoverTimeout(Config.mesosFrameworkTimeout)
+    frameworkBuilder.setFailoverTimeout(Config.mesosFrameworkTimeout.ms / 1000)
     frameworkBuilder.setCheckpoint(true)
 
     val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.mesosConnect)

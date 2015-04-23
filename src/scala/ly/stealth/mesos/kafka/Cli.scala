@@ -24,6 +24,7 @@ import java.io.{PrintStream, IOException}
 import java.util
 import scala.collection.JavaConversions._
 import java.util.Collections
+import ly.stealth.mesos.kafka.Util.Period
 
 object Cli {
   var out: PrintStream = System.out
@@ -112,8 +113,8 @@ object Cli {
     parser.accepts("mesos.user", "Mesos user to run tasks. Leave blank to use your current system user")
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos.framework.timeout", "Kafka-Mesos framework timeout in seconds")
-      .withRequiredArg().ofType(classOf[Integer])
+    parser.accepts("mesos.framework.timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
+      .withRequiredArg().ofType(classOf[String])
 
 
     parser.accepts("kafka.zk.connect",
@@ -148,8 +149,10 @@ object Cli {
     val mesosUser = options.valueOf("mesos.user").asInstanceOf[String]
     if (mesosUser != null) Config.mesosUser = mesosUser
 
-    val mesosFrameworkTimeout = options.valueOf("mesos.framework.timeout").asInstanceOf[Integer]
-    if (mesosFrameworkTimeout != null) Config.mesosFrameworkTimeout = mesosFrameworkTimeout
+    val mesosFrameworkTimeout = options.valueOf("mesos.framework.timeout").asInstanceOf[String]
+    if (mesosFrameworkTimeout != null)
+      try { Config.mesosFrameworkTimeout = new Period(mesosFrameworkTimeout) }
+      catch { case e: IllegalArgumentException => throw new Error("Invalid mesos.framework.timeout") }
 
 
     val kafkaZkConnect = options.valueOf("kafka.zk.connect").asInstanceOf[String]

@@ -20,6 +20,7 @@ package ly.stealth.mesos.kafka
 import java.io.{FileInputStream, File}
 import java.util.Properties
 import java.net.URI
+import ly.stealth.mesos.kafka.Util.Period
 
 object Config {
   var debug: Boolean = false
@@ -27,7 +28,7 @@ object Config {
 
   var mesosConnect: String = null
   var mesosUser: String = null
-  var mesosFrameworkTimeout: Int = 24 * 3600
+  var mesosFrameworkTimeout: Period = new Period("1d")
 
   var kafkaZkConnect: String = null
   var schedulerUrl: String = null
@@ -51,7 +52,7 @@ object Config {
 
     mesosConnect = props.getProperty("mesos.connect")
     mesosUser = props.getProperty("mesos.user")
-    if (props.contains("mesos.framework.timeout")) mesosFrameworkTimeout = Integer.parseInt(props.getProperty("mesos.framework.timeout"))
+    if (props.contains("mesos.framework.timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos.framework.timeout"))
 
     kafkaZkConnect = props.getProperty("kafka.zk.connect")
     schedulerUrl = props.getProperty("scheduler.url")
