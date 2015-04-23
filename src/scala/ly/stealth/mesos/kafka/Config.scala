@@ -48,13 +48,13 @@ object Config {
     stream.close()
 
     debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
-    if (props.contains("cluster.storage")) clusterStorage = props.getProperty("cluster.storage")
+    if (props.contains("cluster-storage")) clusterStorage = props.getProperty("cluster-storage")
 
-    mesosConnect = props.getProperty("mesos.connect")
-    mesosUser = props.getProperty("mesos.user")
-    if (props.contains("mesos.framework.timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos.framework.timeout"))
+    mesosConnect = props.getProperty("mesos-connect")
+    mesosUser = props.getProperty("mesos-user")
+    if (props.contains("mesos-framework-timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos-framework-timeout"))
 
-    kafkaZkConnect = props.getProperty("kafka.zk.connect")
-    schedulerUrl = props.getProperty("scheduler.url")
+    kafkaZkConnect = props.getProperty("kafka-zk-connect")
+    schedulerUrl = props.getProperty("scheduler-url")
   }
 }

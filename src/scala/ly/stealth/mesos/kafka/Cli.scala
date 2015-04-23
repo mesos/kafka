@@ -92,16 +92,18 @@ object Cli {
 
   private def handleScheduler(args: Array[String]): Unit = {
     val parser = new OptionParser()
-    parser.accepts("debug", "Debug mode").withRequiredArg().ofType(classOf[java.lang.Boolean])
+    parser.accepts("debug", "Debug mode. Default - " + Config.debug)
+      .withRequiredArg().ofType(classOf[java.lang.Boolean])
 
-    parser.accepts("cluster.storage",
+    parser.accepts("cluster-storage",
       """Storage for cluster state. Examples:
         | - file:kafka-mesos.json
-        | - zk:/kafka-mesos""".stripMargin)
+        | - zk:/kafka-mesos
+        |Default - """.stripMargin + Config.clusterStorage)
       .withRequiredArg().ofType(classOf[String])
 
 
-    parser.accepts("mesos.connect",
+    parser.accepts("mesos-connect",
       """Master connection settings. Examples:
         | - master:5050
         | - master:5050,master2:5050
@@ -110,20 +112,20 @@ object Cli {
         | - zk://master:2181,master2:2181/mesos""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos.user", "Mesos user to run tasks. Leave blank to use your current system user")
+    parser.accepts("mesos-user", "Mesos user to run tasks. Leave blank to use your current system user")
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos.framework.timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
+    parser.accepts("mesos-framework-timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
       .withRequiredArg().ofType(classOf[String])
 
 
-    parser.accepts("kafka.zk.connect",
+    parser.accepts("kafka-zk-connect",
       """Kafka zookeeper.connect. Examples:
         | - master:2181
         | - master:2181,master2:2181""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("scheduler.url", "Scheduler url. Example: http://master:7000")
+    parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000")
       .withRequiredArg().ofType(classOf[String])
 
     var options: OptionSet = null
@@ -138,30 +140,30 @@ object Cli {
     val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
     if (debug != null) Config.debug = debug
 
-    val clusterStorage = options.valueOf("cluster.storage").asInstanceOf[String]
+    val clusterStorage = options.valueOf("cluster-storage").asInstanceOf[String]
     if (clusterStorage != null) Config.clusterStorage = clusterStorage
 
 
-    val mesosConnect = options.valueOf("mesos.connect").asInstanceOf[String]
+    val mesosConnect = options.valueOf("mesos-connect").asInstanceOf[String]
     if (mesosConnect != null) Config.mesosConnect = mesosConnect
-    else if (Config.mesosConnect == null) throw new Error("Undefined mesos.connect")
+    else if (Config.mesosConnect == null) throw new Error("Undefined mesos-connect")
 
-    val mesosUser = options.valueOf("mesos.user").asInstanceOf[String]
+    val mesosUser = options.valueOf("mesos-user").asInstanceOf[String]
     if (mesosUser != null) Config.mesosUser = mesosUser
 
-    val mesosFrameworkTimeout = options.valueOf("mesos.framework.timeout").asInstanceOf[String]
+    val mesosFrameworkTimeout = options.valueOf("mesos-framework-timeout").asInstanceOf[String]
     if (mesosFrameworkTimeout != null)
       try { Config.mesosFrameworkTimeout = new Period(mesosFrameworkTimeout) }
-      catch { case e: IllegalArgumentException => throw new Error("Invalid mesos.framework.timeout") }
+      catch { case e: IllegalArgumentException => throw new Error("Invalid mesos-framework-timeout") }
 
 
-    val kafkaZkConnect = options.valueOf("kafka.zk.connect").asInstanceOf[String]
+    val kafkaZkConnect = options.valueOf("kafka-zk-connect").asInstanceOf[String]
     if (kafkaZkConnect != null) Config.kafkaZkConnect = kafkaZkConnect
-    else if (Config.kafkaZkConnect == null) throw new Error("Undefined kafka.zk.connect")
+    else if (Config.kafkaZkConnect == null) throw new Error("Undefined kafka-zk-connect")
 
-    val schedulerUrl = options.valueOf("scheduler.url").asInstanceOf[String]
+    val schedulerUrl = options.valueOf("scheduler-url").asInstanceOf[String]
     if (schedulerUrl != null) Config.schedulerUrl = schedulerUrl
-    else if (Config.schedulerUrl == null) throw new Error("Undefined scheduler.url")
+    else if (Config.schedulerUrl == null) throw new Error("Undefined scheduler-url")
 
     Scheduler.main(new Array[String](0))
   }
