@@ -291,7 +291,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setFailoverTimeout(Config.failoverTimeout)
     frameworkBuilder.setCheckpoint(true)
 
-    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.masterConnect)
+    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.mesosConnect)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() = {

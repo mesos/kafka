@@ -40,3 +40,4 @@ RUN \
 COPY tmp/kafka* /opt/kafka-mesos/
 
 WORKDIR /opt/kafka-mesos
+EXPOSE 7000

@@ -49,7 +49,7 @@ object Cli {
     args = args.slice(1, args.length)
     
     if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
-    if (command == "scheduler") { Scheduler.main(args); return }
+    if (command == "scheduler") { handleScheduler(args); return }
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <argument>
@@ -87,6 +87,53 @@ object Cli {
       case _ =>
         throw new Error("unsupported command " + command)
     }
+  }
+
+  private def handleScheduler(args: Array[String]): Unit = {
+    val parser = new OptionParser()
+    parser.accepts("mesos.connect",
+      """Master connection settings. Examples:
+        | - master:5050
+        | - master:5050,master2:5050
+        | - zk://master:2181/mesos
+        | - zk://username:password@master:2181
+        | - zk://master:2181,master2:2181/mesos""".stripMargin)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("mesos.user",
+      """Mesos user to run tasks.
+        | Leave blank to use your current system user.""".stripMargin)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("kafka.zk.connect",
+      """Kafka zookeeper.connect. Examples:
+        | - master:2181
+        | - master:2181,master2:2181""".stripMargin)
+      .withRequiredArg().ofType(classOf[String])
+
+
+    var options: OptionSet = null
+    try { options = parser.parse(args: _*) }
+    catch {
+      case e: OptionException =>
+        parser.printHelpOn(out)
+        out.println()
+        throw new Error(e.getMessage)
+    }
+
+    val mesosConnect = options.valueOf("mesos.connect").asInstanceOf[String]
+    if (mesosConnect != null) Config.mesosConnect = mesosConnect
+    else if (Config.mesosConnect == null) throw new Error("Undefined mesos.connect")
+
+    val mesosUser = options.valueOf("mesos.user").asInstanceOf[String]
+    if (mesosUser != null) Config.mesosUser = mesosUser
+    else if (Config.mesosUser == null) throw new Error("Undefined mesos.user")
+
+    val kafkaZkConnect = options.valueOf("kafka.zk.connect").asInstanceOf[String]
+    if (kafkaZkConnect != null) Config.kafkaZkConnect = kafkaZkConnect
+    else if (Config.kafkaZkConnect == null) throw new Error("Undefined kafka.zk.connect")
+
+    Scheduler.main(new Array[String](0))
   }
 
   private def handleStatus(help: Boolean = false): Unit = {
