@@ -118,7 +118,7 @@ object Cli {
 
     parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
-    parser.accepts("failoverMaxTries", "max failover tries").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failoverMaxTries", "max failover tries. Default - none").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       val command = if (add) "add" else "update"
