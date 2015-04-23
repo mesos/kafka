@@ -74,7 +74,7 @@ object Cli {
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
-        out.println("Start scheduler process\nUsage: scheduler")
+        handleScheduler(null, help = true)
       case "status" =>
         handleStatus(help = true)
       case "add" | "update" => 
@@ -90,7 +90,7 @@ object Cli {
     }
   }
 
-  private def handleScheduler(args: Array[String]): Unit = {
+  private def handleScheduler(args: Array[String], help: Boolean = false): Unit = {
     val parser = new OptionParser()
     parser.accepts("debug", "Debug mode. Default - " + Config.debug)
       .withRequiredArg().ofType(classOf[java.lang.Boolean])
@@ -112,7 +112,7 @@ object Cli {
         | - zk://master:2181,master2:2181/mesos""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos-user", "Mesos user to run tasks. Leave blank to use your current system user")
+    parser.accepts("mesos-user", "Mesos user to run tasks. Default - current system user")
       .withRequiredArg().ofType(classOf[String])
 
     parser.accepts("mesos-framework-timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
@@ -127,6 +127,12 @@ object Cli {
 
     parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000")
       .withRequiredArg().ofType(classOf[String])
+
+    if (help) {
+      out.println("Start scheduler \nUsage: scheduler [options]\n")
+      parser.printHelpOn(out)
+      return
+    }
 
     var options: OptionSet = null
     try { options = parser.parse(args: _*) }
