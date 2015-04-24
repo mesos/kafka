@@ -61,7 +61,7 @@ object Config {
   override def toString: String = {
     s"""
       |debug: $debug, cluster-storage: $clusterStorage
-      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<system>" else mesosUser}, framework-timeout=$mesosFrameworkTimeout
+      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<current user>" else mesosUser}, framework-timeout=$mesosFrameworkTimeout
       |kafka-zk-connect: $kafkaZkConnect, scheduler-url: $schedulerUrl
     """.stripMargin.trim
   }

@@ -154,7 +154,7 @@ object Cli {
     if (configFile == null && Config.DEFAULT_FILE.exists()) configFile = Config.DEFAULT_FILE
 
     if (configFile != null) {
-      out.println("Loading config from " + configFile)
+      out.println("Loading config defaults from " + configFile)
       Config.load(configFile)
     }
 
@@ -164,10 +164,11 @@ object Cli {
     val clusterStorage = options.valueOf("cluster-storage").asInstanceOf[String]
     if (clusterStorage != null) Config.clusterStorage = clusterStorage
 
+    val provideOption = "Provide either cli option or config default value"
 
     val mesosConnect = options.valueOf("mesos-connect").asInstanceOf[String]
     if (mesosConnect != null) Config.mesosConnect = mesosConnect
-    else if (Config.mesosConnect == null) throw new Error("Undefined mesos-connect")
+    else if (Config.mesosConnect == null) throw new Error(s"Undefined mesos-connect. $provideOption")
 
     val mesosUser = options.valueOf("mesos-user").asInstanceOf[String]
     if (mesosUser != null) Config.mesosUser = mesosUser
@@ -180,11 +181,11 @@ object Cli {
 
     val kafkaZkConnect = options.valueOf("kafka-zk-connect").asInstanceOf[String]
     if (kafkaZkConnect != null) Config.kafkaZkConnect = kafkaZkConnect
-    else if (Config.kafkaZkConnect == null) throw new Error("Undefined kafka-zk-connect")
+    else if (Config.kafkaZkConnect == null) throw new Error(s"Undefined kafka-zk-connect. $provideOption")
 
     val schedulerUrl = options.valueOf("scheduler-url").asInstanceOf[String]
     if (schedulerUrl != null) Config.schedulerUrl = schedulerUrl
-    else if (Config.schedulerUrl == null) throw new Error("Undefined scheduler-url")
+    else if (Config.schedulerUrl == null) throw new Error(s"Undefined scheduler-url. $provideOption")
 
     Scheduler.start()
   }
@@ -527,7 +528,7 @@ object Cli {
       if (schedulerUrl != null) return
     }
 
-    throw new Error("Undefined scheduler-url")
+    throw new Error("Undefined scheduler-url. Provide either cli option or config default value")
   }
 
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
