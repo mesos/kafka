@@ -34,3 +34,39 @@ Example:
 
 Note: if you want to inspect image content you can it without specifying `./kafka-mesos.sh` entry point.
 In that case you will got shell access.
+
+# Running image in Marathon
+In order to run image in Marathon it is better to pre-pull image on the required (all) nodes using:
+```
+# sudo docker pull <image-name>
+```
+
+After that, scheduler process could be created via Marathon API via POST /v2/apps call.
+Example:
+```
+{
+    "container": {
+        "type": "DOCKER",
+        "docker": {
+            "network": "HOST",
+            "image": "$imageName"
+        }
+    },
+    "id":"kafka-mesos-scheduler",
+    "cpus": 0.5,
+    "mem": 256,
+    "cmd": "./kafka-mesos.sh scheduler --mesos-connect=master:5050 --kafka-zk-connect=master:2181 --scheduler-url=http://master:7000 --cluster-storage=zk:/kafka-mesos",
+    "instances": 1,
+    "constraints": [["hostname", "LIKE", "master"]]
+}
+```
+
+Then the cli should be able to connect to url http://master:7000. Example:
+```
+# ./kafka-mesos.sh status --scheduler-url=http://master:7000
+Cluster status received
+
+cluster:
+  brokers:
+```
+Now you can configure and start brokers.

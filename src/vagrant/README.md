@@ -6,6 +6,9 @@ Vagrantfile creates mesos cluster with following nodes:
 Master provides web ui listening on http://master:5050
 Both master and slave nodes runs mesos slave daemons.
 
+Every node has pre-installed docker. Master node has pre-installed
+marathon scheduler.
+
 Host's public key is copied to `authorized_hosts`,
 so direct access like `ssh vagrant@master|slaveX` should work.
 

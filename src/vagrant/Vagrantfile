@@ -15,7 +15,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-SLAVES=2
+SLAVES=1
 NET_PREFIX="192.168.3."
 
 NODES={"master" => NET_PREFIX + "5"}
