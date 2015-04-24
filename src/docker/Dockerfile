@@ -16,7 +16,7 @@
 FROM ubuntu:14.04
 
 # Enable apt-proxy if present
-COPY tmp/apt-proxy* /tmp/apt-proxy
+COPY .docker/apt-proxy* /tmp/apt-proxy
 RUN \
   if [ -f "/tmp/apt-proxy" ]; then \
     APT_PROXY=$(cat "/tmp/apt-proxy"); \
@@ -37,7 +37,7 @@ RUN \
     openjdk-7-jdk mesos libc6
 
 # Add kafka-mesos & kafka
-COPY tmp/kafka* /opt/kafka-mesos/
+COPY .docker/kafka* /opt/kafka-mesos/
 
 WORKDIR /opt/kafka-mesos
 EXPOSE 7000

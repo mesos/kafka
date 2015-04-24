@@ -4,7 +4,7 @@ project/*
 *.iml
 todo.txt
 
-src/docker/tmp
+src/docker/.docker
 src/vagrant/.vagrant
 
 kafka-mesos*.json

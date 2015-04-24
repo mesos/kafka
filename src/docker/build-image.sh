@@ -2,7 +2,7 @@
 set -ue
 
 base_dir=../..
-tmp_dir=./tmp
+tmp_dir=.docker
 mkdir -p $tmp_dir
 
 kafka_version=0.8.2.0
