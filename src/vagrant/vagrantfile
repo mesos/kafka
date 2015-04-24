@@ -15,7 +15,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-SLAVES=1
+SLAVES=2
 NET_PREFIX="192.168.3."
 # APT_CACHE="192.168.1.101"
 
@@ -38,7 +38,7 @@ if (File.exists?(SSH_KEY))
 end
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "precise64"
+  config.vm.box = "ubuntu/trusty64"
   config.vm.synced_folder "../../", "/vagrant"
 
   config.vm.define "master" do |master|

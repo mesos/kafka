@@ -47,6 +47,7 @@ object HttpServer {
     server = new Server(threadPool)
     val connector = new ServerConnector(server)
     connector.setPort(Config.schedulerPort)
+    connector.setIdleTimeout(60 * 1000)
 
     val handler = new ServletContextHandler
     handler.addServlet(new ServletHolder(new Servlet()), "/")
@@ -86,6 +87,7 @@ object HttpServer {
       try { handle(request, response) }
       catch {
         case e: Exception =>
+          logger.warn("", e)
           response.sendError(500, "" + e) // specify error message
           throw e
       }
