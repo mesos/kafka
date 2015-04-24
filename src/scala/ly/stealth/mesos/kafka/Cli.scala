@@ -118,6 +118,9 @@ object Cli {
     parser.accepts("mesos-user", "Mesos user to run tasks. Default - current system user")
       .withRequiredArg().ofType(classOf[String])
 
+    parser.accepts("mesos-framework-name", "Kafka-Mesos framework name. Default - " + Config.mesosFrameworkName)
+      .withRequiredArg().ofType(classOf[String])
+
     parser.accepts("mesos-framework-timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
       .withRequiredArg().ofType(classOf[String])
 
@@ -172,6 +175,9 @@ object Cli {
 
     val mesosUser = options.valueOf("mesos-user").asInstanceOf[String]
     if (mesosUser != null) Config.mesosUser = mesosUser
+
+    val mesosFrameworkName = options.valueOf("mesos-framework-name").asInstanceOf[String]
+    if (mesosFrameworkName != null) Config.mesosFrameworkName = mesosFrameworkName
 
     val mesosFrameworkTimeout = options.valueOf("mesos-framework-timeout").asInstanceOf[String]
     if (mesosFrameworkTimeout != null)
