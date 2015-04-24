@@ -35,6 +35,18 @@ install_mesos() {
     service mesos-slave start
 }
 
+install_marathon() {
+    apt-get install -qy marathon
+    service marathon start
+}
+
+install_docker() {
+    apt-get install -qy lxc-docker
+    echo 'docker,mesos' > /etc/mesos-slave/containerizers
+    echo '5mins' > /etc/mesos-slave/executor_registration_timeout
+    service mesos-slave restart
+}
+
 if [[ $1 != "master" && $1 != "slave" ]]; then
     echo "Usage: $0 master|slave"
     exit 1
@@ -69,8 +81,16 @@ DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
 CODENAME=$(lsb_release -cs)
 echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" | tee /etc/apt/sources.list.d/mesosphere.list
 
+# add docker repo
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
+echo "deb http://get.docker.com/ubuntu docker main" > /etc/apt/sources.list.d/docker.list
+
 apt-get -qy update
-apt-get install -qy vim zip mc curl openjdk-7-jre scala git
+
+# install deps
+apt-get install -qy vim zip mc curl wget openjdk-7-jre scala git
 
 install_mesos $mode
+if [ $mode == "master" ]; then install_marathon; fi
+install_docker
 
