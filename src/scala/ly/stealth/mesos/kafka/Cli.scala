@@ -118,10 +118,13 @@ object Cli {
     parser.accepts("mesos-user", "Mesos user to run tasks. Default - current system user")
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos-framework-name", "Kafka-Mesos framework name. Default - " + Config.mesosFrameworkName)
+    parser.accepts("framework-name", "Framework name. Default - " + Config.frameworkName)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos-framework-timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
+    parser.accepts("framework-role", "Framework role. Default - " + Config.frameworkRole)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("framework-timeout", "Framework timeout (30s, 1m, 1h). Default - " + Config.frameworkTimeout)
       .withRequiredArg().ofType(classOf[String])
 
 
@@ -176,13 +179,16 @@ object Cli {
     val mesosUser = options.valueOf("mesos-user").asInstanceOf[String]
     if (mesosUser != null) Config.mesosUser = mesosUser
 
-    val mesosFrameworkName = options.valueOf("mesos-framework-name").asInstanceOf[String]
-    if (mesosFrameworkName != null) Config.mesosFrameworkName = mesosFrameworkName
+    val frameworkName = options.valueOf("framework-name").asInstanceOf[String]
+    if (frameworkName != null) Config.frameworkName = frameworkName
 
-    val mesosFrameworkTimeout = options.valueOf("mesos-framework-timeout").asInstanceOf[String]
-    if (mesosFrameworkTimeout != null)
-      try { Config.mesosFrameworkTimeout = new Period(mesosFrameworkTimeout) }
-      catch { case e: IllegalArgumentException => throw new Error("Invalid mesos-framework-timeout") }
+    val frameworkRole = options.valueOf("framework-role").asInstanceOf[String]
+    if (frameworkRole != null) Config.frameworkRole = frameworkRole
+
+    val frameworkTimeout = options.valueOf("framework-timeout").asInstanceOf[String]
+    if (frameworkTimeout != null)
+      try { Config.frameworkTimeout = new Period(frameworkTimeout) }
+      catch { case e: IllegalArgumentException => throw new Error("Invalid framework-timeout") }
 
 
     val kafkaZkConnect = options.valueOf("kafka-zk-connect").asInstanceOf[String]

@@ -30,8 +30,10 @@ object Config {
 
   var mesosConnect: String = null
   var mesosUser: String = null
-  var mesosFrameworkTimeout: Period = new Period("1d")
-  var mesosFrameworkName: String = "KafkaMesos"
+
+  var frameworkName: String = "KafkaMesos"
+  var frameworkRole: String = "*"
+  var frameworkTimeout: Period = new Period("1d")
 
   var kafkaZkConnect: String = null
   var schedulerUrl: String = null
@@ -53,8 +55,10 @@ object Config {
 
     if (props.containsKey("mesos-connect")) mesosConnect = props.getProperty("mesos-connect")
     if (props.containsKey("mesos-user")) mesosUser = props.getProperty("mesos-user")
-    if (props.containsKey("mesos-framework-timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos-framework-timeout"))
-    if (props.containsKey("mesos-framework-name")) mesosFrameworkName = props.getProperty("mesos-framework-name")
+
+    if (props.containsKey("framework-name")) frameworkName = props.getProperty("framework-name")
+    if (props.containsKey("framework-role")) frameworkRole = props.getProperty("framework-role")
+    if (props.containsKey("framework-timeout")) frameworkTimeout = new Period(props.getProperty("framework-timeout"))
 
     if (props.containsKey("kafka-zk-connect")) kafkaZkConnect = props.getProperty("kafka-zk-connect")
     if (props.containsKey("scheduler-url")) schedulerUrl = props.getProperty("scheduler-url")
@@ -63,7 +67,7 @@ object Config {
   override def toString: String = {
     s"""
       |debug: $debug, cluster-storage: $clusterStorage
-      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<current user>" else mesosUser}, framework-name=$mesosFrameworkName, framework-timeout=$mesosFrameworkTimeout
+      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<current user>" else mesosUser}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
       |kafka-zk-connect: $kafkaZkConnect, scheduler-url: $schedulerUrl
     """.stripMargin.trim
   }
