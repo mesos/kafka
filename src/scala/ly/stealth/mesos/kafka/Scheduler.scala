@@ -278,20 +278,21 @@ object Scheduler extends org.apache.mesos.Scheduler {
     throw new IllegalArgumentException("No port range in offer " + Str.offer(offer))
   }
 
-  def main(args: Array[String]) {
+  def start() {
     initLogging()
-    cluster.load()
+    logger.info(s"Starting ${getClass.getSimpleName}:\n$Config")
 
+    cluster.load()
     HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
-    frameworkBuilder.setUser(Config.mesosUser)
+    frameworkBuilder.setUser(if (Config.mesosUser != null) Config.mesosUser else "")
     cluster.frameworkId.map(fwId => frameworkBuilder.setId(fwId))
     frameworkBuilder.setName("Kafka Mesos")
-    frameworkBuilder.setFailoverTimeout(Config.failoverTimeout)
+    frameworkBuilder.setFailoverTimeout(Config.mesosFrameworkTimeout.ms / 1000)
     frameworkBuilder.setCheckpoint(true)
 
-    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.masterConnect)
+    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.mesosConnect)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() = {

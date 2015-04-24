@@ -48,6 +48,9 @@ class MesosTestCase {
     storageFile.delete()
     Cluster.storage = new FsStorage(storageFile)
 
+    Config.schedulerUrl = "http://localhost:7000"
+    Config.kafkaZkConnect = "localhost"
+
     Scheduler.cluster.clear()
     Scheduler.cluster.rebalancer = new TestRebalancer()
 

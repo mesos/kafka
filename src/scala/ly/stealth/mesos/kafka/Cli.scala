@@ -20,12 +20,14 @@ package ly.stealth.mesos.kafka
 import joptsimple.{OptionException, OptionSet, OptionParser}
 import java.net.{HttpURLConnection, URLEncoder, URL}
 import scala.io.Source
-import java.io.{PrintStream, IOException}
+import java.io.{FileInputStream, File, PrintStream, IOException}
 import java.util
 import scala.collection.JavaConversions._
-import java.util.Collections
+import java.util.{Properties, Collections}
+import ly.stealth.mesos.kafka.Util.Period
 
 object Cli {
+  var schedulerUrl: String = null
   var out: PrintStream = System.out
   var err: PrintStream = System.err
 
@@ -49,7 +51,9 @@ object Cli {
     args = args.slice(1, args.length)
     
     if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
-    if (command == "scheduler") { Scheduler.main(args); return }
+    if (command == "scheduler") { handleScheduler(args); return }
+
+    args = handleGenericOptions(args)
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <argument>
@@ -73,7 +77,7 @@ object Cli {
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
-        out.println("Start scheduler process\nUsage: scheduler")
+        handleScheduler(null, help = true)
       case "status" =>
         handleStatus(help = true)
       case "add" | "update" => 
@@ -89,9 +93,107 @@ object Cli {
     }
   }
 
+  private def handleScheduler(args: Array[String], help: Boolean = false): Unit = {
+    val parser = new OptionParser()
+    parser.accepts("debug", "Debug mode. Default - " + Config.debug)
+      .withRequiredArg().ofType(classOf[java.lang.Boolean])
+
+    parser.accepts("cluster-storage",
+      """Storage for cluster state. Examples:
+        | - file:kafka-mesos.json
+        | - zk:/kafka-mesos
+        |Default - """.stripMargin + Config.clusterStorage)
+      .withRequiredArg().ofType(classOf[String])
+
+
+    parser.accepts("mesos-connect",
+      """Master connection settings. Examples:
+        | - master:5050
+        | - master:5050,master2:5050
+        | - zk://master:2181/mesos
+        | - zk://username:password@master:2181
+        | - zk://master:2181,master2:2181/mesos""".stripMargin)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("mesos-user", "Mesos user to run tasks. Default - current system user")
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("mesos-framework-timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
+      .withRequiredArg().ofType(classOf[String])
+
+
+    parser.accepts("kafka-zk-connect",
+      """Kafka zookeeper.connect. Examples:
+        | - master:2181
+        | - master:2181,master2:2181""".stripMargin)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000")
+      .withRequiredArg().ofType(classOf[String])
+
+    val configArg = parser.nonOptions()
+
+    if (help) {
+      out.println("Start scheduler \nUsage: scheduler [options] [config.properties]\n")
+      parser.printHelpOn(out)
+      return
+    }
+
+    var options: OptionSet = null
+    try { options = parser.parse(args: _*) }
+    catch {
+      case e: OptionException =>
+        parser.printHelpOn(out)
+        out.println()
+        throw new Error(e.getMessage)
+    }
+
+    var configFile = if (options.valueOf(configArg) != null) new File(options.valueOf(configArg)) else null
+    if (configFile != null && !configFile.exists()) throw new Error(s"config-file $configFile not found")
+
+    if (configFile == null && Config.DEFAULT_FILE.exists()) configFile = Config.DEFAULT_FILE
+
+    if (configFile != null) {
+      out.println("Loading config defaults from " + configFile)
+      Config.load(configFile)
+    }
+
+    val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
+    if (debug != null) Config.debug = debug
+
+    val clusterStorage = options.valueOf("cluster-storage").asInstanceOf[String]
+    if (clusterStorage != null) Config.clusterStorage = clusterStorage
+
+    val provideOption = "Provide either cli option or config default value"
+
+    val mesosConnect = options.valueOf("mesos-connect").asInstanceOf[String]
+    if (mesosConnect != null) Config.mesosConnect = mesosConnect
+    else if (Config.mesosConnect == null) throw new Error(s"Undefined mesos-connect. $provideOption")
+
+    val mesosUser = options.valueOf("mesos-user").asInstanceOf[String]
+    if (mesosUser != null) Config.mesosUser = mesosUser
+
+    val mesosFrameworkTimeout = options.valueOf("mesos-framework-timeout").asInstanceOf[String]
+    if (mesosFrameworkTimeout != null)
+      try { Config.mesosFrameworkTimeout = new Period(mesosFrameworkTimeout) }
+      catch { case e: IllegalArgumentException => throw new Error("Invalid mesos-framework-timeout") }
+
+
+    val kafkaZkConnect = options.valueOf("kafka-zk-connect").asInstanceOf[String]
+    if (kafkaZkConnect != null) Config.kafkaZkConnect = kafkaZkConnect
+    else if (Config.kafkaZkConnect == null) throw new Error(s"Undefined kafka-zk-connect. $provideOption")
+
+    val schedulerUrl = options.valueOf("scheduler-url").asInstanceOf[String]
+    if (schedulerUrl != null) Config.schedulerUrl = schedulerUrl
+    else if (Config.schedulerUrl == null) throw new Error(s"Undefined scheduler-url. $provideOption")
+
+    Scheduler.start()
+  }
+
   private def handleStatus(help: Boolean = false): Unit = {
     if (help) {
-      out.println("Print cluster status\nUsage: status")
+      out.println("Print cluster status\nUsage: status [options]\n")
+      handleGenericOptions(null, help = true)
       return
     }
 
@@ -116,9 +218,9 @@ object Cli {
     parser.accepts("options", "kafka options (log.dirs=/tmp/kafka/$id,num.io.threads=16)").withRequiredArg()
     parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*). See below.").withRequiredArg()
 
-    parser.accepts("failoverDelay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
-    parser.accepts("failoverMaxDelay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
-    parser.accepts("failoverMaxTries", "max failover tries").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failover-delay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failover-max-delay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failover-max-tries", "max failover tries. Default - none").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       val command = if (add) "add" else "update"
@@ -126,12 +228,15 @@ object Cli {
       parser.printHelpOn(out)
 
       out.println()
+      handleGenericOptions(null, help = true)
+
+      out.println()
       printIdExprExamples()
 
       out.println()
       printConstraintExamples()
 
-      if (!add) out.println("\nNote: use \"\" arg to unset the option")
+      if (!add) out.println("\nNote: use \"\" arg to unset an option")
       return
     }
 
@@ -151,9 +256,9 @@ object Cli {
     val options_ = options.valueOf("options").asInstanceOf[String]
     val constraints = options.valueOf("constraints").asInstanceOf[String]
 
-    val failoverDelay = options.valueOf("failoverDelay").asInstanceOf[String]
-    val failoverMaxDelay = options.valueOf("failoverMaxDelay").asInstanceOf[String]
-    val failoverMaxTries = options.valueOf("failoverMaxTries").asInstanceOf[String]
+    val failoverDelay = options.valueOf("failover-delay").asInstanceOf[String]
+    val failoverMaxDelay = options.valueOf("failover-max-delay").asInstanceOf[String]
+    val failoverMaxTries = options.valueOf("failover-max-tries").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]
     params.put("id", id)
@@ -190,7 +295,10 @@ object Cli {
 
   private def handleRemoveBroker(id: String, help: Boolean = false): Unit = {
     if (help) {
-      out.println("Remove broker\nUsage: remove <id-expr>\n")
+      out.println("Remove broker\nUsage: remove <id-expr> [options]\n")
+      handleGenericOptions(null, help = true)
+
+      out.println()
       printIdExprExamples()
       return
     }
@@ -214,6 +322,9 @@ object Cli {
       val command = if (start) "start" else "stop"
       out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
+
+      out.println()
+      handleGenericOptions(null, help = true)
 
       out.println()
       printIdExprExamples()
@@ -264,6 +375,9 @@ object Cli {
       parser.printHelpOn(out)
 
       out.println()
+      handleGenericOptions(null, help = true)
+
+      out.println()
       printTopicExprExamples()
 
       out.println()
@@ -305,6 +419,30 @@ object Cli {
     if (error.isEmpty && !state.isEmpty) printLine(state)
   }
 
+  private[kafka] def handleGenericOptions(args: Array[String], help: Boolean = false): Array[String] = {
+    val parser = new OptionParser()
+    parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000").withRequiredArg().ofType(classOf[java.lang.String])
+    parser.allowsUnrecognizedOptions()
+
+    if (help) {
+      out.println("Generic Options")
+      parser.printHelpOn(out)
+      return args
+    }
+
+    var options: OptionSet = null
+    try { options = parser.parse(args: _*) }
+    catch {
+      case e: OptionException =>
+        parser.printHelpOn(out)
+        out.println()
+        throw new Error(e.getMessage)
+    }
+
+    resolveSchedulerUrl(options.valueOf("scheduler-url").asInstanceOf[String])
+    options.nonOptionArguments().toArray(new Array[String](0))
+  }
+
   private def printCluster(cluster: Cluster): Unit = {
     printLine("brokers:", 1)
     for (broker <- cluster.getBrokers) {
@@ -324,8 +462,8 @@ object Cli {
 
     var failover = "failover:"
     failover += " delay:" + broker.failover.delay
-    failover += ", maxDelay:" + broker.failover.maxDelay
-    if (broker.failover.maxTries != null) failover += ", maxTries:" + broker.failover.maxTries
+    failover += ", max-delay:" + broker.failover.maxDelay
+    if (broker.failover.maxTries != null) failover += ", max-tries:" + broker.failover.maxTries
     printLine(failover, indent)
 
     val task = broker.task
@@ -372,6 +510,27 @@ object Cli {
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
 
+  private[kafka] def resolveSchedulerUrl(urlOption: String): Unit = {
+    if (schedulerUrl != null) return
+
+    if (urlOption != null) {
+      schedulerUrl = urlOption
+      return
+    }
+
+    if (Config.DEFAULT_FILE.exists()) {
+      val props: Properties = new Properties()
+      val stream: FileInputStream = new FileInputStream(Config.DEFAULT_FILE)
+      props.load(stream)
+      stream.close()
+
+      schedulerUrl = props.getProperty("scheduler-url")
+      if (schedulerUrl != null) return
+    }
+
+    throw new Error("Undefined scheduler-url. Provide either cli option or config default value")
+  }
+
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
       var s = ""
@@ -384,7 +543,7 @@ object Cli {
     }
 
     val qs: String = queryString(params)
-    val url: String = Config.schedulerUrl + "/api" + uri + "?" + qs
+    val url: String = schedulerUrl + (if (schedulerUrl.endsWith("/")) "" else "/") + "api" + uri + "?" + qs
 
     val connection: HttpURLConnection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     var response: String = null

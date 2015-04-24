@@ -20,44 +20,49 @@ package ly.stealth.mesos.kafka
 import java.io.{FileInputStream, File}
 import java.util.Properties
 import java.net.URI
+import ly.stealth.mesos.kafka.Util.Period
 
 object Config {
+  val DEFAULT_FILE = new File("kafka-mesos.properties")
+
   var debug: Boolean = false
-  var clusterStorage: String = null
+  var clusterStorage: String = "file:kafka-mesos.json"
 
-  var frameworkId: String = null
+  var mesosConnect: String = null
   var mesosUser: String = null
+  var mesosFrameworkTimeout: Period = new Period("1d")
 
-  var masterConnect: String = null
   var kafkaZkConnect: String = null
   var schedulerUrl: String = null
 
-  var failoverTimeout: Int = 60
+  def schedulerPort: Int = {
+    val port = new URI(schedulerUrl).getPort
+    if (port == -1) 80 else port
+  }
 
-  def schedulerPort: Int = new URI(schedulerUrl).getPort
-  load()
-
-  private[kafka] def load(): Unit = {
-    val configPath = System.getProperty("config")
-    val file = new File(if (configPath != null) configPath else "kafka-mesos.properties")
-    if (!file.exists()) throw new IllegalStateException("File " + file + " not found")
-
+  private[kafka] def load(file: File): Unit = {
     val props: Properties = new Properties()
     val stream: FileInputStream = new FileInputStream(file)
 
     props.load(stream)
     stream.close()
 
-    debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
-    clusterStorage = props.getProperty("clusterStorage", "file:kafka-mesos.json")
+    if (props.containsKey("debug")) debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
+    if (props.containsKey("cluster-storage")) clusterStorage = props.getProperty("cluster-storage")
 
-    frameworkId = props.getProperty("framework.id")
-    mesosUser = props.getProperty("mesos.user")
+    if (props.containsKey("mesos-connect")) mesosConnect = props.getProperty("mesos-connect")
+    if (props.containsKey("mesos-user")) mesosUser = props.getProperty("mesos-user")
+    if (props.containsKey("mesos-framework-timeout")) mesosFrameworkTimeout = new Period(props.getProperty("mesos-framework-timeout"))
 
-    masterConnect = props.getProperty("master.connect")
-    kafkaZkConnect = props.getProperty("kafka.zk.connect")
-    schedulerUrl = props.getProperty("scheduler.url")
+    if (props.containsKey("kafka-zk-connect")) kafkaZkConnect = props.getProperty("kafka-zk-connect")
+    if (props.containsKey("scheduler-url")) schedulerUrl = props.getProperty("scheduler-url")
+  }
 
-    failoverTimeout = Integer.parseInt(props.getProperty("failoverTimeout"))
+  override def toString: String = {
+    s"""
+      |debug: $debug, cluster-storage: $clusterStorage
+      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<current user>" else mesosUser}, framework-timeout=$mesosFrameworkTimeout
+      |kafka-zk-connect: $kafkaZkConnect, scheduler-url: $schedulerUrl
+    """.stripMargin.trim
   }
 }

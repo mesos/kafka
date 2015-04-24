@@ -69,7 +69,7 @@ broker:
   active: false
   state: stopped
   resources: cpus:1.00, mem:128, heap:128
-  failover: delay:10s, maxDelay:60s
+  failover: delay:10s, max-delay:60s
 ```
 
 You now have a cluster with 1 broker that is not started.
@@ -84,7 +84,7 @@ cluster:
     active: false
     state: stopped
     resources: cpus:1.00, mem:128, heap:128
-    failover: delay:10s, maxDelay:60s
+    failover: delay:10s, max-delay:60s
 ```
 Now lets startup the broker.
 
@@ -105,7 +105,7 @@ cluster:
     active: true
     state: running
     resources: cpus:1.00, mem:128, heap:128
-    failover: delay:10s, maxDelay:60s
+    failover: delay:10s, max-delay:60s
     task:
       id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
       running: true
@@ -146,7 +146,7 @@ broker:
   state: stopped
   resources: cpus:1.00, mem:128, heap:128
   options: log.dirs=/mnt/array1/broker0
-  failover: delay:10s, maxDelay:60s
+  failover: delay:10s, max-delay:60s
 
 # ./kafka-mesos.sh start 0
 Broker 0 started
@@ -164,19 +164,19 @@ brokers:
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024
-  failover: delay:10s, maxDelay:60s
+  failover: delay:10s, max-delay:60s
 
   id: 1
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024
-  failover: delay:10s, maxDelay:60s
+  failover: delay:10s, max-delay:60s
 
   id: 2
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024
-  failover: delay:10s, maxDelay:60s
+  failover: delay:10s, max-delay:60s
 
 #./kafka-mesos.sh start 0
 Broker 0 started
@@ -197,16 +197,16 @@ clusterStorage=zk:/kafka-mesos
 Failed Broker Recovery
 ------------------------
 When the broker fails, kafka mesos scheduler assumes that the failure is recoverable. Scheduler will try
-to restart broker after waiting failoverDelay (i.e. 30s, 2m) on any matched slave. Initially waiting
-delay is equal to failoverDelay setting. After each serial failure it doubles until it reaches failoverMaxDelay value.
+to restart broker on any matched slave after waiting failover-delay (i.e. 30s, 2m). Initially waiting
+delay is equal to failover-delay setting. After each serial failure it doubles until it reaches failover-max-delay value.
 
-If failoverMaxTries is defined and serial failure count exceeds it, broker will be deactivated.
+If failover-max-tries is defined and serial failure count exceeds it, broker will be deactivated.
 
 Following failover settings exists:
 ```
---failoverDelay    - initial failover delay to wait after failure, required
---failoverMaxDelay - max failover delay, required
---failoverMaxTries - max failover tries to deactivate broker, optional
+--failover-delay    - initial failover delay to wait after failure, required
+--failover-max-delay - max failover delay, required
+--failover-max-tries - max failover tries to deactivate broker, optional
 ```
 
 Navigating the CLI
@@ -222,16 +222,16 @@ Usage: add <id-expr> [options]
 
 Option              Description
 ------              -----------
---constraints       constraints (hostname=like:master,
-                      rack=like:1.*). See below.
---cpus <Double>     cpu amount (0.5, 1, 2)
---failoverDelay     failover delay (10s, 5m, 3h)
---failoverMaxDelay  max failover delay. See failoverDelay.
---failoverMaxTries  max failover tries
---heap <Long>       heap amount in Mb
---mem <Long>        mem amount in Mb
---options           kafka options (log.dirs=/tmp/kafka/$id,
-                      num.io.threads=16)
+--constraints         constraints (hostname=like:master,
+                        rack=like:1.*). See below.
+--cpus <Double>       cpu amount (0.5, 1, 2)
+--failover-delay      failover delay (10s, 5m, 3h)
+--failover-max-delay  max failover delay. See failoverDelay.
+--failover-max-tries  max failover tries. Default - none
+--heap <Long>         heap amount in Mb
+--mem <Long>          mem amount in Mb
+--options             kafka options (log.dirs=/tmp/kafka/$id,
+                        num.io.threads=16)
 id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
@@ -260,16 +260,16 @@ Usage: update <id-expr> [options]
 
 Option              Description
 ------              -----------
---constraints       constraints (hostname=like:master,
-                      rack=like:1.*). See below.
---cpus <Double>     cpu amount (0.5, 1, 2)
---failoverDelay     failover delay (10s, 5m, 3h)
---failoverMaxDelay  max failover delay. See failoverDelay.
---failoverMaxTries  max failover tries
---heap <Long>       heap amount in Mb
---mem <Long>        mem amount in Mb
---options           kafka options (log.dirs=/tmp/kafka/$id,
-                      num.io.threads=16)
+--constraints         constraints (hostname=like:master,
+                        rack=like:1.*). See below.
+--cpus <Double>       cpu amount (0.5, 1, 2)
+--failover-delay      failover delay (10s, 5m, 3h)
+--failover-max-delay  max failover delay. See failoverDelay.
+--failover-max-tries  max failover tries. Default - none
+--heap <Long>         heap amount in Mb
+--mem <Long>          mem amount in Mb
+--options             kafka options (log.dirs=/tmp/kafka/$id,
+                        num.io.threads=16)
 id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
