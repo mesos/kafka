@@ -44,10 +44,10 @@ mode=$1
 cd /vagrant/src/vagrant
 
 # name resolution
-cp hosts /etc/hosts
+cp .vagrant/hosts /etc/hosts
 
 # ssh key
-key="ssh_key.pub"
+key=".vagrant/ssh_key.pub"
 if [ -f $key ]; then
     cat $key >> /home/vagrant/.ssh/authorized_keys
 fi
@@ -56,11 +56,11 @@ fi
 echo -e "\nnet.ipv6.conf.all.disable_ipv6 = 1\n" >> /etc/sysctl.conf
 sysctl -p
 
-# use apt-cacher if present
-apt_cache=$(cat hosts | grep apt-cache)
-if [ -n "$apt_cache" ]; then
-    echo "Using apt-cacher http://apt-cache:3142"
-    echo "Acquire::http::Proxy \"http://apt-cache:3142\";" > /etc/apt/apt.conf.d/90-apt-proxy.conf
+# use apt-proxy if present
+if [ -f ".vagrant/apt-proxy" ]; then
+    apt_proxy=$(cat ".vagrant/apt-proxy")
+    echo "Using apt-proxy: $apt_proxy";
+    echo "Acquire::http::Proxy \"$apt_proxy\";" > /etc/apt/apt.conf.d/90-apt-proxy.conf
 fi
 
 # add mesosphere repo

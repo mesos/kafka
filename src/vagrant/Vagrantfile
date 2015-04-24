@@ -17,15 +17,12 @@
 
 SLAVES=2
 NET_PREFIX="192.168.3."
-# APT_CACHE="192.168.1.101"
 
 NODES={"master" => NET_PREFIX + "5"}
 (0..SLAVES-1).each do |i| NODES["slave#{i}"] = NET_PREFIX + (6 + i).to_s end
 
-if (defined? APT_CACHE) then NODES["apt-cache"] = APT_CACHE end
-
 # create hosts
-File.open('hosts', 'w') do |file|
+File.open('.vagrant/hosts', 'w') do |file|
   file.write("127.0.0.1\tlocalhost\n")
   file.write("\n# cluster nodes\n")
   NODES.each do |name, ip| file.write("#{ip}\t#{name}\n") end
@@ -34,7 +31,7 @@ end
 # copy ssh key
 SSH_KEY=File.expand_path("~/.ssh/id_rsa.pub")
 if (File.exists?(SSH_KEY))
-  FileUtils.cp(SSH_KEY, 'ssh_key.pub')
+  FileUtils.cp(SSH_KEY, '.vagrant/ssh_key.pub')
 end
 
 Vagrant.configure(2) do |config|

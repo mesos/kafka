@@ -103,6 +103,7 @@ object HttpServer {
 
     def downloadFile(file: File, response: HttpServletResponse): Unit = {
       response.setContentType("application/zip")
+      response.setHeader("Content-Length", "" + file.length())
       response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
       Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
     }
