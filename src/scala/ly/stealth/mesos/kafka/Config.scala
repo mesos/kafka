@@ -23,6 +23,8 @@ import java.net.URI
 import ly.stealth.mesos.kafka.Util.Period
 
 object Config {
+  val DEFAULT_FILE = new File("kafka-mesos.properties")
+
   var debug: Boolean = false
   var clusterStorage: String = "file:kafka-mesos.json"
 

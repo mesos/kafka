@@ -20,13 +20,14 @@ package ly.stealth.mesos.kafka
 import joptsimple.{OptionException, OptionSet, OptionParser}
 import java.net.{HttpURLConnection, URLEncoder, URL}
 import scala.io.Source
-import java.io.{File, PrintStream, IOException}
+import java.io.{FileInputStream, File, PrintStream, IOException}
 import java.util
 import scala.collection.JavaConversions._
-import java.util.Collections
+import java.util.{Properties, Collections}
 import ly.stealth.mesos.kafka.Util.Period
 
 object Cli {
+  var schedulerUrl: String = null
   var out: PrintStream = System.out
   var err: PrintStream = System.err
 
@@ -51,6 +52,8 @@ object Cli {
     
     if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
     if (command == "scheduler") { handleScheduler(args); return }
+
+    args = handleGenericOptions(args)
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <argument>
@@ -148,8 +151,7 @@ object Cli {
     var configFile = if (options.valueOf(configArg) != null) new File(options.valueOf(configArg)) else null
     if (configFile != null && !configFile.exists()) throw new Error(s"config-file $configFile not found")
 
-    val defaultConfigFile = new File("kafka-mesos.properties")
-    if (configFile == null && defaultConfigFile.exists()) configFile = defaultConfigFile
+    if (configFile == null && Config.DEFAULT_FILE.exists()) configFile = Config.DEFAULT_FILE
 
     if (configFile != null) {
       out.println("Loading config from " + configFile)
@@ -189,7 +191,8 @@ object Cli {
 
   private def handleStatus(help: Boolean = false): Unit = {
     if (help) {
-      out.println("Print cluster status\nUsage: status")
+      out.println("Print cluster status\nUsage: status [options]\n")
+      handleGenericOptions(null, help = true)
       return
     }
 
@@ -222,6 +225,9 @@ object Cli {
       val command = if (add) "add" else "update"
       out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
+
+      out.println()
+      handleGenericOptions(null, help = true)
 
       out.println()
       printIdExprExamples()
@@ -288,7 +294,10 @@ object Cli {
 
   private def handleRemoveBroker(id: String, help: Boolean = false): Unit = {
     if (help) {
-      out.println("Remove broker\nUsage: remove <id-expr>\n")
+      out.println("Remove broker\nUsage: remove <id-expr> [options]\n")
+      handleGenericOptions(null, help = true)
+
+      out.println()
       printIdExprExamples()
       return
     }
@@ -312,6 +321,9 @@ object Cli {
       val command = if (start) "start" else "stop"
       out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
+
+      out.println()
+      handleGenericOptions(null, help = true)
 
       out.println()
       printIdExprExamples()
@@ -362,6 +374,9 @@ object Cli {
       parser.printHelpOn(out)
 
       out.println()
+      handleGenericOptions(null, help = true)
+
+      out.println()
       printTopicExprExamples()
 
       out.println()
@@ -401,6 +416,30 @@ object Cli {
     if (status == "timeout") throw new Error("Rebalance timeout:\n" + state)
     printLine(s"Rebalance $is$status$colon $error")
     if (error.isEmpty && !state.isEmpty) printLine(state)
+  }
+
+  private[kafka] def handleGenericOptions(args: Array[String], help: Boolean = false): Array[String] = {
+    val parser = new OptionParser()
+    parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000").withRequiredArg().ofType(classOf[java.lang.String])
+    parser.allowsUnrecognizedOptions()
+
+    if (help) {
+      out.println("Generic Options")
+      parser.printHelpOn(out)
+      return args
+    }
+
+    var options: OptionSet = null
+    try { options = parser.parse(args: _*) }
+    catch {
+      case e: OptionException =>
+        parser.printHelpOn(out)
+        out.println()
+        throw new Error(e.getMessage)
+    }
+
+    resolveSchedulerUrl(options.valueOf("scheduler-url").asInstanceOf[String])
+    options.nonOptionArguments().toArray(new Array[String](0))
   }
 
   private def printCluster(cluster: Cluster): Unit = {
@@ -470,6 +509,27 @@ object Cli {
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
 
+  private[kafka] def resolveSchedulerUrl(urlOption: String): Unit = {
+    if (schedulerUrl != null) return
+
+    if (urlOption != null) {
+      schedulerUrl = urlOption
+      return
+    }
+
+    if (Config.DEFAULT_FILE.exists()) {
+      val props: Properties = new Properties()
+      val stream: FileInputStream = new FileInputStream(Config.DEFAULT_FILE)
+      props.load(stream)
+      stream.close()
+
+      schedulerUrl = props.getProperty("scheduler-url")
+      if (schedulerUrl != null) return
+    }
+
+    throw new Error("Undefined scheduler-url")
+  }
+
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
       var s = ""
@@ -482,7 +542,7 @@ object Cli {
     }
 
     val qs: String = queryString(params)
-    val url: String = Config.schedulerUrl + "/api" + uri + "?" + qs
+    val url: String = schedulerUrl + (if (schedulerUrl.endsWith("/")) "" else "/") + "api" + uri + "?" + qs
 
     val connection: HttpURLConnection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     var response: String = null

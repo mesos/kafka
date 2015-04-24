@@ -30,6 +30,7 @@ class HttpServerTest extends MesosTestCase {
   override def before {
     super.before
     Config.schedulerUrl = "http://localhost:8000"
+    Cli.schedulerUrl = Config.schedulerUrl
     HttpServer.start(resolveDeps = false)
   }
   
