@@ -67,7 +67,7 @@ object Config {
   override def toString: String = {
     s"""
       |debug: $debug, storage: $storage
-      |mesos: connect=$master, user=${if (user == null) "<current user>" else user}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
+      |mesos: connect=$master, user=${if (user == null) "<default>" else user}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
       |zk: $zk, api: $api
     """.stripMargin.trim
   }
