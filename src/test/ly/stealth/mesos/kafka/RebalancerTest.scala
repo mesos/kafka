@@ -38,7 +38,7 @@ class RebalancerTest extends MesosTestCase {
     rebalancer = new Rebalancer()
 
     val port = 8001
-    Config.kafkaZkConnect = s"localhost:$port"
+    Config.zk = s"localhost:$port"
 
     zkDir = File.createTempFile(getClass.getName, null)
     zkDir.delete()

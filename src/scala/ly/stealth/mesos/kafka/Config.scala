@@ -26,20 +26,20 @@ object Config {
   val DEFAULT_FILE = new File("kafka-mesos.properties")
 
   var debug: Boolean = false
-  var clusterStorage: String = "file:kafka-mesos.json"
+  var storage: String = "file:kafka-mesos.json"
 
-  var mesosConnect: String = null
-  var mesosUser: String = null
+  var master: String = null
+  var user: String = null
 
   var frameworkName: String = "KafkaMesos"
   var frameworkRole: String = "*"
   var frameworkTimeout: Period = new Period("1d")
 
-  var kafkaZkConnect: String = null
-  var schedulerUrl: String = null
+  var zk: String = null
+  var api: String = null
 
-  def schedulerPort: Int = {
-    val port = new URI(schedulerUrl).getPort
+  def apiPort: Int = {
+    val port = new URI(api).getPort
     if (port == -1) 80 else port
   }
 
@@ -51,24 +51,24 @@ object Config {
     stream.close()
 
     if (props.containsKey("debug")) debug = java.lang.Boolean.valueOf(props.getProperty("debug"))
-    if (props.containsKey("cluster-storage")) clusterStorage = props.getProperty("cluster-storage")
+    if (props.containsKey("storage")) storage = props.getProperty("storage")
 
-    if (props.containsKey("mesos-connect")) mesosConnect = props.getProperty("mesos-connect")
-    if (props.containsKey("mesos-user")) mesosUser = props.getProperty("mesos-user")
+    if (props.containsKey("master")) master = props.getProperty("master")
+    if (props.containsKey("user")) user = props.getProperty("user")
 
     if (props.containsKey("framework-name")) frameworkName = props.getProperty("framework-name")
     if (props.containsKey("framework-role")) frameworkRole = props.getProperty("framework-role")
     if (props.containsKey("framework-timeout")) frameworkTimeout = new Period(props.getProperty("framework-timeout"))
 
-    if (props.containsKey("kafka-zk-connect")) kafkaZkConnect = props.getProperty("kafka-zk-connect")
-    if (props.containsKey("scheduler-url")) schedulerUrl = props.getProperty("scheduler-url")
+    if (props.containsKey("zk")) zk = props.getProperty("zk")
+    if (props.containsKey("api")) api = props.getProperty("api")
   }
 
   override def toString: String = {
     s"""
-      |debug: $debug, cluster-storage: $clusterStorage
-      |mesos: connect=$mesosConnect, user=${if (mesosUser == null) "<current user>" else mesosUser}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
-      |kafka-zk-connect: $kafkaZkConnect, scheduler-url: $schedulerUrl
+      |debug: $debug, storage: $storage
+      |mesos: connect=$master, user=${if (user == null) "<current user>" else user}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
+      |zk: $zk, api: $api
     """.stripMargin.trim
   }
 }

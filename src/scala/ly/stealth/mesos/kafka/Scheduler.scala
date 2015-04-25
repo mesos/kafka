@@ -43,8 +43,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
       .setCommand(
         CommandInfo.newBuilder
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/executor/" + HttpServer.jar.getName))
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.schedulerUrl + "/kafka/" + HttpServer.kafkaDist.getName))
+          .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/executor/" + HttpServer.jar.getName))
+          .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
           .setValue(cmd)
       )
       .setName("BrokerExecutor")
@@ -60,7 +60,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "port" -> ("" + port),
         "log.dirs" -> "kafka-logs",
 
-        "zookeeper.connect" -> Config.kafkaZkConnect,
+        "zookeeper.connect" -> Config.zk,
         "host.name" -> offer.getHostname
       )
 
@@ -291,7 +291,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
-    frameworkBuilder.setUser(if (Config.mesosUser != null) Config.mesosUser else "")
+    frameworkBuilder.setUser(if (Config.user != null) Config.user else "")
     if (cluster.frameworkId != null) frameworkBuilder.setId(FrameworkID.newBuilder().setValue(cluster.frameworkId))
     frameworkBuilder.setRole(Config.frameworkRole)
 
@@ -299,7 +299,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setFailoverTimeout(Config.frameworkTimeout.ms / 1000)
     frameworkBuilder.setCheckpoint(true)
 
-    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.mesosConnect)
+    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.master)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() = HttpServer.stop()

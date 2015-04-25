@@ -114,7 +114,7 @@ class Cluster {
 }
 
 object Cluster {
-  var storage: Storage = newStorage(Config.clusterStorage)
+  var storage: Storage = newStorage(Config.storage)
 
   def newStorage(s: String): Storage = {
     if (s.startsWith("file:")) return new FsStorage(new File(s.substring("file:".length)))
@@ -157,7 +157,7 @@ object Cluster {
   }
 
   class ZkStorage(val path: String) extends Storage {
-    def zkClient: ZkClient = new ZkClient(Config.kafkaZkConnect, 30000, 30000, ZKStringSerializer)
+    def zkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 
     protected def loadJson: String = {
       val zkClient = this.zkClient

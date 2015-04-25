@@ -29,8 +29,8 @@ class HttpServerTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.schedulerUrl = "http://localhost:8000"
-    Cli.schedulerUrl = Config.schedulerUrl
+    Config.api = "http://localhost:8000"
+    Cli.api = Config.api
     HttpServer.start(resolveDeps = false)
   }
   
@@ -176,7 +176,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   def download(uri: String): File = {
-    val url = new URL(Config.schedulerUrl + uri)
+    val url = new URL(Config.api + uri)
     val connection = url.openConnection().asInstanceOf[HttpURLConnection]
     try {
       val file = File.createTempFile(getClass.getSimpleName, new File(uri).getName)
