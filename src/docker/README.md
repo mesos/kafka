@@ -29,7 +29,7 @@ so ./kafka-mesos.sh should be specified explicitly.
 Example:
 ```
 # docker run -it -p 7000:7000 --add-host=master:192.168.3.5 <username>/kafka-mesos ./kafka-mesos.sh scheduler \
---mesos-connect=master:5050 --kafka-zk-connect=master:2181 --scheduler-url=http://<accessible-ip>:7000 --cluster-storage=zk:/kafka-mesos
+--master=master:5050 --zk=master:2181 --api=http://<accessible-ip>:7000 --storage=zk:/kafka-mesos
 ```
 
 Note: if you want to inspect image content you can it without specifying `./kafka-mesos.sh` entry point.
@@ -55,7 +55,7 @@ Example:
     "id":"kafka-mesos-scheduler",
     "cpus": 0.5,
     "mem": 256,
-    "cmd": "./kafka-mesos.sh scheduler --mesos-connect=master:5050 --kafka-zk-connect=master:2181 --scheduler-url=http://master:7000 --cluster-storage=zk:/kafka-mesos",
+    "cmd": "./kafka-mesos.sh scheduler --master=master:5050 --zk=master:2181 --api=http://master:7000 --storage=zk:/kafka-mesos",
     "instances": 1,
     "constraints": [["hostname", "LIKE", "master"]]
 }
@@ -63,7 +63,7 @@ Example:
 
 Then the cli should be able to connect to url http://master:7000. Example:
 ```
-# ./kafka-mesos.sh status --scheduler-url=http://master:7000
+# ./kafka-mesos.sh status --api=http://master:7000
 Cluster status received
 
 cluster:

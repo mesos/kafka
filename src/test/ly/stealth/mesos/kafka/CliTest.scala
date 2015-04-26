@@ -30,8 +30,8 @@ class CliTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.schedulerUrl = "http://localhost:8000"
-    Cli.schedulerUrl = Config.schedulerUrl
+    Config.api = "http://localhost:8000"
+    Cli.api = Config.api
     HttpServer.start(resolveDeps = false)
     Cli.out = new PrintStream(out, true)
   }

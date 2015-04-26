@@ -27,7 +27,7 @@ import java.util.{Properties, Collections}
 import ly.stealth.mesos.kafka.Util.Period
 
 object Cli {
-  var schedulerUrl: String = null
+  var api: String = null
   var out: PrintStream = System.out
   var err: PrintStream = System.err
 
@@ -98,15 +98,15 @@ object Cli {
     parser.accepts("debug", "Debug mode. Default - " + Config.debug)
       .withRequiredArg().ofType(classOf[java.lang.Boolean])
 
-    parser.accepts("cluster-storage",
+    parser.accepts("storage",
       """Storage for cluster state. Examples:
         | - file:kafka-mesos.json
         | - zk:/kafka-mesos
-        |Default - """.stripMargin + Config.clusterStorage)
+        |Default - """.stripMargin + Config.storage)
       .withRequiredArg().ofType(classOf[String])
 
 
-    parser.accepts("mesos-connect",
+    parser.accepts("master",
       """Master connection settings. Examples:
         | - master:5050
         | - master:5050,master2:5050
@@ -115,20 +115,26 @@ object Cli {
         | - zk://master:2181,master2:2181/mesos""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos-user", "Mesos user to run tasks. Default - current system user")
+    parser.accepts("user", "Mesos user to run tasks. Default - current system user")
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("mesos-framework-timeout", "Kafka-Mesos framework timeout (30s, 1m, 1h). Default - " + Config.mesosFrameworkTimeout)
+    parser.accepts("framework-name", "Framework name. Default - " + Config.frameworkName)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("framework-role", "Framework role. Default - " + Config.frameworkRole)
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("framework-timeout", "Framework timeout (30s, 1m, 1h). Default - " + Config.frameworkTimeout)
       .withRequiredArg().ofType(classOf[String])
 
 
-    parser.accepts("kafka-zk-connect",
+    parser.accepts("zk",
       """Kafka zookeeper.connect. Examples:
         | - master:2181
         | - master:2181,master2:2181""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000")
+    parser.accepts("api", "Api url. Example: http://master:7000")
       .withRequiredArg().ofType(classOf[String])
 
     val configArg = parser.nonOptions()
@@ -161,31 +167,37 @@ object Cli {
     val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
     if (debug != null) Config.debug = debug
 
-    val clusterStorage = options.valueOf("cluster-storage").asInstanceOf[String]
-    if (clusterStorage != null) Config.clusterStorage = clusterStorage
+    val storage = options.valueOf("storage").asInstanceOf[String]
+    if (storage != null) Config.storage = storage
 
     val provideOption = "Provide either cli option or config default value"
 
-    val mesosConnect = options.valueOf("mesos-connect").asInstanceOf[String]
-    if (mesosConnect != null) Config.mesosConnect = mesosConnect
-    else if (Config.mesosConnect == null) throw new Error(s"Undefined mesos-connect. $provideOption")
+    val master = options.valueOf("master").asInstanceOf[String]
+    if (master != null) Config.master = master
+    else if (Config.master == null) throw new Error(s"Undefined master. $provideOption")
 
-    val mesosUser = options.valueOf("mesos-user").asInstanceOf[String]
-    if (mesosUser != null) Config.mesosUser = mesosUser
+    val user = options.valueOf("user").asInstanceOf[String]
+    if (user != null) Config.user = user
 
-    val mesosFrameworkTimeout = options.valueOf("mesos-framework-timeout").asInstanceOf[String]
-    if (mesosFrameworkTimeout != null)
-      try { Config.mesosFrameworkTimeout = new Period(mesosFrameworkTimeout) }
-      catch { case e: IllegalArgumentException => throw new Error("Invalid mesos-framework-timeout") }
+    val frameworkName = options.valueOf("framework-name").asInstanceOf[String]
+    if (frameworkName != null) Config.frameworkName = frameworkName
+
+    val frameworkRole = options.valueOf("framework-role").asInstanceOf[String]
+    if (frameworkRole != null) Config.frameworkRole = frameworkRole
+
+    val frameworkTimeout = options.valueOf("framework-timeout").asInstanceOf[String]
+    if (frameworkTimeout != null)
+      try { Config.frameworkTimeout = new Period(frameworkTimeout) }
+      catch { case e: IllegalArgumentException => throw new Error("Invalid framework-timeout") }
 
 
-    val kafkaZkConnect = options.valueOf("kafka-zk-connect").asInstanceOf[String]
-    if (kafkaZkConnect != null) Config.kafkaZkConnect = kafkaZkConnect
-    else if (Config.kafkaZkConnect == null) throw new Error(s"Undefined kafka-zk-connect. $provideOption")
+    val zk = options.valueOf("zk").asInstanceOf[String]
+    if (zk != null) Config.zk = zk
+    else if (Config.zk == null) throw new Error(s"Undefined zk. $provideOption")
 
-    val schedulerUrl = options.valueOf("scheduler-url").asInstanceOf[String]
-    if (schedulerUrl != null) Config.schedulerUrl = schedulerUrl
-    else if (Config.schedulerUrl == null) throw new Error(s"Undefined scheduler-url. $provideOption")
+    val api = options.valueOf("api").asInstanceOf[String]
+    if (api != null) Config.api = api
+    else if (Config.api == null) throw new Error(s"Undefined api. $provideOption")
 
     Scheduler.start()
   }
@@ -421,7 +433,7 @@ object Cli {
 
   private[kafka] def handleGenericOptions(args: Array[String], help: Boolean = false): Array[String] = {
     val parser = new OptionParser()
-    parser.accepts("scheduler-url", "Scheduler url. Example: http://master:7000").withRequiredArg().ofType(classOf[java.lang.String])
+    parser.accepts("api", "Api url. Example: http://master:7000").withRequiredArg().ofType(classOf[java.lang.String])
     parser.allowsUnrecognizedOptions()
 
     if (help) {
@@ -439,7 +451,7 @@ object Cli {
         throw new Error(e.getMessage)
     }
 
-    resolveSchedulerUrl(options.valueOf("scheduler-url").asInstanceOf[String])
+    resolveApi(options.valueOf("api").asInstanceOf[String])
     options.nonOptionArguments().toArray(new Array[String](0))
   }
 
@@ -510,11 +522,11 @@ object Cli {
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
 
-  private[kafka] def resolveSchedulerUrl(urlOption: String): Unit = {
-    if (schedulerUrl != null) return
+  private[kafka] def resolveApi(urlOption: String): Unit = {
+    if (api != null) return
 
     if (urlOption != null) {
-      schedulerUrl = urlOption
+      api = urlOption
       return
     }
 
@@ -524,11 +536,11 @@ object Cli {
       props.load(stream)
       stream.close()
 
-      schedulerUrl = props.getProperty("scheduler-url")
-      if (schedulerUrl != null) return
+      api = props.getProperty("api")
+      if (api != null) return
     }
 
-    throw new Error("Undefined scheduler-url. Provide either cli option or config default value")
+    throw new Error("Undefined api. Provide either cli option or config default value")
   }
 
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
@@ -543,7 +555,7 @@ object Cli {
     }
 
     val qs: String = queryString(params)
-    val url: String = schedulerUrl + (if (schedulerUrl.endsWith("/")) "" else "/") + "api" + uri + "?" + qs
+    val url: String = api + (if (api.endsWith("/")) "" else "/") + "api" + uri + "?" + qs
 
     val connection: HttpURLConnection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     var response: String = null

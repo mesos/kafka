@@ -76,7 +76,7 @@ class SchedulerTest extends MesosTestCase {
     val options = Util.parseMap(task.getData.toStringUtf8)
     assertEquals(broker.id, options.get("broker.id"))
     assertEquals("" + 1000, options.get("port"))
-    assertEquals(Config.kafkaZkConnect, options.get("zookeeper.connect"))
+    assertEquals(Config.zk, options.get("zookeeper.connect"))
 
     assertEquals("kafka-logs", options.get("log.dirs"))
     assertEquals(offer.getHostname, options.get("host.name"))

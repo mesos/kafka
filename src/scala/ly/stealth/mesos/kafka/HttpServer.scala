@@ -46,7 +46,7 @@ object HttpServer {
 
     server = new Server(threadPool)
     val connector = new ServerConnector(server)
-    connector.setPort(Config.schedulerPort)
+    connector.setPort(Config.apiPort)
     connector.setIdleTimeout(60 * 1000)
 
     val handler = new ServletContextHandler
