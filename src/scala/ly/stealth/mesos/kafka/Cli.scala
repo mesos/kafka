@@ -49,11 +49,10 @@ object Cli {
 
     val command = args(0)
     args = args.slice(1, args.length)
-    
-    if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
     if (command == "scheduler") { handleScheduler(args); return }
 
     args = handleGenericOptions(args)
+    if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <argument>
@@ -128,14 +127,15 @@ object Cli {
       .withRequiredArg().ofType(classOf[String])
 
 
+    parser.accepts("api", "Api url. Example: http://master:7000")
+      .withRequiredArg().ofType(classOf[String])
+
     parser.accepts("zk",
       """Kafka zookeeper.connect. Examples:
         | - master:2181
         | - master:2181,master2:2181""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("api", "Api url. Example: http://master:7000")
-      .withRequiredArg().ofType(classOf[String])
 
     val configArg = parser.nonOptions()
 
@@ -522,11 +522,16 @@ object Cli {
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
 
-  private[kafka] def resolveApi(urlOption: String): Unit = {
+  private[kafka] def resolveApi(apiOption: String): Unit = {
     if (api != null) return
 
-    if (urlOption != null) {
-      api = urlOption
+    if (apiOption != null) {
+      api = apiOption
+      return
+    }
+
+    if (System.getenv("KM_API") != null) {
+      api = System.getenv("KM_API")
       return
     }
 
