@@ -31,7 +31,7 @@ object Config {
   var master: String = null
   var user: String = null
 
-  var frameworkName: String = "KafkaMesos"
+  var frameworkName: String = "kafka"
   var frameworkRole: String = "*"
   var frameworkTimeout: Period = new Period("1d")
 
