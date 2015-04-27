@@ -49,7 +49,7 @@ object Cli {
 
     val command = args(0)
     args = args.slice(1, args.length)
-    if (command == "scheduler") { handleScheduler(args); return }
+    if (command == "scheduler" && !noScheduler) { handleScheduler(args); return }
 
     args = handleGenericOptions(args)
     if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
@@ -72,10 +72,11 @@ object Cli {
   private def handleHelp(command: String = null): Unit = {
     command match {
       case null =>
-        out.println("Usage: {help {command}|scheduler|status|add|update|remove|start|stop|rebalance}")
+        out.println(s"Usage: {help {command}${if (!noScheduler) "|scheduler" else ""}|status|add|update|remove|start|stop|rebalance}")
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
+        if (noScheduler) throw new Error(s"unsupported command $command")
         handleScheduler(null, help = true)
       case "status" =>
         handleStatus(help = true)
@@ -88,7 +89,7 @@ object Cli {
       case "rebalance" =>
         handleRebalance(null, null, help = true)
       case _ =>
-        throw new Error("unsupported command " + command)
+        throw new Error(s"unsupported command $command")
     }
   }
 
@@ -547,6 +548,8 @@ object Cli {
 
     throw new Error("Undefined api. Provide either cli option or config default value")
   }
+
+  private[kafka] def noScheduler: Boolean = System.getenv("KM_NO_SCHEDULER") != null
 
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
