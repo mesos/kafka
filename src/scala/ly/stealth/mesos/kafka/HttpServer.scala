@@ -95,7 +95,7 @@ object HttpServer {
 
     def handle(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val uri = request.getRequestURI
-      if (uri.startsWith("/executor/")) downloadFile(HttpServer.jar, response)
+      if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
       else response.sendError(404)
