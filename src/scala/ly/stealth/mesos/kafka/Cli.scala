@@ -50,9 +50,9 @@ object Cli {
     val command = args(0)
     args = args.slice(1, args.length)
     if (command == "scheduler" && !noScheduler) { handleScheduler(args); return }
+    if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
 
     args = handleGenericOptions(args)
-    if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <argument>
