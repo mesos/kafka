@@ -4,7 +4,8 @@ Kafka Mesos Framework
 This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 
 [Installation](#installation)    
-[Configuration](#configuration)    
+[Environment Configuration](#environment_configuration)    
+[Scheduler Configuration](#scheduler_configuration)    
 [Run the scheduler Standalone](#run-the-scheduler)    
 [Starting and using 1 broker](#starting-and-using-1-broker)    
 
@@ -40,13 +41,47 @@ Clone and build the project
     # ./gradlew jar
     # wget https://archive.apache.org/dist/kafka/0.8.1.1/kafka_2.9.2-0.8.1.1.tgz
 
-Configuration
--------------
+Environment Configuration
+--------------------------
 
 Edit `kafka-mesos.properties` and make the right settings for your environment.
 Before running `./kafka-mesos.sh`, set the location of libmesos:
 
     # export MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so
+
+Scheduler Configuration
+----------------------
+The scheduler can be configured either through property file or through the command line.
+
+```
+# ./kafka-mesos.sh help scheduler
+Start scheduler 
+Usage: scheduler [options] [config.properties]
+
+Option               Description                           
+------               -----------                           
+--api                Api url. Example: http://master:7000  
+--debug <Boolean>    Debug mode. Default - false           
+--framework-name     Framework name. Default - kafka       
+--framework-role     Framework role. Default - *           
+--framework-timeout  Framework timeout (30s, 1m, 1h).      
+                       Default - 1d                        
+--master             Master connection settings. Examples: 
+                      - master:5050                        
+                      - master:5050,master2:5050           
+                      - zk://master:2181/mesos             
+                      - zk://username:password@master:2181 
+                      - zk://master:2181,master2:2181/mesos
+--storage            Storage for cluster state. Examples:  
+                      - file:kafka-mesos.json              
+                      - zk:/kafka-mesos                    
+                     Default - file:kafka-mesos.json       
+--user               Mesos user to run tasks. Default -    
+                       current system user                 
+--zk                 Kafka zookeeper.connect. Examples:    
+                      - master:2181                        
+                      - master:2181,master2:2181
+```
 
 Run the scheduler
 -----------------
