@@ -172,6 +172,8 @@ object Broker {
     parts(1)
   }
 
+  def isOptionOverridable(name: String): Boolean = !List("broker.id", "port").contains(name)
+
   class Failover(_delay: Period = new Period("10s"), _maxDelay: Period = new Period("60s")) {
     var delay: Period = _delay
     var maxDelay: Period = _maxDelay

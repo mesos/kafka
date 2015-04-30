@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSON
-import java.io.{IOException, OutputStream, InputStream}
+import java.io.{File, IOException, OutputStream, InputStream}
 import java.util.Date
 import java.text.SimpleDateFormat
 import org.apache.mesos.Protos._
@@ -121,6 +121,27 @@ object Util {
       try { out.close() }
       catch { case ignore: IOException => }
     }
+  }
+
+  var terminalWidth: Int = getTerminalWidth
+  private def getTerminalWidth: Int = {
+    val file: File = File.createTempFile("getTerminalWidth", null)
+    file.delete()
+
+    var width = 80
+    try {
+      new ProcessBuilder(List("bash", "-c", "tput cols"))
+        .inheritIO().redirectOutput(file).start().waitFor()
+
+      val source = scala.io.Source.fromFile(file)
+      width = try Integer.valueOf(source.mkString.trim) finally source.close()
+    } catch {
+      case e: IOException => /* ignore */
+      case e: NumberFormatException => /* ignore */
+    }
+
+    file.delete()
+    width
   }
 
   class Period(s: String) {

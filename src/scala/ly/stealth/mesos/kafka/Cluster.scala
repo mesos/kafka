@@ -142,7 +142,9 @@ object Cluster {
 
   class FsStorage(val file: File) extends Storage {
     protected def loadJson: String = {
-      if (!file.exists) null else scala.io.Source.fromFile(file).mkString
+      if (!file.exists) return null
+      val source = scala.io.Source.fromFile(file)
+      try source.mkString finally source.close()
     }
 
     protected def saveJson(json: String): Unit = {

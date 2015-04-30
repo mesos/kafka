@@ -17,10 +17,10 @@
 
 package ly.stealth.mesos.kafka
 
-import joptsimple.{OptionException, OptionSet, OptionParser}
+import joptsimple.{BuiltinHelpFormatter, OptionException, OptionSet, OptionParser}
 import java.net.{HttpURLConnection, URLEncoder, URL}
 import scala.io.Source
-import java.io.{FileInputStream, File, PrintStream, IOException}
+import java.io._
 import java.util
 import scala.collection.JavaConversions._
 import java.util.{Properties, Collections}
@@ -94,7 +94,7 @@ object Cli {
   }
 
   private def handleScheduler(args: Array[String], help: Boolean = false): Unit = {
-    val parser = new OptionParser()
+    val parser = newParser()
     parser.accepts("debug", "Debug mode. Default - " + Config.debug)
       .withRequiredArg().ofType(classOf[java.lang.Boolean])
 
@@ -115,7 +115,7 @@ object Cli {
         | - zk://master:2181,master2:2181/mesos""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("user", "Mesos user to run tasks. Default - current system user")
+    parser.accepts("user", "Mesos user to run tasks. Default - none")
       .withRequiredArg().ofType(classOf[String])
 
     parser.accepts("framework-name", "Framework name. Default - " + Config.frameworkName)
@@ -223,12 +223,12 @@ object Cli {
   }
 
   private def handleAddUpdateBroker(id: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
-    val parser = new OptionParser()
+    val parser = newParser()
     parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
 
-    parser.accepts("options", "kafka options (log.dirs=/tmp/kafka/$id,num.io.threads=16)").withRequiredArg()
+    parser.accepts("options", "kafka options or file. Examples:\n log.dirs=/tmp/kafka/$id,num.io.threads=16\n file:server.properties").withRequiredArg()
     parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*). See below.").withRequiredArg()
 
     parser.accepts("failover-delay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
@@ -280,7 +280,7 @@ object Cli {
     if (mem != null) params.put("mem", "" + mem)
     if (heap != null) params.put("heap", "" + heap)
 
-    if (options_ != null) params.put("options", options_)
+    if (options_ != null) params.put("options", optionsOrFile(options_))
     if (constraints != null) params.put("constraints", constraints)
 
     if (failoverDelay != null) params.put("failoverDelay", failoverDelay)
@@ -327,7 +327,7 @@ object Cli {
   }
 
   private def handleStartStopBroker(id: String, args: Array[String], start: Boolean, help: Boolean = false): Unit = {
-    val parser = new OptionParser()
+    val parser = newParser()
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
     if (!start) parser.accepts("force", "forcibly stop").withOptionalArg().ofType(classOf[String])
 
@@ -379,7 +379,7 @@ object Cli {
   }
 
   private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
-    val parser = new OptionParser()
+    val parser = newParser()
     parser.accepts("topics", "<topic-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
@@ -433,7 +433,7 @@ object Cli {
   }
 
   private[kafka] def handleGenericOptions(args: Array[String], help: Boolean = false): Array[String] = {
-    val parser = new OptionParser()
+    val parser = newParser()
     parser.accepts("api", "Api url. Example: http://master:7000").withRequiredArg().ofType(classOf[java.lang.String])
     parser.allowsUnrecognizedOptions()
 
@@ -454,6 +454,27 @@ object Cli {
 
     resolveApi(options.valueOf("api").asInstanceOf[String])
     options.nonOptionArguments().toArray(new Array[String](0))
+  }
+  
+  private def optionsOrFile(value: String): String = {
+    if (!value.startsWith("file:")) return value
+    
+    val file = new File(value.substring("file:".length))
+    if (!file.exists()) throw new Error(s"File $file does not exists")
+    
+    val props: Properties = new Properties()
+    val reader = new FileReader(file)
+    try { props.load(reader) }
+    finally { reader.close() }
+
+    val map = new util.HashMap[String, String](props.toMap)
+    Util.formatMap(map)
+  }
+
+  private def newParser(): OptionParser = {
+    val parser: OptionParser = new OptionParser()
+    parser.formatHelpWith(new BuiltinHelpFormatter(Util.terminalWidth, 2))
+    parser
   }
 
   private def printCluster(cluster: Cluster): Unit = {
