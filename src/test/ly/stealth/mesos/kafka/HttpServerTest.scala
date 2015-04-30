@@ -162,8 +162,8 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def executor_download {
-    val file = download("/executor/kafka-mesos.jar")
+  def jar_download {
+    val file = download("/jar/kafka-mesos.jar")
     val content = scala.io.Source.fromFile(file).mkString
     assertEquals("executor", content)
   }

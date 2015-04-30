@@ -31,12 +31,12 @@ object Config {
   var master: String = null
   var user: String = null
 
-  var frameworkName: String = "KafkaMesos"
+  var frameworkName: String = "kafka"
   var frameworkRole: String = "*"
   var frameworkTimeout: Period = new Period("1d")
 
-  var zk: String = null
   var api: String = null
+  var zk: String = null
 
   def apiPort: Int = {
     val port = new URI(api).getPort
@@ -60,15 +60,15 @@ object Config {
     if (props.containsKey("framework-role")) frameworkRole = props.getProperty("framework-role")
     if (props.containsKey("framework-timeout")) frameworkTimeout = new Period(props.getProperty("framework-timeout"))
 
-    if (props.containsKey("zk")) zk = props.getProperty("zk")
     if (props.containsKey("api")) api = props.getProperty("api")
+    if (props.containsKey("zk")) zk = props.getProperty("zk")
   }
 
   override def toString: String = {
     s"""
       |debug: $debug, storage: $storage
       |mesos: connect=$master, user=${if (user == null) "<default>" else user}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
-      |zk: $zk, api: $api
+      |api: $api, zk: $zk
     """.stripMargin.trim
   }
 }

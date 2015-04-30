@@ -49,9 +49,8 @@ object Cli {
 
     val command = args(0)
     args = args.slice(1, args.length)
-    
+    if (command == "scheduler" && !noScheduler) { handleScheduler(args); return }
     if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
-    if (command == "scheduler") { handleScheduler(args); return }
 
     args = handleGenericOptions(args)
     if (command == "status") { handleStatus(); return }
@@ -73,10 +72,11 @@ object Cli {
   private def handleHelp(command: String = null): Unit = {
     command match {
       case null =>
-        out.println("Usage: {help {command}|scheduler|status|add|update|remove|start|stop|rebalance}")
+        out.println(s"Usage: {help {command}${if (!noScheduler) "|scheduler" else ""}|status|add|update|remove|start|stop|rebalance}")
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
+        if (noScheduler) throw new Error(s"unsupported command $command")
         handleScheduler(null, help = true)
       case "status" =>
         handleStatus(help = true)
@@ -89,7 +89,7 @@ object Cli {
       case "rebalance" =>
         handleRebalance(null, null, help = true)
       case _ =>
-        throw new Error("unsupported command " + command)
+        throw new Error(s"unsupported command $command")
     }
   }
 
@@ -128,14 +128,15 @@ object Cli {
       .withRequiredArg().ofType(classOf[String])
 
 
+    parser.accepts("api", "Api url. Example: http://master:7000")
+      .withRequiredArg().ofType(classOf[String])
+
     parser.accepts("zk",
       """Kafka zookeeper.connect. Examples:
         | - master:2181
         | - master:2181,master2:2181""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
-    parser.accepts("api", "Api url. Example: http://master:7000")
-      .withRequiredArg().ofType(classOf[String])
 
     val configArg = parser.nonOptions()
 
@@ -522,11 +523,16 @@ object Cli {
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
 
-  private[kafka] def resolveApi(urlOption: String): Unit = {
+  private[kafka] def resolveApi(apiOption: String): Unit = {
     if (api != null) return
 
-    if (urlOption != null) {
-      api = urlOption
+    if (apiOption != null) {
+      api = apiOption
+      return
+    }
+
+    if (System.getenv("KM_API") != null) {
+      api = System.getenv("KM_API")
       return
     }
 
@@ -542,6 +548,8 @@ object Cli {
 
     throw new Error("Undefined api. Provide either cli option or config default value")
   }
+
+  private[kafka] def noScheduler: Boolean = System.getenv("KM_NO_SCHEDULER") != null
 
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
