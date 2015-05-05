@@ -43,7 +43,7 @@ object Cli {
     var args = _args
 
     if (args.length == 0) {
-      handleHelp()
+      handleHelp(); out.println()
       throw new Error("command required")
     }
 
@@ -56,7 +56,11 @@ object Cli {
     if (command == "status") { handleStatus(); return }
 
     // rest of the commands require <argument>
-    if (args.length < 1) throw new Error("argument required")
+    if (args.length < 1) {
+      handleHelp(command); out.println()
+      throw new Error("argument required")
+    }
+
     val arg = args(0)
     args = args.slice(1, args.length)
 
@@ -72,7 +76,8 @@ object Cli {
   private def handleHelp(command: String = null): Unit = {
     command match {
       case null =>
-        out.println(s"Usage: {help {command}${if (!noScheduler) "|scheduler" else ""}|status|add|update|remove|start|stop|rebalance}")
+        out.println("Usage: <command>\n")
+        printCommands()
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
@@ -237,7 +242,7 @@ object Cli {
 
     if (help) {
       val command = if (add) "add" else "update"
-      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
+      out.println(s"${command.capitalize} brokers\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
 
       out.println()
@@ -308,7 +313,7 @@ object Cli {
 
   private def handleRemoveBroker(id: String, help: Boolean = false): Unit = {
     if (help) {
-      out.println("Remove broker\nUsage: remove <id-expr> [options]\n")
+      out.println("Remove brokers\nUsage: remove <id-expr> [options]\n")
       handleGenericOptions(null, help = true)
 
       out.println()
@@ -333,7 +338,7 @@ object Cli {
 
     if (help) {
       val command = if (start) "start" else "stop"
-      out.println(s"${command.capitalize} broker\nUsage: $command <id-expr> [options]\n")
+      out.println(s"${command.capitalize} brokers\nUsage: $command <id-expr> [options]\n")
       parser.printHelpOn(out)
 
       out.println()
@@ -384,7 +389,7 @@ object Cli {
     parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
     if (help) {
-      out.println("Rebalance\nUsage: rebalance <id-expr>|status [options]\n")
+      out.println("Rebalance topics\nUsage: rebalance <id-expr>|status [options]\n")
       parser.printHelpOn(out)
 
       out.println()
@@ -454,6 +459,19 @@ object Cli {
 
     resolveApi(options.valueOf("api").asInstanceOf[String])
     options.nonOptionArguments().toArray(new Array[String](0))
+  }
+
+  private def printCommands(): Unit = {
+    printLine("Commands:")
+    printLine("help {cmd} - print general or command-specific help", 1)
+    if (!noScheduler) printLine("scheduler  - start scheduler", 1)
+    printLine("status     - print cluster status", 1)
+    printLine("add        - add brokers", 1)
+    printLine("update     - update brokers", 1)
+    printLine("remove     - remove brokers", 1)
+    printLine("start      - start brokers", 1)
+    printLine("stop       - stop brokers", 1)
+    printLine("rebalance  - rebalance topics", 1)
   }
 
   private def printCluster(cluster: Cluster): Unit = {
