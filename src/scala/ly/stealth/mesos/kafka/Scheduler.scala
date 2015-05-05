@@ -299,7 +299,18 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setFailoverTimeout(Config.frameworkTimeout.ms / 1000)
     frameworkBuilder.setCheckpoint(true)
 
-    val driver = new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.master)
+    var credsBuilder: Credential.Builder = null
+    if (Config.principal != null) {
+      frameworkBuilder.setPrincipal(Config.principal)
+
+      credsBuilder = Credential.newBuilder()
+      credsBuilder.setPrincipal(Config.principal)
+      if (Config.secret != null) credsBuilder.setSecret(ByteString.copyFromUtf8(Config.secret))
+    }
+
+    val driver =
+      if (credsBuilder != null) new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.master, credsBuilder.build)
+      else new MesosSchedulerDriver(Scheduler, frameworkBuilder.build, Config.master)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() = HttpServer.stop()
