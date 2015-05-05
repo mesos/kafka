@@ -33,7 +33,7 @@ object Config {
 
   var frameworkName: String = "kafka"
   var frameworkRole: String = "*"
-  var frameworkTimeout: Period = new Period("1d")
+  var frameworkTimeout: Period = new Period("30d")
 
   var api: String = null
   var zk: String = null
