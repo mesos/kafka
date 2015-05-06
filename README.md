@@ -258,18 +258,24 @@ Adding brokers to the cluster
 Add broker
 Usage: add <id-expr> [options]
 
-Option              Description
-------              -----------
---constraints         constraints (hostname=like:master,
-                        rack=like:1.*). See below.
+Option                Description
+------                -----------
+--constraints         constraints (hostname=like:master,rack=like:1.*). See below.
 --cpus <Double>       cpu amount (0.5, 1, 2)
 --failover-delay      failover delay (10s, 5m, 3h)
 --failover-max-delay  max failover delay. See failoverDelay.
 --failover-max-tries  max failover tries. Default - none
 --heap <Long>         heap amount in Mb
 --mem <Long>          mem amount in Mb
---options             kafka options (log.dirs=/tmp/kafka/$id,
-                        num.io.threads=16)
+--options             kafka options or file. Examples:
+                       log.dirs=/tmp/kafka/$id,num.io.threads=16
+                       file:server.properties
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
 id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
@@ -296,18 +302,24 @@ Updating broker configurations
 Update broker
 Usage: update <id-expr> [options]
 
-Option              Description
-------              -----------
---constraints         constraints (hostname=like:master,
-                        rack=like:1.*). See below.
+Option                Description
+------                -----------
+--constraints         constraints (hostname=like:master,rack=like:1.*). See below.
 --cpus <Double>       cpu amount (0.5, 1, 2)
 --failover-delay      failover delay (10s, 5m, 3h)
 --failover-max-delay  max failover delay. See failoverDelay.
 --failover-max-tries  max failover tries. Default - none
 --heap <Long>         heap amount in Mb
 --mem <Long>          mem amount in Mb
---options             kafka options (log.dirs=/tmp/kafka/$id,
-                        num.io.threads=16)
+--options             kafka options or file. Examples:
+                       log.dirs=/tmp/kafka/$id,num.io.threads=16
+                       file:server.properties
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
 id-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
@@ -325,7 +337,7 @@ constraint examples:
   groupBy         - all values are the same
   groupBy:3       - all values are within 3 different groups
 
-Note: use "" arg to unset the option
+Note: use "" arg to unset an option
 ```
 
 Starting brokers in the cluster
@@ -339,6 +351,11 @@ Usage: start <id-expr> [options]
 Option     Description
 ------     -----------
 --timeout  timeout (30s, 1m, 1h). 0s - no timeout
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
 
 id-expr examples:
   0      - broker 0
@@ -358,8 +375,13 @@ Usage: stop <id-expr> [options]
 
 Option     Description
 ------     -----------
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
 --force    forcibly stop
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
 
 id-expr examples:
   0      - broker 0
@@ -375,7 +397,12 @@ Removing brokers from the cluster
 ```
 # ./kafka-mesos.sh help remove
 Remove broker
-Usage: remove <id-expr>
+Usage: remove <id-expr> [options]
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
 
 id-expr examples:
   0      - broker 0
@@ -396,6 +423,11 @@ Option     Description
 ------     -----------
 --timeout  timeout (30s, 1m, 1h). 0s - no timeout
 --topics   <topic-expr>. Default - *. See below.
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
 
 topic-expr examples:
   t0        - topic t0 with default RF (replication-factor)
