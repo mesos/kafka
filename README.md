@@ -44,6 +44,7 @@ Clone and build the project
 
 Environment Configuration
 --------------------------
+
 Before running `./kafka-mesos.sh`, set the location of libmesos:
 
     # export MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so
@@ -54,6 +55,7 @@ If the host running scheduler has several IP addresses you may also need to
 
 Scheduler Configuration
 ----------------------
+
 The scheduler is configured through the command line or `kafka-mesos.properties` file.
 
 Following options are available:
