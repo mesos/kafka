@@ -4,11 +4,10 @@ Kafka Mesos Framework
 This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 
 [Installation](#installation)    
-[Environment Configuration](#environment-configuration)
-[Scheduler Configuration](#scheduler-configuration)
-
-[Run the scheduler](#run-the-scheduler)
-[Starting and using 1 broker](#starting-and-using-1-broker)    
+* [Environment Configuration](#environment-configuration)
+* [Scheduler Configuration](#scheduler-configuration)
+* [Run the scheduler](#run-the-scheduler)
+* [Starting and using 1 broker](#starting-and-using-1-broker)
 
 [Typical Operations](#typical-operations)
 * [Run the scheduler with Docker](https://github.com/mesos/kafka/tree/master/src/docker#intro)   
