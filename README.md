@@ -6,7 +6,7 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 [Installation](#installation)    
 [Environment Configuration](#environment-configuration)
 [Scheduler Configuration](#scheduler-configuration)
-[Run the scheduler Standalone](#run-the-scheduler)    
+[Run the scheduler](#run-the-scheduler)
 [Starting and using 1 broker](#starting-and-using-1-broker)    
 
 [Typical Operations](#typical-operations)
