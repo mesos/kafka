@@ -103,8 +103,8 @@ zk=master:2181
 api=http://master:7000
 ```
 
-Now if running scheduler via `/kafka-mesos.sh scheduler` (no options specified) the scheduler will read values for options
-from the above file. You could also specify alternative config file by using `config` argument of scheduler.
+Now if running scheduler via `./kafka-mesos.sh scheduler` (no options specified) the scheduler will read values for options
+from the above file. You could also specify alternative config file by using `config` argument of the scheduler.
 
 Run the scheduler
 -----------------
@@ -113,7 +113,7 @@ Start the Kafka scheduler using this command:
 
     # ./kafka-mesos.sh scheduler
 
-You can use Marathon to launch the scheduler process so it gets restarted if it crashes.
+Note: you can also use Marathon to launch the scheduler process so it gets restarted if it crashes.
 
 Starting and using 1 broker
 ---------------------------
@@ -128,7 +128,7 @@ broker:
   id: 0
   active: false
   state: stopped
-  resources: cpus:1.00, mem:128, heap:128
+  resources: cpus:0.50, mem:128, heap:128
   failover: delay:10s, max-delay:60s
 ```
 
@@ -143,10 +143,10 @@ cluster:
     id: 0
     active: false
     state: stopped
-    resources: cpus:1.00, mem:128, heap:128
+    resources: cpus:0.50, mem:128, heap:128
     failover: delay:10s, max-delay:60s
 ```
-Now lets startup the broker.
+Now lets start the broker.
 
 ```
 # ./kafka-mesos.sh start 0
@@ -186,7 +186,7 @@ And lets read it back.
 test
 ```
 
-This is an alpha version.
+This is an beta version.
 
 Typical Operations
 ===================
