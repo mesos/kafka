@@ -323,7 +323,6 @@ class BrokerTest extends MesosTestCase {
   @Test
   def Task_toJson_fromJson {
     val task = new Task("id", "slave", "executor", "host", 9092, parseMap("a=1,b=2"), State.RUNNING)
-    task.registerReconcile(now = new Date(0))
 
     val read: Task = new Task()
     read.fromJson(Util.parseJson("" + task.toJson))
@@ -373,8 +372,6 @@ object BrokerTest {
     assertEquals(expected.attributes, actual.attributes)
 
     assertEquals(expected.state, actual.state)
-    assertEquals(expected.reconciles, actual.reconciles)
-    assertEquals(expected.reconcileTime, actual.reconcileTime)
   }
 
   private def checkNulls(expected: Object, actual: Object): Boolean = {

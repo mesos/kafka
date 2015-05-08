@@ -163,9 +163,6 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
-  val RECONCILE_DELAY: Period = new Period("60s")
-  val RECONCILE_MAX_TRIES: Int = 3
-
   def nextTaskId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
   def nextExecutorId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
 
@@ -258,32 +255,12 @@ object Broker {
 
     @volatile var state: String = _state
 
-    @volatile var reconciles: Int = 0
-    @volatile var reconcileTime: Date = null
-
     def starting: Boolean = state == State.STARTING
     def running: Boolean = state == State.RUNNING
     def stopping: Boolean = state == State.STOPPING
     def reconciling: Boolean = state == State.RECONCILING
 
     def endpoint: String = hostname + ":" + port
-
-    def shouldReconcile(now: Date = new Date()): Boolean = {
-      if (state != Broker.State.RECONCILING) return false
-      reconcileTime == null || (now.getTime - reconcileTime.getTime) >= Broker.RECONCILE_DELAY.ms
-    }
-
-    def registerReconcile(now: Date = new Date()): Unit = {
-      reconciles += 1
-      reconcileTime = now
-    }
-
-    def resetReconciles(): Unit = {
-      reconciles = 0
-      reconcileTime = null
-    }
-
-    def reconcileExceedsLimit(): Boolean = reconciles > Broker.RECONCILE_MAX_TRIES
 
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]
@@ -295,9 +272,6 @@ object Broker {
       attributes = node("attributes").asInstanceOf[Map[String, String]]
 
       state = node("state").asInstanceOf[String]
-
-      if (node.contains("reconciles")) reconciles = node("reconciles").asInstanceOf[Number].intValue()
-      if (node.contains("reconcileTime")) reconcileTime = dateTimeFormat.parse(node("reconcileTime").asInstanceOf[String])
     }
 
     def toJson: JSONObject = {
@@ -312,9 +286,6 @@ object Broker {
       obj("attributes") = new JSONObject(attributes.toMap)
 
       obj("state") = state
-
-      obj("reconciles") = reconciles
-      if (reconcileTime != null) obj("reconcileTime") = dateTimeFormat.format(reconcileTime)
 
       new JSONObject(obj.toMap)
     }

@@ -24,7 +24,7 @@ import java.util
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
-import Util.Str
+import ly.stealth.mesos.kafka.Util.{Period, Str}
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -190,8 +190,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
       return
     }
 
+    if (broker.task.reconciling)
+      logger.info(s"Finished reconciling of broker ${broker.id}, task ${broker.task.id}")
+
     broker.task.state = Broker.State.RUNNING
-    broker.task.resetReconciles()
     broker.failover.resetFailures()
   }
 
@@ -246,30 +248,43 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
+  private[kafka] val RECONCILE_DELAY = new Period("10s")
+  private[kafka] val RECONCILE_MAX_TRIES = 3
+
+  private[kafka] var reconciles: Int = 0
+  private[kafka] var reconcileTime: Date = null
+
   private[kafka] def reconcileTasksIfRequired(force: Boolean = false, now: Date = new Date()): Unit = {
+    if (reconcileTime != null && now.getTime - reconcileTime.getTime < RECONCILE_DELAY.ms)
+      return
+
+    if (!isReconciling) reconciles = 0
+    reconciles += 1
+    reconcileTime = now
+
+    if (reconciles > RECONCILE_MAX_TRIES) {
+      for (broker <- cluster.getBrokers.filter(b => b.task != null && b.task.reconciling)) {
+        logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for broker ${broker.id}, sending killTask for task ${broker.task.id}")
+        driver.killTask(TaskID.newBuilder().setValue(broker.task.id).build())
+        broker.task = null
+      }
+
+      return
+    }
+
     val statuses = new util.ArrayList[TaskStatus]
 
-    for (broker <- cluster.getBrokers.filter(_.task != null)) {
-      if (force || broker.task.shouldReconcile(now)) {
+    for (broker <- cluster.getBrokers.filter(_.task != null))
+      if (force || broker.task.reconciling) {
         broker.task.state = Broker.State.RECONCILING
-        broker.task.registerReconcile(now)
+        logger.info(s"Reconciling $reconciles/$RECONCILE_MAX_TRIES state of broker ${broker.id}, task ${broker.task.id}")
 
-        if (broker.task.reconcileExceedsLimit()) {
-          logger.info(s"Reconciling exceeded ${Broker.RECONCILE_MAX_TRIES} tries for broker ${broker.id}, sending killTask for task ${broker.task.id}")
-
-          driver.killTask(TaskID.newBuilder().setValue(broker.task.id).build())
-          broker.task = null
-        } else {
-          logger.info(s"Reconciling ${broker.task.reconciles}/${Broker.RECONCILE_MAX_TRIES} state of broker ${broker.id}, task ${broker.task.id}")
-
-          statuses.add(TaskStatus.newBuilder()
-            .setTaskId(TaskID.newBuilder().setValue(broker.task.id))
-            .setState(TaskState.TASK_STAGING)
-            .build()
-          )
-        }
+        statuses.add(TaskStatus.newBuilder()
+          .setTaskId(TaskID.newBuilder().setValue(broker.task.id))
+          .setState(TaskState.TASK_STAGING)
+          .build()
+        )
       }
-    }
 
     if (force || !statuses.isEmpty)
       driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
