@@ -22,7 +22,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
-import java.util.Date
+import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import Util.Str
 
@@ -92,13 +92,13 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cluster.save()
 
     this.driver = driver
-    reconcileTasks()
+    reconcileTasksIfRequired(force = true)
   }
 
   def reregistered(driver: SchedulerDriver, master: MasterInfo): Unit = {
     logger.info("[reregistered] master:" + Str.master(master))
     this.driver = driver
-    reconcileTasks()
+    reconcileTasksIfRequired(force = true)
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
@@ -138,6 +138,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
     def startBroker(offer: Offer): Boolean = {
+      if (isReconciling) return false
+
       for (broker <- cluster.getBrokers) {
         if (broker.shouldStart(offer, otherTasksAttributes)) {
           launchTask(broker, offer)
@@ -161,6 +163,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
 
+    reconcileTasksIfRequired()
     cluster.save()
   }
 
@@ -181,7 +184,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
+    if (broker == null || broker.task == null || broker.task.id != status.getTaskId.getValue) {
+      logger.info(s"Got ${status.getState} for unknown/stopped broker, killing task ${status.getTaskId}")
+      driver.killTask(status.getTaskId)
+      return
+    }
+
     broker.task.state = Broker.State.RUNNING
+    broker.task.resetReconciles()
     broker.failover.resetFailures()
   }
 
@@ -207,6 +217,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       logger.info(msg)
     }
   }
+
+  private def isReconciling: Boolean = cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
 
   private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
     val task_ = newTask(broker, offer)
@@ -234,22 +246,33 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private[kafka] def reconcileTasks(): Unit = {
+  private[kafka] def reconcileTasksIfRequired(force: Boolean = false, now: Date = new Date()): Unit = {
     val statuses = new util.ArrayList[TaskStatus]
 
-    for (broker <- cluster.getBrokers)
-      if (broker.task != null) {
-        logger.info(s"Reconciling state of broker ${broker.id}, task ${broker.task.id}")
+    for (broker <- cluster.getBrokers.filter(_.task != null)) {
+      if (force || broker.task.shouldReconcile(now)) {
         broker.task.state = Broker.State.RECONCILING
+        broker.task.registerReconcile(now)
 
-        statuses.add(TaskStatus.newBuilder()
-          .setTaskId(TaskID.newBuilder().setValue(broker.task.id))
-          .setState(TaskState.TASK_STAGING)
-          .build()
-        )
+        if (broker.task.reconcileExceedsLimit()) {
+          logger.info(s"Reconciling exceeded ${Broker.RECONCILE_MAX_TRIES} tries for broker ${broker.id}, sending killTask for task ${broker.task.id}")
+
+          driver.killTask(TaskID.newBuilder().setValue(broker.task.id).build())
+          broker.task = null
+        } else {
+          logger.info(s"Reconciling ${broker.task.reconciles}/${Broker.RECONCILE_MAX_TRIES} state of broker ${broker.id}, task ${broker.task.id}")
+
+          statuses.add(TaskStatus.newBuilder()
+            .setTaskId(TaskID.newBuilder().setValue(broker.task.id))
+            .setState(TaskState.TASK_STAGING)
+            .build()
+          )
+        }
       }
+    }
 
-    driver.reconcileTasks(statuses)
+    if (force || !statuses.isEmpty)
+      driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
   }
 
   private[kafka] def otherTasksAttributes(name: String): Array[String] = {

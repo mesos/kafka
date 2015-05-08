@@ -84,7 +84,7 @@ class Broker(_id: String = "0") {
   }
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
-  
+
   def state(now: Date = new Date()): String = {
     if (task != null && !task.starting) return task.state
 
@@ -163,6 +163,9 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
+  val RECONCILE_DELAY: Period = new Period("60s")
+  val RECONCILE_MAX_TRIES: Int = 3
+
   def nextTaskId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
   def nextExecutorId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
 
@@ -213,19 +216,13 @@ object Broker {
       failureTime = null
     }
 
-    def dateFormat: SimpleDateFormat = {
-      val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-      format.setTimeZone(TimeZone.getTimeZone("UTC-0"))
-      format
-    }
-
     def fromJson(node: Map[String, Object]): Unit = {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
 
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
-      if (node.contains("failureTime")) failureTime = dateFormat.parse(node("failureTime").asInstanceOf[String])
+      if (node.contains("failureTime")) failureTime = dateTimeFormat.parse(node("failureTime").asInstanceOf[String])
     }
 
     def toJson: JSONObject = {
@@ -236,7 +233,7 @@ object Broker {
       if (maxTries != null) obj("maxTries") = maxTries
 
       if (failures != 0) obj("failures") = failures
-      if (failureTime != null) obj("failureTime") = dateFormat.format(failureTime)
+      if (failureTime != null) obj("failureTime") = dateTimeFormat.format(failureTime)
 
       new JSONObject(obj.toMap)
     }
@@ -260,12 +257,33 @@ object Broker {
     var attributes: util.Map[String, String] = _attributes
 
     @volatile var state: String = _state
+
+    @volatile var reconciles: Int = 0
+    @volatile var reconcileTime: Date = null
+
     def starting: Boolean = state == State.STARTING
     def running: Boolean = state == State.RUNNING
     def stopping: Boolean = state == State.STOPPING
     def reconciling: Boolean = state == State.RECONCILING
 
     def endpoint: String = hostname + ":" + port
+
+    def shouldReconcile(now: Date = new Date()): Boolean = {
+      if (state != Broker.State.RECONCILING) return false
+      reconcileTime == null || (now.getTime - reconcileTime.getTime) >= Broker.RECONCILE_DELAY.ms
+    }
+
+    def registerReconcile(now: Date = new Date()): Unit = {
+      reconciles += 1
+      reconcileTime = now
+    }
+
+    def resetReconciles(): Unit = {
+      reconciles = 0
+      reconcileTime = null
+    }
+
+    def reconcileExceedsLimit(): Boolean = reconciles > Broker.RECONCILE_MAX_TRIES
 
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]
@@ -277,6 +295,9 @@ object Broker {
       attributes = node("attributes").asInstanceOf[Map[String, String]]
 
       state = node("state").asInstanceOf[String]
+
+      if (node.contains("reconciles")) reconciles = node("reconciles").asInstanceOf[Number].intValue()
+      if (node.contains("reconcileTime")) reconcileTime = dateTimeFormat.parse(node("reconcileTime").asInstanceOf[String])
     }
 
     def toJson: JSONObject = {
@@ -292,6 +313,9 @@ object Broker {
 
       obj("state") = state
 
+      obj("reconciles") = reconciles
+      if (reconcileTime != null) obj("reconcileTime") = dateTimeFormat.format(reconcileTime)
+
       new JSONObject(obj.toMap)
     }
   }
@@ -306,4 +330,10 @@ object Broker {
 
   type OtherAttributes = (String) => Array[String]
   def NoAttributes: OtherAttributes = _ => Array()
+
+  private def dateTimeFormat: SimpleDateFormat = {
+    val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+    format.setTimeZone(TimeZone.getTimeZone("UTC-0"))
+    format
+  }
 }

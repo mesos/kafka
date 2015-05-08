@@ -129,7 +129,7 @@ class SchedulerTest extends MesosTestCase {
     broker.task = new Broker.Task("task")
     assertEquals(Broker.State.STARTING, broker.task.state)
 
-    Scheduler.onBrokerStarted(broker, taskStatus(state = TaskState.TASK_RUNNING))
+    Scheduler.onBrokerStarted(broker, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING))
     assertEquals(Broker.State.RUNNING, broker.task.state)
   }
 
@@ -181,19 +181,33 @@ class SchedulerTest extends MesosTestCase {
   }
 
   @Test
-  def reconcileTasks {
+  def reconcileTasksIfRequired {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
 
-    val broker1 = Scheduler.cluster.addBroker(new Broker("0"))
+    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
     broker1.task = new Broker.Task(_id = "1", _state = Broker.State.RUNNING)
 
-    val broker2 = Scheduler.cluster.addBroker(new Broker("0"))
+    val broker2 = Scheduler.cluster.addBroker(new Broker("2"))
     broker2.task = new Broker.Task(_id = "2", _state = Broker.State.STARTING)
 
-    Scheduler.reconcileTasks()
+    Scheduler.reconcileTasksIfRequired(force = true, now = new Date(0))
     assertNull(broker0.task)
     assertEquals(Broker.State.RECONCILING, broker1.task.state)
+    assertEquals(1, broker1.task.reconciles)
     assertEquals(Broker.State.RECONCILING, broker2.task.state)
+    assertEquals(1, broker2.task.reconciles)
+
+    for (i <- 2 until Broker.RECONCILE_MAX_TRIES + 1) {
+      Scheduler.reconcileTasksIfRequired(now = new Date(Broker.RECONCILE_DELAY.ms * i))
+      assertEquals(i, broker1.task.reconciles)
+      assertEquals(Broker.State.RECONCILING, broker1.task.state)
+    }
+    assertEquals(0, schedulerDriver.killedTasks.size())
+
+    // last reconcile should stop broker
+    Scheduler.reconcileTasksIfRequired(now = new Date(Broker.RECONCILE_DELAY.ms * (Broker.RECONCILE_MAX_TRIES + 1)))
+    assertNull(broker1.task)
+    assertEquals(2, schedulerDriver.killedTasks.size())
   }
 
   @Test
