@@ -28,12 +28,6 @@ File.open('.vagrant/hosts', 'w') do |file|
   NODES.each do |name, ip| file.write("#{ip}\t#{name}\n") end
 end
 
-# copy ssh key
-SSH_KEY=File.expand_path("~/.ssh/id_rsa.pub")
-if (File.exists?(SSH_KEY))
-  FileUtils.cp(SSH_KEY, '.vagrant/ssh_key.pub')
-end
-
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/trusty64"
   config.vm.synced_folder "../../", "/vagrant"
