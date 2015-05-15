@@ -4,10 +4,10 @@ Kafka Mesos Framework
 This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 
 [Installation](#installation)    
-[Environment Configuration](#environment_configuration)    
-[Scheduler Configuration](#scheduler_configuration)    
-[Run the scheduler Standalone](#run-the-scheduler)    
-[Starting and using 1 broker](#starting-and-using-1-broker)    
+* [Environment Configuration](#environment-configuration)
+* [Scheduler Configuration](#scheduler-configuration)
+* [Run the scheduler](#run-the-scheduler)
+* [Starting and using 1 broker](#starting-and-using-1-broker)
 
 [Typical Operations](#typical-operations)
 * [Run the scheduler with Docker](https://github.com/mesos/kafka/tree/master/src/docker#intro)   
@@ -45,15 +45,20 @@ Clone and build the project
 Environment Configuration
 --------------------------
 
-Edit `kafka-mesos.properties` and make the right settings for your environment.
 Before running `./kafka-mesos.sh`, set the location of libmesos:
 
     # export MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so
 
+If the host running scheduler has several IP addresses you may also need to
+
+    # export LIBPROCESS_IP=<IP_ACCESSIBLE_FROM_MASTER>
+
 Scheduler Configuration
 ----------------------
-The scheduler can be configured either through property file or through the command line.
 
+The scheduler is configured through the command line or `kafka-mesos.properties` file.
+
+Following options are available:
 ```
 # ./kafka-mesos.sh help scheduler
 Start scheduler 
@@ -66,32 +71,49 @@ Option               Description
 --framework-name     Framework name. Default - kafka       
 --framework-role     Framework role. Default - *           
 --framework-timeout  Framework timeout (30s, 1m, 1h).      
-                       Default - 1d                        
---master             Master connection settings. Examples: 
-                      - master:5050                        
-                      - master:5050,master2:5050           
-                      - zk://master:2181/mesos             
-                      - zk://username:password@master:2181 
+                       Default - 30d
+--master             Master connection settings. Examples:
+                      - master:5050
+                      - master:5050,master2:5050
+                      - zk://master:2181/mesos
+                      - zk://username:password@master:2181
                       - zk://master:2181,master2:2181/mesos
---storage            Storage for cluster state. Examples:  
-                      - file:kafka-mesos.json              
-                      - zk:/kafka-mesos                    
-                     Default - file:kafka-mesos.json       
---user               Mesos user to run tasks. Default -    
-                       current system user                 
---zk                 Kafka zookeeper.connect. Examples:    
-                      - master:2181                        
+--principal          Principal (username) used to register
+                       framework. Default - none
+--secret             Secret (password) used to register
+                       framework. Default - none
+--storage            Storage for cluster state. Examples:
+                      - file:kafka-mesos.json
+                      - zk:/kafka-mesos
+                     Default - file:kafka-mesos.json
+--user               Mesos user to run tasks. Default -
+                       current system user
+--zk                 Kafka zookeeper.connect. Examples:
+                      - master:2181
                       - master:2181,master2:2181
 ```
+
+Additionally you can create `kafka-mesos.properties` containing values for CLI options of scheduler.
+
+Example of `kafka-mesos.properties`:
+```
+storage=file:kafka-mesos.json
+master=zk://master:2181/mesos
+zk=master:2181
+api=http://master:7000
+```
+
+Now if running scheduler via `./kafka-mesos.sh scheduler` (no options specified) the scheduler will read values for options
+from the above file. You could also specify alternative config file by using `config` argument of the scheduler.
 
 Run the scheduler
 -----------------
 
 Start the Kafka scheduler using this command:
 
-    # MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so ./kafka-mesos.sh scheduler
+    # ./kafka-mesos.sh scheduler
 
-You can use Marathon to launch the scheduler process so it gets restarted if it crashes.
+Note: you can also use Marathon to launch the scheduler process so it gets restarted if it crashes.
 
 Starting and using 1 broker
 ---------------------------
@@ -106,7 +128,7 @@ broker:
   id: 0
   active: false
   state: stopped
-  resources: cpus:1.00, mem:128, heap:128
+  resources: cpus:0.50, mem:128, heap:128
   failover: delay:10s, max-delay:60s
 ```
 
@@ -121,10 +143,10 @@ cluster:
     id: 0
     active: false
     state: stopped
-    resources: cpus:1.00, mem:128, heap:128
+    resources: cpus:0.50, mem:128, heap:128
     failover: delay:10s, max-delay:60s
 ```
-Now lets startup the broker.
+Now lets start the broker.
 
 ```
 # ./kafka-mesos.sh start 0
@@ -164,7 +186,7 @@ And lets read it back.
 test
 ```
 
-This is an alpha version.
+This is an beta version.
 
 Typical Operations
 ===================

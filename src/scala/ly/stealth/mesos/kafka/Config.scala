@@ -29,11 +29,13 @@ object Config {
   var storage: String = "file:kafka-mesos.json"
 
   var master: String = null
+  var principal: String = null
+  var secret: String = null
   var user: String = null
 
   var frameworkName: String = "kafka"
   var frameworkRole: String = "*"
-  var frameworkTimeout: Period = new Period("1d")
+  var frameworkTimeout: Period = new Period("30d")
 
   var api: String = null
   var zk: String = null
@@ -55,6 +57,8 @@ object Config {
 
     if (props.containsKey("master")) master = props.getProperty("master")
     if (props.containsKey("user")) user = props.getProperty("user")
+    if (props.containsKey("principal")) principal = props.getProperty("principal")
+    if (props.containsKey("secret")) secret = props.getProperty("secret")
 
     if (props.containsKey("framework-name")) frameworkName = props.getProperty("framework-name")
     if (props.containsKey("framework-role")) frameworkRole = props.getProperty("framework-role")
@@ -67,7 +71,8 @@ object Config {
   override def toString: String = {
     s"""
       |debug: $debug, storage: $storage
-      |mesos: connect=$master, user=${if (user == null) "<default>" else user}, framework-name=$frameworkName, framework-role=$frameworkRole, framework-timeout=$frameworkTimeout
+      |mesos: master=$master, user=${if (user == null) "<default>" else user}, principal=${if (principal != null) principal else "<none>"}, secret=${if (secret != null) "*****" else "<none>"}
+      |framework: name=$frameworkName, role=$frameworkRole, timeout=$frameworkTimeout
       |api: $api, zk: $zk
     """.stripMargin.trim
   }

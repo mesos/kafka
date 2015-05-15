@@ -123,6 +123,13 @@ object Cli {
     parser.accepts("user", "Mesos user to run tasks. Default - none")
       .withRequiredArg().ofType(classOf[String])
 
+    parser.accepts("principal", "Principal (username) used to register framework. Default - none")
+      .withRequiredArg().ofType(classOf[String])
+
+    parser.accepts("secret", "Secret (password) used to register framework. Default - none")
+      .withRequiredArg().ofType(classOf[String])
+
+
     parser.accepts("framework-name", "Framework name. Default - " + Config.frameworkName)
       .withRequiredArg().ofType(classOf[String])
 
@@ -184,6 +191,13 @@ object Cli {
 
     val user = options.valueOf("user").asInstanceOf[String]
     if (user != null) Config.user = user
+
+    val principal = options.valueOf("principal").asInstanceOf[String]
+    if (principal != null) Config.principal = principal
+
+    val secret = options.valueOf("secret").asInstanceOf[String]
+    if (secret != null) Config.secret = secret
+
 
     val frameworkName = options.valueOf("framework-name").asInstanceOf[String]
     if (frameworkName != null) Config.frameworkName = frameworkName
