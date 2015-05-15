@@ -84,7 +84,7 @@ class Broker(_id: String = "0") {
   }
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
-  
+
   def state(now: Date = new Date()): String = {
     if (task != null && !task.starting) return task.state
 
@@ -172,7 +172,7 @@ object Broker {
     parts(1)
   }
 
-  def isOptionOverridable(name: String): Boolean = !List("broker.id", "port").contains(name)
+  def isOptionOverridable(name: String): Boolean = !List("broker.id", "port", "zookeeper.connect").contains(name)
 
   class Failover(_delay: Period = new Period("10s"), _maxDelay: Period = new Period("60s")) {
     var delay: Period = _delay
@@ -213,19 +213,13 @@ object Broker {
       failureTime = null
     }
 
-    def dateFormat: SimpleDateFormat = {
-      val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-      format.setTimeZone(TimeZone.getTimeZone("UTC-0"))
-      format
-    }
-
     def fromJson(node: Map[String, Object]): Unit = {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
 
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
-      if (node.contains("failureTime")) failureTime = dateFormat.parse(node("failureTime").asInstanceOf[String])
+      if (node.contains("failureTime")) failureTime = dateTimeFormat.parse(node("failureTime").asInstanceOf[String])
     }
 
     def toJson: JSONObject = {
@@ -236,7 +230,7 @@ object Broker {
       if (maxTries != null) obj("maxTries") = maxTries
 
       if (failures != 0) obj("failures") = failures
-      if (failureTime != null) obj("failureTime") = dateFormat.format(failureTime)
+      if (failureTime != null) obj("failureTime") = dateTimeFormat.format(failureTime)
 
       new JSONObject(obj.toMap)
     }
@@ -260,6 +254,7 @@ object Broker {
     var attributes: util.Map[String, String] = _attributes
 
     @volatile var state: String = _state
+
     def starting: Boolean = state == State.STARTING
     def running: Boolean = state == State.RUNNING
     def stopping: Boolean = state == State.STOPPING
@@ -306,4 +301,10 @@ object Broker {
 
   type OtherAttributes = (String) => Array[String]
   def NoAttributes: OtherAttributes = _ => Array()
+
+  private def dateTimeFormat: SimpleDateFormat = {
+    val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+    format.setTimeZone(TimeZone.getTimeZone("UTC-0"))
+    format
+  }
 }

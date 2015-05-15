@@ -329,7 +329,6 @@ class BrokerTest extends MesosTestCase {
 
     BrokerTest.assertTaskEquals(task, read)
   }
-
 }
 
 object BrokerTest {

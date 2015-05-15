@@ -53,6 +53,8 @@ class MesosTestCase {
 
     Scheduler.cluster.clear()
     Scheduler.cluster.rebalancer = new TestRebalancer()
+    Scheduler.reconciles = 0
+    Scheduler.reconcileTime = null
 
     schedulerDriver = _schedulerDriver
     Scheduler.registered(schedulerDriver, frameworkId(), master())
