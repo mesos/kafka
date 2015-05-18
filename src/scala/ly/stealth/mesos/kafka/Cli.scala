@@ -149,6 +149,9 @@ object Cli {
         | - master:2181,master2:2181""".stripMargin)
       .withRequiredArg().ofType(classOf[String])
 
+    parser.accepts("jre", "JRE zip-file (jre-7-openjdk.zip). Default - none.")
+      .withRequiredArg().ofType(classOf[String])
+
 
     val configArg = parser.nonOptions()
 
@@ -211,13 +214,17 @@ object Cli {
       catch { case e: IllegalArgumentException => throw new Error("Invalid framework-timeout") }
 
 
+    val api = options.valueOf("api").asInstanceOf[String]
+    if (api != null) Config.api = api
+    else if (Config.api == null) throw new Error(s"Undefined api. $provideOption")
+
     val zk = options.valueOf("zk").asInstanceOf[String]
     if (zk != null) Config.zk = zk
     else if (Config.zk == null) throw new Error(s"Undefined zk. $provideOption")
 
-    val api = options.valueOf("api").asInstanceOf[String]
-    if (api != null) Config.api = api
-    else if (Config.api == null) throw new Error(s"Undefined api. $provideOption")
+    val jre = options.valueOf("jre").asInstanceOf[String]
+    if (jre != null) Config.jre = new File(jre)
+    if (Config.jre != null && !Config.jre.exists()) throw new Error("JRE file doesn't exists")
 
     Scheduler.start()
   }
