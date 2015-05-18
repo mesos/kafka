@@ -97,6 +97,7 @@ object HttpServer {
       val uri = request.getRequestURI
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
+      else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
       else response.sendError(404)
     }
