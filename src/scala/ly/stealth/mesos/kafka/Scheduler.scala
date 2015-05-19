@@ -40,15 +40,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cmd += " ly.stealth.mesos.kafka.Executor"
 
     val commandBuilder = CommandInfo.newBuilder
-      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
-      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
-
     if (Config.jre != null) {
       commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jre/" + Config.jre.getName))
       cmd = "jre/bin/" + cmd
     }
 
-    commandBuilder.setValue(cmd)
+    commandBuilder
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
+      .setValue(cmd)
 
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
