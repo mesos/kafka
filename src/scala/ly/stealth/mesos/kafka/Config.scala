@@ -73,7 +73,7 @@ object Config {
   override def toString: String = {
     s"""
       |debug: $debug, storage: $storage
-      |mesos: master=$master, user=${if (user == null) "<default>" else user}, principal=${if (principal != null) principal else "<none>"}, secret=${if (secret != null) "*****" else "<none>"}
+      |mesos: master=$master, user=${if (user == null || user.isEmpty) "<default>" else user}, principal=${if (principal != null) principal else "<none>"}, secret=${if (secret != null) "*****" else "<none>"}
       |framework: name=$frameworkName, role=$frameworkRole, timeout=$frameworkTimeout
       |api: $api, zk: $zk, jre: ${if (jre == null) "<none>" else jre}
     """.stripMargin.trim
