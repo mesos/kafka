@@ -37,6 +37,7 @@ object Config {
   var frameworkRole: String = "*"
   var frameworkTimeout: Period = new Period("30d")
 
+  var jre: File = null
   var api: String = null
   var zk: String = null
 
@@ -64,6 +65,7 @@ object Config {
     if (props.containsKey("framework-role")) frameworkRole = props.getProperty("framework-role")
     if (props.containsKey("framework-timeout")) frameworkTimeout = new Period(props.getProperty("framework-timeout"))
 
+    if (props.containsKey("jre")) jre = new File(props.getProperty("jre"))
     if (props.containsKey("api")) api = props.getProperty("api")
     if (props.containsKey("zk")) zk = props.getProperty("zk")
   }
@@ -73,7 +75,7 @@ object Config {
       |debug: $debug, storage: $storage
       |mesos: master=$master, user=${if (user == null) "<default>" else user}, principal=${if (principal != null) principal else "<none>"}, secret=${if (secret != null) "*****" else "<none>"}
       |framework: name=$frameworkName, role=$frameworkRole, timeout=$frameworkTimeout
-      |api: $api, zk: $zk
+      |api: $api, zk: $zk, jre: ${if (jre == null) "<none>" else jre}
     """.stripMargin.trim
   }
 }

@@ -39,14 +39,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (Config.debug) cmd += " -Ddebug"
     cmd += " ly.stealth.mesos.kafka.Executor"
 
+    val commandBuilder = CommandInfo.newBuilder
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
+
+    if (Config.jre != null) {
+      commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jre/" + Config.jre.getName))
+      cmd = "jre/bin/" + cmd
+    }
+
+    commandBuilder.setValue(cmd)
+
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
-      .setCommand(
-        CommandInfo.newBuilder
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
-          .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
-          .setValue(cmd)
-      )
+      .setCommand(commandBuilder)
       .setName("broker-" + broker.id)
       .build()
   }
