@@ -122,7 +122,7 @@ class SchedulerTest extends MesosTestCase {
     assertNull(Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
-    assertEquals("no brokers to start", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
+    assertEquals("", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
   }
 
   @Test

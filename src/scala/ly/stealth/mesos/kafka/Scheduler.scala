@@ -143,17 +143,17 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
-    val declineOffers = new util.ArrayList[String]()
+    val declineReasons = new util.ArrayList[String]()
     for (offer <- offers) {
       val declineReason = acceptOffer(offer)
 
       if (declineReason != null) {
         driver.declineOffer(offer.getId)
-        declineOffers.add(offer.getHostname + Str.id(offer.getId.getValue) + " - " + declineReason)
+        if (!declineReason.isEmpty) declineReasons.add(offer.getHostname + Str.id(offer.getId.getValue) + " - " + declineReason)
       }
     }
     
-    if (!declineOffers.isEmpty) logger.info("Declined offers:\n" + declineOffers.mkString("\n"))
+    if (!declineReasons.isEmpty) logger.info("Declined offers:\n" + declineReasons.mkString("\n"))
 
     for (broker <- cluster.getBrokers) {
       if (broker.shouldStop) {
@@ -183,7 +183,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
 
-    if (reason.isEmpty) "no brokers to start" else "" + reason
+    if (reason.isEmpty) "" else "" + reason
   }
 
   private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {
