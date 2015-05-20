@@ -143,23 +143,17 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
-    def startBroker(offer: Offer): Boolean = {
-      if (isReconciling) return false
-
-      for (broker <- cluster.getBrokers) {
-        if (broker.shouldStart(offer, otherTasksAttributes)) {
-          launchTask(broker, offer)
-          return true
-        }
-      }
-
-      false
-    }
-
+    val declineOffers = new util.ArrayList[String]()
     for (offer <- offers) {
-      val started = startBroker(offer)
-      if (!started) driver.declineOffer(offer.getId)
+      val declineReason = acceptOffer(offer)
+
+      if (declineReason != null) {
+        driver.declineOffer(offer.getId)
+        declineOffers.add(offer.getHostname + Str.id(offer.getId.getValue) + " - " + declineReason)
+      }
     }
+    
+    if (!declineOffers.isEmpty) logger.info("Declined offers:\n" + declineOffers.mkString("\n"))
 
     for (broker <- cluster.getBrokers) {
       if (broker.shouldStop) {
@@ -171,6 +165,25 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     reconcileTasksIfRequired()
     cluster.save()
+  }
+
+  private[kafka] def acceptOffer(offer: Offer): String = {
+    if (isReconciling) return "scheduler is reconciling"
+
+    var reason = ""
+    for (broker <- cluster.getBrokers.filter(_.shouldStart())) {
+      val diff = broker.matches(offer, otherTasksAttributes)
+
+      if (diff == null) {
+        launchTask(broker, offer)
+        return null
+      } else {
+        if (!reason.isEmpty) reason += ", "
+        reason += s"broker ${broker.id}: $diff"
+      }
+    }
+
+    if (reason.isEmpty) "no brokers to start" else "" + reason
   }
 
   private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {

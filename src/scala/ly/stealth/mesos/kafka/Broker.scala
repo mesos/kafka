@@ -53,16 +53,16 @@ class Broker(_id: String = "0") {
 
   @volatile var task: Broker.Task = null
 
-  def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): Boolean = {
+  def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {
     // check resources
     val offerResources = new util.HashMap[String, Resource]()
     for (resource <- offer.getResourcesList) offerResources.put(resource.getName, resource)
 
     val cpusResource = offerResources.get("cpus")
-    if (cpusResource == null || cpusResource.getScalar.getValue < cpus) return false
+    if (cpusResource == null || cpusResource.getScalar.getValue < cpus) return s"cpus < $cpus"
 
     val memResource = offerResources.get("mem")
-    if (memResource == null || memResource.getScalar.getValue < mem) return false
+    if (memResource == null || memResource.getScalar.getValue < mem) return s"mem < $mem"
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -72,16 +72,14 @@ class Broker(_id: String = "0") {
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
     for ((name, constraint) <- constraints) {
-      if (!offerAttributes.containsKey(name)) return false
-      if (!constraint.matches(offerAttributes.get(name), otherAttributes(name))) return false
+      if (!offerAttributes.containsKey(name) || !constraint.matches(offerAttributes.get(name), otherAttributes(name)))
+        return s"$name doesn't match"
     }
 
-    true
+    null
   }
 
-  def shouldStart(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes, now: Date = new Date()): Boolean = {
-    active && task == null && matches(offer, otherAttributes) && !failover.isWaitingDelay(now)
-  }
+  def shouldStart(now: Date = new Date()): Boolean = active && task == null && !failover.isWaitingDelay(now)
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
 
