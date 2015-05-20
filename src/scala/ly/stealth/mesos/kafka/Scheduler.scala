@@ -168,7 +168,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def acceptOffer(offer: Offer): String = {
-    if (isReconciling) return "scheduler is reconciling"
+    if (isReconciling) return "reconciling"
 
     var reason = ""
     for (broker <- cluster.getBrokers.filter(_.shouldStart())) {
@@ -183,7 +183,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
 
-    if (reason.isEmpty) "" else "" + reason
+    reason
   }
 
   private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {

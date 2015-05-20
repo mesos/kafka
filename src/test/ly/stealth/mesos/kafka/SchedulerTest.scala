@@ -113,7 +113,7 @@ class SchedulerTest extends MesosTestCase {
     broker.active = true
 
     broker.task = new Broker.Task(_state = Broker.State.RECONCILING)
-    assertEquals("scheduler is reconciling", Scheduler.acceptOffer(null))
+    assertEquals("reconciling", Scheduler.acceptOffer(null))
 
     broker.task = null
     assertEquals(s"broker ${broker.id}: cpus 0.4 < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = 0.4, mem = broker.mem, ports = Pair(100, 100))))
