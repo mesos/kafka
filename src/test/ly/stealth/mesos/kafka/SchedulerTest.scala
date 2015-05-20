@@ -116,8 +116,8 @@ class SchedulerTest extends MesosTestCase {
     assertEquals("scheduler is reconciling", Scheduler.acceptOffer(null))
 
     broker.task = null
-    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = broker.cpus - 0.1, mem = broker.mem, ports = Pair(100, 100))))
-    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem - 1, ports = Pair(100, 100))))
+    assertEquals(s"broker ${broker.id}: cpus 0.4 < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = 0.4, mem = broker.mem, ports = Pair(100, 100))))
+    assertEquals(s"broker ${broker.id}: mem 99 < ${broker.mem}", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = 99, ports = Pair(100, 100))))
 
     assertNull(Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
     assertEquals(1, schedulerDriver.launchedTasks.size())

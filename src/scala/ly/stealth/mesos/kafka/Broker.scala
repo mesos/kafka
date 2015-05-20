@@ -59,10 +59,12 @@ class Broker(_id: String = "0") {
     for (resource <- offer.getResourcesList) offerResources.put(resource.getName, resource)
 
     val cpusResource = offerResources.get("cpus")
-    if (cpusResource == null || cpusResource.getScalar.getValue < cpus) return s"cpus < $cpus"
+    if (cpusResource == null) return "no cpus"
+    if (cpusResource.getScalar.getValue < cpus) return s"cpus ${cpusResource.getScalar.getValue} < $cpus"
 
     val memResource = offerResources.get("mem")
-    if (memResource == null || memResource.getScalar.getValue < mem) return s"mem < $mem"
+    if (memResource == null) return "no mem"
+    if (memResource.getScalar.getValue < mem) return s"mem ${memResource.getScalar.getValue.toLong} < $mem"
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -72,8 +74,8 @@ class Broker(_id: String = "0") {
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
     for ((name, constraint) <- constraints) {
-      if (!offerAttributes.containsKey(name) || !constraint.matches(offerAttributes.get(name), otherAttributes(name)))
-        return s"$name doesn't match"
+      if (!offerAttributes.containsKey(name)) return s"no $name"
+      if (!constraint.matches(offerAttributes.get(name), otherAttributes(name))) return s"$name doesn't match $constraint"
     }
 
     null

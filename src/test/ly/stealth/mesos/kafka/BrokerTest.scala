@@ -52,13 +52,13 @@ class BrokerTest extends MesosTestCase {
     // cpus
     broker.cpus = 0.5
     assertNull(broker.matches(offer(cpus = 0.5)))
-    assertEquals("cpus < 0.5", broker.matches(offer(cpus = 0.49)))
+    assertEquals("cpus 0.49 < 0.5", broker.matches(offer(cpus = 0.49)))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
     assertNull(broker.matches(offer(mem = 100)))
-    assertEquals("mem < 100", broker.matches(offer(mem = 99)))
+    assertEquals("mem 99 < 100", broker.matches(offer(mem = 99)))
     broker.mem = 0
   }
 
@@ -70,25 +70,25 @@ class BrokerTest extends MesosTestCase {
     // token
     broker.constraints = parseMap("hostname=like:master").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(hostname = "master")))
-    assertEquals("hostname doesn't match", broker.matches(offer(hostname = "slave")))
+    assertEquals("hostname doesn't match like:master", broker.matches(offer(hostname = "slave")))
 
     // like
     broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(hostname = "master")))
     assertNull(broker.matches(offer(hostname = "master-2")))
-    assertEquals("hostname doesn't match", broker.matches(offer(hostname = "slave")))
+    assertEquals("hostname doesn't match like:master.*", broker.matches(offer(hostname = "slave")))
 
     // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(hostname = "master")))
-    assertEquals("hostname doesn't match", broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertEquals("hostname doesn't match unique", broker.matches(offer(hostname = "master"), _ => Array("master")))
     assertNull(broker.matches(offer(hostname = "master"), _ => Array("slave")))
 
     // groupBy
     broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(hostname = "master")))
     assertNull(broker.matches(offer(hostname = "master"), _ => Array("master")))
-    assertEquals("hostname doesn't match", broker.matches(offer(hostname = "master"), _ => Array("slave")))
+    assertEquals("hostname doesn't match groupBy", broker.matches(offer(hostname = "master"), _ => Array("slave")))
   }
 
   @Test
@@ -97,13 +97,13 @@ class BrokerTest extends MesosTestCase {
     broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(attributes = "rack=1-1")))
     assertNull(broker.matches(offer(attributes = "rack=1-2")))
-    assertEquals("rack doesn't match", broker.matches(offer(attributes = "rack=2-1")))
+    assertEquals("rack doesn't match like:1-.*", broker.matches(offer(attributes = "rack=2-1")))
 
     // groupBy
     broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(attributes = "rack=1")))
     assertNull(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
-    assertEquals("rack doesn't match", broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
+    assertEquals("rack doesn't match groupBy", broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
   }
 
   @Test
