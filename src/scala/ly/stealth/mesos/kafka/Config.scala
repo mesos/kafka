@@ -38,6 +38,7 @@ object Config {
   var frameworkTimeout: Period = new Period("30d")
 
   var jre: File = null
+  var log: File = null
   var api: String = null
   var zk: String = null
 
@@ -66,6 +67,7 @@ object Config {
     if (props.containsKey("framework-timeout")) frameworkTimeout = new Period(props.getProperty("framework-timeout"))
 
     if (props.containsKey("jre")) jre = new File(props.getProperty("jre"))
+    if (props.containsKey("log")) log = new File(props.getProperty("log"))
     if (props.containsKey("api")) api = props.getProperty("api")
     if (props.containsKey("zk")) zk = props.getProperty("zk")
   }

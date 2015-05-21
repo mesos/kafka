@@ -391,7 +391,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
     val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
-    root.addAppender(new ConsoleAppender(layout))
+
+    var appender: Appender = null
+    if (Config.log == null) appender = new ConsoleAppender(layout)
+    else appender = new DailyRollingFileAppender(layout, Config.log.getPath, "'.'yyyy-MM-dd")
+    
+    root.addAppender(appender)
   }
 
   class JettyLog4jLogger extends org.eclipse.jetty.util.log.Logger {
