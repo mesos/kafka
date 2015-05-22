@@ -51,82 +51,74 @@ class BrokerTest extends MesosTestCase {
   def matches {
     // cpus
     broker.cpus = 0.5
-    assertTrue(broker.matches(offer(cpus = 0.5)))
-    assertFalse(broker.matches(offer(cpus = 0.49)))
+    assertNull(broker.matches(offer(cpus = 0.5)))
+    assertEquals("cpus 0.49 < 0.5", broker.matches(offer(cpus = 0.49)))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
-    assertTrue(broker.matches(offer(mem = 100)))
-    assertFalse(broker.matches(offer(mem = 99)))
+    assertNull(broker.matches(offer(mem = 100)))
+    assertEquals("mem 99 < 100", broker.matches(offer(mem = 99)))
     broker.mem = 0
   }
 
   @Test
   def matches_hostname {
-    assertTrue(broker.matches(offer(hostname = "master")))
-    assertTrue(broker.matches(offer(hostname = "slave")))
+    assertNull(broker.matches(offer(hostname = "master")))
+    assertNull(broker.matches(offer(hostname = "slave")))
 
     // token
     broker.constraints = parseMap("hostname=like:master").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(hostname = "master")))
-    assertFalse(broker.matches(offer(hostname = "slave")))
+    assertNull(broker.matches(offer(hostname = "master")))
+    assertEquals("hostname doesn't match like:master", broker.matches(offer(hostname = "slave")))
 
     // like
     broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(hostname = "master")))
-    assertTrue(broker.matches(offer(hostname = "master-2")))
-    assertFalse(broker.matches(offer(hostname = "slave")))
+    assertNull(broker.matches(offer(hostname = "master")))
+    assertNull(broker.matches(offer(hostname = "master-2")))
+    assertEquals("hostname doesn't match like:master.*", broker.matches(offer(hostname = "slave")))
 
     // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(hostname = "master")))
-    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("master")))
-    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("slave")))
+    assertNull(broker.matches(offer(hostname = "master")))
+    assertEquals("hostname doesn't match unique", broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertNull(broker.matches(offer(hostname = "master"), _ => Array("slave")))
 
     // groupBy
     broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(hostname = "master")))
-    assertTrue(broker.matches(offer(hostname = "master"), _ => Array("master")))
-    assertFalse(broker.matches(offer(hostname = "master"), _ => Array("slave")))
+    assertNull(broker.matches(offer(hostname = "master")))
+    assertNull(broker.matches(offer(hostname = "master"), _ => Array("master")))
+    assertEquals("hostname doesn't match groupBy", broker.matches(offer(hostname = "master"), _ => Array("slave")))
   }
 
   @Test
   def matches_attributes {
     // like
     broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(attributes = "rack=1-1")))
-    assertTrue(broker.matches(offer(attributes = "rack=1-2")))
-    assertFalse(broker.matches(offer(attributes = "rack=2-1")))
+    assertNull(broker.matches(offer(attributes = "rack=1-1")))
+    assertNull(broker.matches(offer(attributes = "rack=1-2")))
+    assertEquals("rack doesn't match like:1-.*", broker.matches(offer(attributes = "rack=2-1")))
 
     // groupBy
     broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
-    assertTrue(broker.matches(offer(attributes = "rack=1")))
-    assertTrue(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
-    assertFalse(broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
+    assertNull(broker.matches(offer(attributes = "rack=1")))
+    assertNull(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
+    assertEquals("rack doesn't match groupBy", broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
   }
 
   @Test
   def shouldStart {
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem.toInt)
-
     // active
     broker.active = false
-    assertFalse(broker.shouldStart(offer))
+    assertFalse(broker.shouldStart())
     broker.active = true
-    assertTrue(broker.shouldStart(offer))
+    assertTrue(broker.shouldStart())
 
     // has task
     broker.task = new Task()
-    assertFalse(broker.shouldStart(offer))
+    assertFalse(broker.shouldStart())
     broker.task = null
-    assertTrue(broker.shouldStart(offer))
-
-    // matches offer
-    broker.mem += 100
-    assertFalse(broker.shouldStart(offer))
-    broker.mem -= 100
-    assertTrue(broker.shouldStart(offer))
+    assertTrue(broker.shouldStart())
 
     // failover waiting delay
     val now = new Date(0)
@@ -134,10 +126,10 @@ class BrokerTest extends MesosTestCase {
     broker.failover.registerFailure(now)
     assertTrue(broker.failover.isWaitingDelay(now))
 
-    assertFalse(broker.shouldStart(offer, now = now))
-    assertTrue(broker.shouldStart(offer, now = new Date(now.getTime + broker.failover.delay.ms)))
+    assertFalse(broker.shouldStart(now = now))
+    assertTrue(broker.shouldStart(now = new Date(now.getTime + broker.failover.delay.ms)))
     broker.failover.resetFailures()
-    assertTrue(broker.shouldStart(offer, now = now))
+    assertTrue(broker.shouldStart(now = now))
   }
 
   @Test

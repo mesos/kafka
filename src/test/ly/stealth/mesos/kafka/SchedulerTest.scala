@@ -108,6 +108,24 @@ class SchedulerTest extends MesosTestCase {
   }
 
   @Test
+  def acceptOffer {
+    val broker = Scheduler.cluster.addBroker(new Broker())
+    broker.active = true
+
+    broker.task = new Broker.Task(_state = Broker.State.RECONCILING)
+    assertEquals("reconciling", Scheduler.acceptOffer(null))
+
+    broker.task = null
+    assertEquals(s"broker ${broker.id}: cpus 0.4 < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = 0.4, mem = broker.mem, ports = Pair(100, 100))))
+    assertEquals(s"broker ${broker.id}: mem 99 < ${broker.mem}", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = 99, ports = Pair(100, 100))))
+
+    assertNull(Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+
+    assertEquals("", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
+  }
+
+  @Test
   def onBrokerStatus {
     val broker = Scheduler.cluster.addBroker(new Broker())
     broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host", 9092)

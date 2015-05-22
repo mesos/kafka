@@ -227,7 +227,7 @@ object Util {
 
       s += offer.getHostname + id(offer.getId.getValue)
       s += " " + resources(offer.getResourcesList)
-      s += " " + attributes(offer.getAttributesList)
+      if (offer.getAttributesCount > 0) s += " " + attributes(offer.getAttributesList)
 
       s
     }

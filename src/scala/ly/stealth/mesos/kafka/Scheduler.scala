@@ -40,15 +40,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cmd += " ly.stealth.mesos.kafka.Executor"
 
     val commandBuilder = CommandInfo.newBuilder
-      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
-      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
-
     if (Config.jre != null) {
       commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jre/" + Config.jre.getName))
       cmd = "jre/bin/" + cmd
     }
 
-    commandBuilder.setValue(cmd)
+    commandBuilder
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
+      .setValue(cmd)
 
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
@@ -143,23 +143,17 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
-    def startBroker(offer: Offer): Boolean = {
-      if (isReconciling) return false
-
-      for (broker <- cluster.getBrokers) {
-        if (broker.shouldStart(offer, otherTasksAttributes)) {
-          launchTask(broker, offer)
-          return true
-        }
-      }
-
-      false
-    }
-
+    val declineReasons = new util.ArrayList[String]()
     for (offer <- offers) {
-      val started = startBroker(offer)
-      if (!started) driver.declineOffer(offer.getId)
+      val declineReason = acceptOffer(offer)
+
+      if (declineReason != null) {
+        driver.declineOffer(offer.getId)
+        if (!declineReason.isEmpty) declineReasons.add(offer.getHostname + Str.id(offer.getId.getValue) + " - " + declineReason)
+      }
     }
+    
+    if (!declineReasons.isEmpty) logger.info("Declined offers:\n" + declineReasons.mkString("\n"))
 
     for (broker <- cluster.getBrokers) {
       if (broker.shouldStop) {
@@ -171,6 +165,25 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     reconcileTasksIfRequired()
     cluster.save()
+  }
+
+  private[kafka] def acceptOffer(offer: Offer): String = {
+    if (isReconciling) return "reconciling"
+
+    var reason = ""
+    for (broker <- cluster.getBrokers.filter(_.shouldStart())) {
+      val diff = broker.matches(offer, otherTasksAttributes)
+
+      if (diff == null) {
+        launchTask(broker, offer)
+        return null
+      } else {
+        if (!reason.isEmpty) reason += ", "
+        reason += s"broker ${broker.id}: $diff"
+      }
+    }
+
+    reason
   }
 
   private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {
@@ -378,7 +391,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
     val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
-    root.addAppender(new ConsoleAppender(layout))
+
+    var appender: Appender = null
+    if (Config.log == null) appender = new ConsoleAppender(layout)
+    else appender = new DailyRollingFileAppender(layout, Config.log.getPath, "'.'yyyy-MM-dd")
+    
+    root.addAppender(appender)
   }
 
   class JettyLog4jLogger extends org.eclipse.jetty.util.log.Logger {

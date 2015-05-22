@@ -98,6 +98,7 @@ object HttpServer {
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
+      else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
       else response.sendError(404)
     }
@@ -107,6 +108,11 @@ object HttpServer {
       response.setHeader("Content-Length", "" + file.length())
       response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
       Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
+    }
+
+    def handleHealth(response: HttpServletResponse): Unit = {
+      response.setContentType("text/plain; charset=utf-8")
+      response.getWriter.println("ok")
     }
 
     def handleBrokersApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {

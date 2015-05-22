@@ -152,6 +152,9 @@ object Cli {
     parser.accepts("jre", "JRE zip-file (jre-7-openjdk.zip). Default - none.")
       .withRequiredArg().ofType(classOf[String])
 
+    parser.accepts("log", "Log file to use. Default - stdout.")
+      .withRequiredArg().ofType(classOf[String])
+
 
     val configArg = parser.nonOptions()
 
@@ -225,6 +228,10 @@ object Cli {
     val jre = options.valueOf("jre").asInstanceOf[String]
     if (jre != null) Config.jre = new File(jre)
     if (Config.jre != null && !Config.jre.exists()) throw new Error("JRE file doesn't exists")
+
+    val log = options.valueOf("log").asInstanceOf[String]
+    if (log != null) Config.log = new File(log)
+    if (Config.log != null) out.println(s"Logging to ${Config.log}")
 
     Scheduler.start()
   }
