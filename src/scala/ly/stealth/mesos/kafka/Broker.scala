@@ -32,8 +32,8 @@ class Broker(_id: String = "0") {
   @volatile var active: Boolean = false
 
   var cpus: Double = 0.5
-  var mem: Long = 128
-  var heap: Long = 128
+  var mem: Long = 2048
+  var heap: Long = 1024
 
   var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
