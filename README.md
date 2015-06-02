@@ -128,7 +128,7 @@ broker:
   id: 0
   active: false
   state: stopped
-  resources: cpus:0.50, mem:128, heap:128
+  resources: cpus:1.00, mem:2048, heap:1024
   failover: delay:10s, max-delay:60s
 ```
 
@@ -143,7 +143,7 @@ cluster:
     id: 0
     active: false
     state: stopped
-    resources: cpus:0.50, mem:128, heap:128
+    resources: cpus:1.00, mem:2048, heap:1024
     failover: delay:10s, max-delay:60s
 ```
 Now lets start the broker.
@@ -164,7 +164,7 @@ cluster:
     id: 0
     active: true
     state: running
-    resources: cpus:1.00, mem:128, heap:128
+    resources: cpus:1.00, mem:2048, heap:1024
     failover: delay:10s, max-delay:60s
     task:
       id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
@@ -204,7 +204,7 @@ broker:
   id: 0
   active: false
   state: stopped
-  resources: cpus:1.00, mem:128, heap:128
+  resources: cpus:1.00, mem:2048, heap:1024
   options: log.dirs=/mnt/array1/broker0
   failover: delay:10s, max-delay:60s
 
