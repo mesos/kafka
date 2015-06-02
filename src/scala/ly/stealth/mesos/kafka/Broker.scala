@@ -31,7 +31,7 @@ class Broker(_id: String = "0") {
   var id: String = _id
   @volatile var active: Boolean = false
 
-  var cpus: Double = 0.5
+  var cpus: Double = 1
   var mem: Long = 2048
   var heap: Long = 1024
 
