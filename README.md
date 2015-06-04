@@ -128,7 +128,7 @@ broker:
   id: 0
   active: false
   state: stopped
-  resources: cpus:1.00, mem:2048, heap:1024
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:10s, max-delay:60s
 ```
 
@@ -143,7 +143,7 @@ cluster:
     id: 0
     active: false
     state: stopped
-    resources: cpus:1.00, mem:2048, heap:1024
+    resources: cpus:1.00, mem:2048, heap:1024, port:auto
     failover: delay:10s, max-delay:60s
 ```
 Now lets start the broker.
@@ -164,7 +164,7 @@ cluster:
     id: 0
     active: true
     state: running
-    resources: cpus:1.00, mem:2048, heap:1024
+    resources: cpus:1.00, mem:2048, heap:1024, port:auto
     failover: delay:10s, max-delay:60s
     task:
       id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
@@ -204,7 +204,7 @@ broker:
   id: 0
   active: false
   state: stopped
-  resources: cpus:1.00, mem:2048, heap:1024
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
   options: log.dirs=/mnt/array1/broker0
   failover: delay:10s, max-delay:60s
 
@@ -223,19 +223,19 @@ brokers:
   id: 0
   active: false
   state: stopped
-  resources: cpus:1.00, mem:2048, heap:1024
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:10s, max-delay:60s
 
   id: 1
   active: false
   state: stopped
-  resources: cpus:1.00, mem:2048, heap:1024
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:10s, max-delay:60s
 
   id: 2
   active: false
   state: stopped
-  resources: cpus:1.00, mem:2048, heap:1024
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:10s, max-delay:60s
 
 #./kafka-mesos.sh start 0
@@ -292,6 +292,7 @@ Option                Description
 --options             kafka options or file. Examples:
                        log.dirs=/tmp/kafka/$id,num.io.threads=16
                        file:server.properties
+--port                port or range (31092, 31090..31100). Default - auto
 
 Generic Options
 Option  Description
@@ -336,6 +337,7 @@ Option                Description
 --options             kafka options or file. Examples:
                        log.dirs=/tmp/kafka/$id,num.io.threads=16
                        file:server.properties
+--port                port or range (31092, 31090..31100). Default - auto
 
 Generic Options
 Option  Description
