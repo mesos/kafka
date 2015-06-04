@@ -46,9 +46,9 @@ class SchedulerTest extends MesosTestCase {
     broker.cpus = 0.5
     broker.mem = 256
 
-    val offer = this.offer(slaveId = "slave", hostname = "host", ports = Pair(1000, 1000))
+    val offer = this.offer(slaveId = "slave", hostname = "host")
 
-    val task = Scheduler.newTask(broker, offer)
+    val task = Scheduler.newTask(broker, offer, 1000)
     assertEquals("slave", task.getSlaveId.getValue)
     assertNotNull(task.getExecutor)
 
@@ -87,7 +87,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def syncBrokers {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem)
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
@@ -116,13 +116,13 @@ class SchedulerTest extends MesosTestCase {
     assertEquals("reconciling", Scheduler.acceptOffer(null))
 
     broker.task = null
-    assertEquals(s"broker ${broker.id}: cpus 0.4 < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = 0.4, mem = broker.mem, ports = Pair(100, 100))))
-    assertEquals(s"broker ${broker.id}: mem 99 < ${broker.mem}", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = 99, ports = Pair(100, 100))))
+    assertEquals(s"broker ${broker.id}: cpus 0.4 < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = 0.4, mem = broker.mem)))
+    assertEquals(s"broker ${broker.id}: mem 99 < ${broker.mem}", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = 99)))
 
-    assertNull(Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
+    assertNull(Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem)))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
-    assertEquals("", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(100, 100))))
+    assertEquals("", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem)))
   }
 
   @Test
@@ -185,7 +185,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, ports = Pair(1000, 1000), attributes = "a=1,b=2")
+    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, attributes = "a=1,b=2")
 
     Scheduler.launchTask(broker, offer)
     assertEquals(1, schedulerDriver.launchedTasks.size())
@@ -241,15 +241,5 @@ class SchedulerTest extends MesosTestCase {
     assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("hostname").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("2", "3"), Scheduler.otherTasksAttributes("b").asInstanceOf[Array[AnyRef]])
-  }
-
-  @Test
-  def findBrokerPort {
-    assertEquals(100, Scheduler.findBrokerPort(offer(ports = Pair(100, 200))))
-    assertEquals(100, Scheduler.findBrokerPort(offer(ports = Pair(100, 100))))
-
-    // no ports
-    try { Scheduler.findBrokerPort(offer()); fail() }
-    catch { case e: IllegalArgumentException => }
   }
 }

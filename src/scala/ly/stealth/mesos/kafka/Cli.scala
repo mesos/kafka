@@ -260,7 +260,7 @@ object Cli {
     parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
-    parser.accepts("port", "port or range (9092, 9000..9100). Default - any").withRequiredArg().ofType(classOf[java.lang.String])
+    parser.accepts("port", "port or range (9092, 9000..9100). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
 
     parser.accepts("options", "kafka options or file. Examples:\n log.dirs=/tmp/kafka/$id,num.io.threads=16\n file:server.properties").withRequiredArg()
     parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*). See below.").withRequiredArg()
@@ -538,7 +538,7 @@ object Cli {
     printLine("id: " + broker.id, indent)
     printLine("active: " + broker.active, indent)
     printLine("state: " + broker.state(), indent)
-    printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap + ", port:" + (if (broker.port != null) broker.port else "any"), indent)
+    printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap + ", port:" + (if (broker.port != null) broker.port else "auto"), indent)
 
     if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
     if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)

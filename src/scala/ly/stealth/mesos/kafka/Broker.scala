@@ -59,6 +59,9 @@ class Broker(_id: String = "0") {
     val offerResources = new util.HashMap[String, Resource]()
     for (resource <- offer.getResourcesList) offerResources.put(resource.getName, resource)
 
+    val port = getSuitablePort(offer)
+    if (port == -1) return "no suitable port"
+
     val cpusResource = offerResources.get("cpus")
     if (cpusResource == null) return "no cpus"
     if (cpusResource.getScalar.getValue < cpus) return s"cpus ${cpusResource.getScalar.getValue} < $cpus"
@@ -80,6 +83,25 @@ class Broker(_id: String = "0") {
     }
 
     null
+  }
+
+  def getSuitablePort(offer: Offer): Int = {
+    val portsResource = offer.getResourcesList.find(_.getName == "ports").getOrElse(null)
+    if (portsResource == null) return -1
+
+    val ports = portsResource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt))
+    if (ports.isEmpty) return -1
+
+    if (port == null)
+      return ports.get(0).start
+
+    for (range <- ports) {
+      val overlap = range.overlap(port)
+        if (overlap != null)
+          return overlap.start
+      }
+
+    -1
   }
 
   def shouldStart(now: Date = new Date()): Boolean = active && task == null && !failover.isWaitingDelay(now)

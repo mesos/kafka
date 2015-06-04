@@ -60,6 +60,35 @@ class BrokerTest extends MesosTestCase {
     assertNull(broker.matches(offer(mem = 100)))
     assertEquals("mem 99 < 100", broker.matches(offer(mem = 99)))
     broker.mem = 0
+
+    // port
+    assertNull(broker.matches(offer(ports = "100")))
+    assertEquals("no suitable port", broker.matches(offer(ports = "")))
+  }
+
+  @Test
+  def getSuitablePort {
+    // no port restrictions
+    assertEquals(-1, broker.getSuitablePort(offer(ports = "")))
+    assertEquals(100, broker.getSuitablePort(offer(ports = "100..100")))
+    assertEquals(100, broker.getSuitablePort(offer(ports = "100..200")))
+
+    // single port restriction
+    broker.port = new Util.Range(92)
+    assertEquals(-1, broker.getSuitablePort(offer(ports = "0..91")))
+    assertEquals(-1, broker.getSuitablePort(offer(ports = "93..100")))
+    assertEquals(92, broker.getSuitablePort(offer(ports = "90..100")))
+
+    // port range restriction
+    broker.port = new Util.Range("92..100")
+    assertEquals(-1, broker.getSuitablePort(offer(ports = "0..91")))
+    assertEquals(-1, broker.getSuitablePort(offer(ports = "101..200")))
+    assertEquals(92, broker.getSuitablePort(offer(ports = "0..100")))
+    assertEquals(92, broker.getSuitablePort(offer(ports = "0..92")))
+
+    assertEquals(100, broker.getSuitablePort(offer(ports = "100..200")))
+    assertEquals(95, broker.getSuitablePort(offer(ports = "0..90,95..96,101..200")))
+    assertEquals(96, broker.getSuitablePort(offer(ports = "0..90,96,101..200")))
   }
 
   @Test

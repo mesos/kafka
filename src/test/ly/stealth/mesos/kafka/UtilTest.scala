@@ -201,6 +201,8 @@ class UtilTest {
   def Range_init {
     new Range("30")
     new Range("30..31")
+    new Range(30)
+    new Range(30, 31)
 
     // empty
     try { new Range(""); fail() }
@@ -228,6 +230,28 @@ class UtilTest {
     assertEquals(0, new Range("0").start)
     assertEquals(0, new Range("0..10").start)
     assertEquals(10, new Range("0..10").end)
+  }
+
+  @Test
+  def overlap {
+    // no overlap
+    assertNull(new Range(0, 10).overlap(new Range(20, 30)))
+    assertNull(new Range(20, 30).overlap(new Range(0, 10)))
+    assertNull(new Range(0).overlap(new Range(1)))
+
+    // partial
+    assertEquals(new Range(5, 10), new Range(0, 10).overlap(new Range(5, 15)))
+    assertEquals(new Range(5, 10), new Range(5, 15).overlap(new Range(0, 10)))
+
+    // includes
+    assertEquals(new Range(2, 3), new Range(0, 10).overlap(new Range(2, 3)))
+    assertEquals(new Range(2, 3), new Range(2, 3).overlap(new Range(0, 10)))
+    assertEquals(new Range(5), new Range(0, 10).overlap(new Range(5)))
+
+    // last point
+    assertEquals(new Range(0), new Range(0, 10).overlap(new Range(0)))
+    assertEquals(new Range(10), new Range(0, 10).overlap(new Range(10)))
+    assertEquals(new Range(0), new Range(0).overlap(new Range(0)))
   }
 
   @Test

@@ -189,6 +189,9 @@ object Util {
     private var _start: Int = -1
     private var _end: Int = -1
 
+    def this(start: Int, end: Int) = this(start + ".." + end)
+    def this(start: Int) = this("" + start)
+
     parse()
     private def parse() {
       val idx = s.indexOf("..")
@@ -206,6 +209,24 @@ object Util {
 
     def start: Int = _start
     def end : Int = _end
+
+    def overlap(r: Range): Range = {
+      var x: Range = this
+      var y: Range = r
+      if (x.start > y.start) {
+        val t = x
+        x = y
+        y = t
+      }
+      assert(x.start <= y.start)
+      
+      if (y.start > x.end) return null
+      assert(y.start <= x.end)
+      
+      val start = y.start
+      val end = Math.min(x.end, y.end)
+      new Range(start, end)
+    }
 
     override def equals(obj: scala.Any): Boolean = {
       if (!obj.isInstanceOf[Range]) return false

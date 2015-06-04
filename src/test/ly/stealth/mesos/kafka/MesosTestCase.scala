@@ -18,7 +18,7 @@
 package ly.stealth.mesos.kafka
 
 import org.apache.mesos.Protos._
-import java.util.UUID
+import java.util.{Collections, UUID}
 import org.apache.mesos.Protos.Value.{Text, Scalar}
 import scala.collection.JavaConversions._
 import org.apache.mesos.{ExecutorDriver, SchedulerDriver}
@@ -118,7 +118,7 @@ class MesosTestCase {
     hostname: String = "host",
     cpus: Double = 0,
     mem: Long = 0,
-    ports: Pair[Int, Int] = null,
+    ports: String = null,
     attributes: String = null
   ): Offer = {
     val builder = Offer.newBuilder()
@@ -141,18 +141,22 @@ class MesosTestCase {
       .setScalar(Scalar.newBuilder().setValue(0.0 + mem))
       .build
     builder.addResources(memResource)
-    
-    if (ports != null) {
-      val portsRange = Value.Range.newBuilder().setBegin(ports._1).setEnd(ports._2)
 
-      val portsResource = Resource.newBuilder()
+    def ranges(s: String): util.List[Value.Range] = {
+      if (s.isEmpty) return Collections.emptyList()
+
+      s.split(",").toList
+        .map(s => new Util.Range(s.trim))
+        .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
+    }
+
+    val portsResource = Resource.newBuilder()
       .setName("ports")
       .setType(Value.Type.RANGES)
-      .setRanges(Value.Ranges.newBuilder().addRange(portsRange))
+      .setRanges(Value.Ranges.newBuilder().addAllRange(ranges(if (ports != null) ports else "31000..32000")))
       .build
 
-      builder.addResources(portsResource)
-    }
+    builder.addResources(portsResource)
 
     if (attributes != null) {
       val map = Util.parseMap(attributes)
