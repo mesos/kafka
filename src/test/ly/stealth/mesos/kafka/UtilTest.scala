@@ -20,6 +20,7 @@ package ly.stealth.mesos.kafka
 import org.junit.Test
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.Period
+import ly.stealth.mesos.kafka.Util.Range
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
 import java.util
 
@@ -193,5 +194,46 @@ class UtilTest {
   def Period_toString {
     assertEquals("10ms", "" + new Period("10ms"))
     assertEquals("5h", "" + new Period("5h"))
+  }
+
+  // Range
+  @Test
+  def Range_init {
+    new Range("30")
+    new Range("30..31")
+
+    // empty
+    try { new Range(""); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // non int
+    try { new Range("abc"); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // non int first
+    try { new Range("abc..30"); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // non int second
+    try { new Range("30..abc"); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // inverted range
+    try { new Range("10..0"); fail() }
+    catch { case e: IllegalArgumentException => }
+  }
+
+  @Test
+  def Range_start_end {
+    assertEquals(0, new Range("0").start)
+    assertEquals(0, new Range("0..10").start)
+    assertEquals(10, new Range("0..10").end)
+  }
+
+  @Test
+  def Range_toString {
+    assertEquals("0", "" + new Range("0"))
+    assertEquals("0..10", "" + new Range("0..10"))
+    assertEquals("0", "" + new Range("0..0"))
   }
 }

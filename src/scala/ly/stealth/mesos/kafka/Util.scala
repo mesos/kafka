@@ -185,6 +185,39 @@ object Util {
     override def toString: String = _value + _unit
   }
 
+  class Range(s: String) {
+    private var _start: Int = -1
+    private var _end: Int = -1
+
+    parse()
+    private def parse() {
+      val idx = s.indexOf("..")
+
+      if (idx == -1) {
+        _start = Integer.parseInt(s)
+        _end = _start
+        return
+      }
+
+      _start = Integer.parseInt(s.substring(0, idx))
+      _end = Integer.parseInt(s.substring(idx + 2))
+      if (_start > _end) throw new IllegalArgumentException("start > end")
+    }
+
+    def start: Int = _start
+    def end : Int = _end
+
+    override def equals(obj: scala.Any): Boolean = {
+      if (!obj.isInstanceOf[Range]) return false
+      val range = obj.asInstanceOf[Range]
+      start == range.start && end == range.end
+    }
+
+    override def hashCode(): Int = 31 * start + end
+
+    override def toString: String = if (start == end) "" + start else start + ".." + end
+  }
+
   object Str {
     def dateTime(date: Date): String = {
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ssX").format(date)

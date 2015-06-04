@@ -200,6 +200,7 @@ class BrokerTest extends MesosTestCase {
     broker.cpus = 0.5
     broker.mem = 128
     broker.heap = 128
+    broker.port = new Util.Range("0..100")
 
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
@@ -333,6 +334,7 @@ object BrokerTest {
     assertEquals(expected.cpus, actual.cpus, 0.001)
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
+    assertEquals(expected.port, actual.port)
 
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)
