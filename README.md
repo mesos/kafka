@@ -33,7 +33,7 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 Installation
 -------------
 
-Install OpenJDK 7+ http://openjdk.java.net/install/
+Install OpenJDK 7 (or higher) http://openjdk.java.net/install/
 
 Install gradle http://gradle.org/installation
 
