@@ -57,9 +57,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build()
   }
 
-  private[kafka] def newTask(broker: Broker, offer: Offer): TaskInfo = {
-    val port = findBrokerPort(offer)
-
+  private[kafka] def newTask(broker: Broker, offer: Offer, port: Int): TaskInfo = {
     def taskData: ByteString = {
       val defaults: Map[String, String] = Map(
         "broker.id" -> broker.id,
@@ -242,7 +240,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private def isReconciling: Boolean = cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
 
   private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
-    val task_ = newTask(broker, offer)
+    val port = broker.getSuitablePort(offer)
+    if (port == -1) throw new IllegalStateException("no suitable port")
+
+    val task_ = newTask(broker, offer, port)
     val id = task_.getTaskId.getValue
 
     val attributes = new util.LinkedHashMap[String, String]()
@@ -250,9 +251,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (attribute.hasText) attributes.put(attribute.getName, attribute.getText.getValue)
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
-    broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, findBrokerPort(offer), attributes)
+    broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, port, attributes)
 
-    logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${Str.id(offer.getId.getValue)}\n ${Str.task(task_)}")
+    logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${offer.getHostname + Str.id(offer.getId.getValue)}\n ${Str.task(task_)}")
   }
 
   def forciblyStopBroker(broker: Broker): Unit = {
@@ -323,21 +324,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
 
     values.toArray(Array[String]())
-  }
-
-  private[kafka] def findBrokerPort(offer: Offer): Int = {
-    for (resource <- offer.getResourcesList) {
-      if (resource.getName == "ports") {
-        val ranges: util.List[Value.Range] = resource.getRanges.getRangeList
-        val range = if (ranges.isEmpty) null else ranges.get(0)
-
-        assert(range.hasBegin)
-        if (range == null) throw new IllegalArgumentException("Invalid port range in offer " + Str.offer(offer))
-        return range.getBegin.toInt
-      }
-    }
-
-    throw new IllegalArgumentException("No port range in offer " + Str.offer(offer))
   }
 
   def start() {
