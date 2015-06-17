@@ -63,6 +63,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "broker.id" -> broker.id,
         "port" -> ("" + port),
         "log.dirs" -> "kafka-logs",
+        "log.retention.bytes" -> ("" + 10l * 1024 * 1024 * 1024),
 
         "zookeeper.connect" -> Config.zk,
         "host.name" -> offer.getHostname
