@@ -264,6 +264,7 @@ object Cli {
 
     parser.accepts("options", "kafka options or file. Examples:\n log.dirs=/tmp/kafka/$id,num.io.threads=16\n file:server.properties").withRequiredArg()
     parser.accepts("constraints", "constraints (hostname=like:master,rack=like:1.*). See below.").withRequiredArg()
+    parser.accepts("log4j-options", "log4j options or file. Examples:\n log4j.logger.kafka=DEBUG\\, kafkaAppender, file:log4j.properties").withRequiredArg()
 
     parser.accepts("failover-delay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failover-max-delay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
@@ -301,8 +302,9 @@ object Cli {
     val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
     val port = options.valueOf("port").asInstanceOf[String]
 
-    val options_ = options.valueOf("options").asInstanceOf[String]
     val constraints = options.valueOf("constraints").asInstanceOf[String]
+    val options_ = options.valueOf("options").asInstanceOf[String]
+    val log4jOptions = options.valueOf("log4j-options").asInstanceOf[String]
 
     val failoverDelay = options.valueOf("failover-delay").asInstanceOf[String]
     val failoverMaxDelay = options.valueOf("failover-max-delay").asInstanceOf[String]
@@ -318,6 +320,7 @@ object Cli {
 
     if (options_ != null) params.put("options", optionsOrFile(options_))
     if (constraints != null) params.put("constraints", constraints)
+    if (log4jOptions != null) params.put("log4jOptions", optionsOrFile(log4jOptions))
 
     if (failoverDelay != null) params.put("failoverDelay", failoverDelay)
     if (failoverMaxDelay != null) params.put("failoverMaxDelay", failoverMaxDelay)
@@ -542,6 +545,7 @@ object Cli {
 
     if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
     if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
+    if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Util.formatMap(broker.log4jOptions), indent)
 
     var failover = "failover:"
     failover += " delay:" + broker.failover.delay
@@ -633,11 +637,19 @@ object Cli {
     }
 
     val qs: String = queryString(params)
-    val url: String = api + (if (api.endsWith("/")) "" else "/") + "api" + uri + "?" + qs
+    val url: String = api + (if (api.endsWith("/")) "" else "/") + "api" + uri
 
     val connection: HttpURLConnection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     var response: String = null
     try {
+      connection.setRequestMethod("POST")
+      connection.setDoOutput(true)
+
+      val data = qs.getBytes("utf-8")
+      connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+      connection.setRequestProperty("Content-Length", "" + data.length)
+      connection.getOutputStream.write(data)
+
       try { response = Source.fromInputStream(connection.getInputStream).getLines().mkString}
       catch {
         case e: IOException =>

@@ -22,6 +22,7 @@ import org.apache.mesos.Protos._
 import java.io._
 import org.apache.log4j._
 import Util.Str
+import java.util
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
@@ -66,7 +67,10 @@ object Executor extends org.apache.mesos.Executor {
   private[kafka] def startBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
     def runBroker0 {
       try {
-        server.start(Util.parseMap(task.getData.toStringUtf8))
+        val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
+        val options = Util.parseMap(data.get("options"))
+        val log4jOptions = Util.parseMap(data.get("log4jOptions"))
+        server.start(options, log4jOptions)
 
         var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
         driver.sendStatusUpdate(status)

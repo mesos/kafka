@@ -38,6 +38,7 @@ class Broker(_id: String = "0") {
 
   var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
+  var log4jOptions: util.Map[String, String] = new util.LinkedHashMap()
 
   var failover: Failover = new Failover()
 
@@ -158,6 +159,7 @@ class Broker(_id: String = "0") {
     if (node.contains("constraints")) constraints = Util.parseMap(node("constraints").asInstanceOf[String])
                                                     .mapValues(new Constraint(_)).view.force
     if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
+    if (node.contains("log4jOptions")) log4jOptions = Util.parseMap(node("log4jOptions").asInstanceOf[String])
 
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
@@ -179,6 +181,7 @@ class Broker(_id: String = "0") {
 
     if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
     if (!options.isEmpty) obj("options") = Util.formatMap(options)
+    if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
 
     obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson

@@ -26,7 +26,7 @@ import scala.collection.JavaConversions._
 
 abstract class BrokerServer {
   def isStarted: Boolean
-  def start(props: util.Map[String, String] = new util.HashMap()): Unit
+  def start(options: util.Map[String, String] = new util.HashMap(), log4jOptions: util.Map[String, String] = new util.HashMap()): Unit
   def stop(): Unit
   def waitFor(): Unit
 }
@@ -37,10 +37,11 @@ class KafkaServer extends BrokerServer {
 
   def isStarted: Boolean = server != null
 
-  def start(props: util.Map[String, String]): Unit = {
+  def start(options: util.Map[String, String], log4jOptions: util.Map[String, String] = new util.HashMap()): Unit = {
     if (isStarted) throw new IllegalStateException("started")
 
-    server = BrokerServer.Distro.newServer(props)
+    BrokerServer.Distro.configureLog4j(log4jOptions)
+    server = BrokerServer.Distro.newServer(options)
 
     logger.info("Starting KafkaServer")
     server.getClass.getMethod("startup").invoke(server)
@@ -68,23 +69,37 @@ object BrokerServer {
     var loader: URLClassLoader = null
     init()
 
-    def newServer(props: util.Map[String, String]): Object = {
-      val p: Properties = new Properties()
-      val stream: FileInputStream = new FileInputStream(dir + "/config/server.properties")
-      try { p.load(stream) }
-      finally { stream.close() }
-
-      for ((k, v) <- props) p.setProperty(k, v)
-
+    def newServer(options: util.Map[String, String]): Object = {
       val serverClass = loader.loadClass("kafka.server.KafkaServerStartable")
       val configClass = loader.loadClass("kafka.server.KafkaConfig")
 
-      val config: Object = configClass.getConstructor(classOf[Properties]).newInstance(p).asInstanceOf[Object]
+      val props: Properties = this.props(options, "server.properties")
+      val config: Object = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object]
       val server: Object = serverClass.getConstructor(configClass).newInstance(config).asInstanceOf[Object]
 
       server
     }
+    
+    def configureLog4j(options: util.Map[String, String]): Unit = {
+      val props: Properties = this.props(options, "log4j.properties")
+      val configurator: Class[_] = loader.loadClass("org.apache.log4j.PropertyConfigurator")
+      configurator.getMethod("configure", classOf[Properties]).invoke(null, props)
+    }
+    
+    private def props(options: util.Map[String, String], defaultsFile: String): Properties = {
+      val p: Properties = new Properties()
+      val stream: FileInputStream = new FileInputStream(dir + "/config/" + defaultsFile)
+      
+      try { p.load(stream) }
+      finally { stream.close() }
+      
+      for ((k, v) <- options)
+        if (v != null) p.setProperty(k, v)
+        else p.remove(k)
 
+      p
+    }
+    
     private def init(): Unit = {
       // find kafka dir
       for (file <- new File(".").listFiles())
@@ -99,9 +114,6 @@ object BrokerServer {
         classpath.add(new URL("" + file.toURI))
 
       loader = new Loader(classpath.toArray(Array()))
-
-      // configure log4j
-      loader.loadClass("org.apache.log4j.PropertyConfigurator").getMethod("configure", classOf[String]).invoke(null, dir + "/config/log4j.properties")
     }
   }
 
