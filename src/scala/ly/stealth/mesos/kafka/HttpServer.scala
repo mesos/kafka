@@ -41,7 +41,7 @@ object HttpServer {
     if (server != null) throw new IllegalStateException("started")
     if (resolveDeps) this.resolveDeps
 
-    val threadPool = new QueuedThreadPool(16)
+    val threadPool = new QueuedThreadPool(Runtime.getRuntime.availableProcessors() * 8)
     threadPool.setName("Jetty")
 
     server = new Server(threadPool)
