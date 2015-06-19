@@ -291,7 +291,8 @@ Option                Description
 --failover-max-tries  max failover tries. Default - none
 --heap <Long>         heap amount in Mb
 --log4j-options       log4j options or file. Examples:
-                       log4j.logger.kafka=DEBUG\, kafkaAppender, file:log4j.properties
+                       log4j.logger.kafka=DEBUG\, kafkaAppender
+                       file:log4j.properties
 --mem <Long>          mem amount in Mb
 --options             broker options or file. Examples:
                        log.dirs=/tmp/kafka/$id,num.io.threads=16
@@ -338,7 +339,8 @@ Option                Description
 --failover-max-tries  max failover tries. Default - none
 --heap <Long>         heap amount in Mb
 --log4j-options       log4j options or file. Examples:
-                       log4j.logger.kafka=DEBUG\, kafkaAppender, file:log4j.properties
+                       log4j.logger.kafka=DEBUG\, kafkaAppender
+                       file:log4j.properties
 --mem <Long>          mem amount in Mb
 --options             broker options or file. Examples:
                        log.dirs=/tmp/kafka/$id,num.io.threads=16
