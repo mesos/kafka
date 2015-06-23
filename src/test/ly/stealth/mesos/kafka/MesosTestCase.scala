@@ -326,14 +326,12 @@ class MesosTestCase {
 class TestBrokerServer extends BrokerServer {
   var failOnStart: Boolean = false
   private val started: AtomicBoolean = new AtomicBoolean(false)
-  var props: util.Map[String, String] = null
 
   def isStarted: Boolean = started.get()
 
-  def start(props: util.Map[String, String]): Unit = {
+  def start(options: util.Map[String, String], log4jOptions: util.Map[String, String]): Unit = {
     if (failOnStart) throw new RuntimeException("failOnStart")
     started.set(true)
-    this.props = props
   }
 
   def stop(): Unit = {

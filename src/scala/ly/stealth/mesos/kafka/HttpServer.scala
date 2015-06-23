@@ -83,6 +83,7 @@ object HttpServer {
   }
 
   private class Servlet extends HttpServlet {
+    override def doPost(request: HttpServletRequest, response: HttpServletResponse): Unit = doGet(request, response)
     override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       try { handle(request, response) }
       catch {
@@ -171,6 +172,10 @@ object HttpServer {
         try { constraints = Util.parseMap(request.getParameter("constraints"), nullValues = false).mapValues(new Constraint(_)).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
 
+      var log4jOptions: util.Map[String, String] = null
+      if (request.getParameter("log4jOptions") != null)
+        try { log4jOptions = Util.parseMap(request.getParameter("log4jOptions")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid log4jOptions: " + e.getMessage) }
 
       var failoverDelay: Period = null
       if (request.getParameter("failoverDelay") != null)
@@ -217,8 +222,9 @@ object HttpServer {
         if (heap != null) broker.heap = heap
         if (port != null) broker.port = if (port != "") new Range(port) else null
 
-        if (options != null) broker.options = options
         if (constraints != null) broker.constraints = constraints
+        if (options != null) broker.options = options
+        if (log4jOptions != null) broker.log4jOptions = log4jOptions
 
         if (failoverDelay != null) broker.failover.delay = failoverDelay
         if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay

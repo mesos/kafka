@@ -43,6 +43,7 @@ class SchedulerTest extends MesosTestCase {
   def newTask {
     val broker = new Broker("1")
     broker.options = Util.parseMap("a=1")
+    broker.log4jOptions = Util.parseMap("b=2")
     broker.cpus = 0.5
     broker.mem = 256
 
@@ -73,7 +74,8 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(1000, range.getEnd)
 
     // options
-    val options = Util.parseMap(task.getData.toStringUtf8)
+    val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
+    val options = Util.parseMap(data.get("options"))
     assertEquals(broker.id, options.get("broker.id"))
     assertEquals("" + 1000, options.get("port"))
     assertEquals(Config.zk, options.get("zookeeper.connect"))
@@ -82,6 +84,10 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(offer.getHostname, options.get("host.name"))
 
     assertEquals("1", options.get("a"))
+
+    // log4j options
+    val log4jOptions = Util.parseMap(data.get("log4jOptions"))
+    assertEquals(broker.log4jOptions, log4jOptions)
   }
 
   @Test

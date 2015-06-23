@@ -69,8 +69,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "host.name" -> offer.getHostname
       )
 
-      val options = Util.formatMap(broker.options(defaults))
-      ByteString.copyFromUtf8(options)
+      val data = new util.HashMap[String, String]()
+      data.put("options", Util.formatMap(broker.options(defaults)))
+      data.put("log4jOptions", Util.formatMap(broker.log4jOptions))
+      ByteString.copyFromUtf8(Util.formatMap(data))
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
