@@ -35,7 +35,7 @@ class Broker(_id: String = "0") {
   var mem: Long = 2048
   var heap: Long = 1024
   var port: Range = null
-  var bindAddress: BindAddress = new BindAddress("offer:hostname")
+  var bindAddress: BindAddress = null
 
   var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
@@ -180,7 +180,7 @@ class Broker(_id: String = "0") {
     obj("mem") = mem
     obj("heap") = heap
     if (port != null) obj("port") = "" + port
-    obj("bindAddress") = "" + bindAddress
+    if (bindAddress != null) obj("bindAddress") = "" + bindAddress
 
     if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
     if (!options.isEmpty) obj("options") = Util.formatMap(options)

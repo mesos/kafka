@@ -264,43 +264,24 @@ class UtilTest {
   // BindAddress
   @Test
   def BindAddress_init {
-    new BindAddress("offer:hostname")
-    new BindAddress("address:broker0")
-    new BindAddress("address:192.168.*")
-    new BindAddress("interface:eth1")
+    new BindAddress("broker0")
+    new BindAddress("192.168.*")
+    new BindAddress("if:eth1")
 
     // unknown source
     try { new BindAddress("unknown:value"); fail() }
-    catch { case e: IllegalArgumentException => }
-
-    // no colon
-    try { new BindAddress("offer"); fail() }
-    catch { case e: IllegalArgumentException => }
-
-    // wrong offer attribute
-    try { new BindAddress("offer:ip"); fail() }
     catch { case e: IllegalArgumentException => }
   }
 
   @Test
   def BindAddress_resolve {
-    // offer
-    val offer = Offer.newBuilder()
-      .setId(OfferID.newBuilder().setValue("id").build())
-      .setFrameworkId(FrameworkID.newBuilder().setValue("id").build())
-      .setSlaveId(SlaveID.newBuilder().setValue("id").build())
-      .setHostname("host")
-      .build()
-
-    assertEquals("host", new BindAddress("offer:hostname").resolve(offer))
-
     // address without mask
-    assertEquals("host", new BindAddress("address:host").resolve(null))
+    assertEquals("host", new BindAddress("host").resolve(null))
 
     // address with mask
-    assertEquals("127.0.0.1", new BindAddress("address:127.0.0.*").resolve(null))
+    assertEquals("127.0.0.1", new BindAddress("127.0.0.*").resolve(null))
 
     // interface
-    assertEquals("127.0.0.1", new BindAddress("interface:lo").resolve(null))
+    assertEquals("127.0.0.1", new BindAddress("if:lo").resolve(null))
   }
 }

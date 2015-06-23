@@ -250,23 +250,20 @@ object Util {
     parse
     def parse {
       val idx = s.indexOf(":")
-      if (idx == -1) throw new IllegalArgumentException(s)
+      if (idx != -1) {
+        _source = s.substring(0, idx)
+        _value = s.substring(idx + 1)
+      } else
+        _value = s
 
-      _source = s.substring(0, idx)
-      _value = s.substring(idx + 1)
-      
-      if (!Array("offer", "address", "interface").contains(_source))
-        throw new IllegalArgumentException(s)
-      
-      if (_source == "offer" && _value != "hostname")
+      if (source != null && source != "if")
         throw new IllegalArgumentException(s)
     }
     
     def resolve(offer: Offer): String = {
       _source match {
-        case "offer" => offer.getHostname
-        case "address" => resolveAddress(_value)
-        case "interface" => resolveInterfaceAddress(_value)
+        case null => resolveAddress(_value)
+        case "if" => resolveInterfaceAddress(_value)
       }
     }
 
