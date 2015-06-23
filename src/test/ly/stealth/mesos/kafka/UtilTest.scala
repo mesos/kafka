@@ -19,10 +19,10 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.Period
-import ly.stealth.mesos.kafka.Util.Range
+import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
 import java.util
+import org.apache.mesos.Protos.{SlaveID, FrameworkID, OfferID, Offer}
 
 class UtilTest {
   @Test
@@ -259,5 +259,48 @@ class UtilTest {
     assertEquals("0", "" + new Range("0"))
     assertEquals("0..10", "" + new Range("0..10"))
     assertEquals("0", "" + new Range("0..0"))
+  }
+
+  // BindAddress
+  @Test
+  def BindAddress_init {
+    new BindAddress("offer:hostname")
+    new BindAddress("address:broker0")
+    new BindAddress("address:192.168.*")
+    new BindAddress("interface:eth1")
+
+    // unknown source
+    try { new BindAddress("unknown:value"); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // no colon
+    try { new BindAddress("offer"); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    // wrong offer attribute
+    try { new BindAddress("offer:ip"); fail() }
+    catch { case e: IllegalArgumentException => }
+  }
+
+  @Test
+  def BindAddress_resolve {
+    // offer
+    val offer = Offer.newBuilder()
+      .setId(OfferID.newBuilder().setValue("id").build())
+      .setFrameworkId(FrameworkID.newBuilder().setValue("id").build())
+      .setSlaveId(SlaveID.newBuilder().setValue("id").build())
+      .setHostname("host")
+      .build()
+
+    assertEquals("host", new BindAddress("offer:hostname").resolve(offer))
+
+    // address without mask
+    assertEquals("host", new BindAddress("address:host").resolve(null))
+
+    // address with mask
+    assertEquals("127.0.0.1", new BindAddress("address:127.0.0.*").resolve(null))
+
+    // interface
+    assertEquals("127.0.0.1", new BindAddress("interface:lo").resolve(null))
   }
 }

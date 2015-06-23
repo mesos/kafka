@@ -230,6 +230,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
     broker.port = new Util.Range("0..100")
+    broker.bindAddress = new Util.BindAddress("address:192.168.0.1")
 
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
@@ -365,6 +366,7 @@ object BrokerTest {
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
     assertEquals(expected.port, actual.port)
+    assertEquals(expected.bindAddress, actual.bindAddress)
 
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)

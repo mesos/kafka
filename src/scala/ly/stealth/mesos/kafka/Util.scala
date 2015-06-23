@@ -25,6 +25,7 @@ import java.util.Date
 import java.text.SimpleDateFormat
 import org.apache.mesos.Protos._
 import org.apache.mesos.Protos
+import java.net.{Inet4Address, InetAddress, NetworkInterface}
 
 object Util {
   Class.forName(kafka.utils.Json.getClass.getName) // init class
@@ -237,6 +238,69 @@ object Util {
     override def hashCode(): Int = 31 * start + end
 
     override def toString: String = if (start == end) "" + start else start + ".." + end
+  }
+
+  class BindAddress(s: String) {
+    private var _source: String = null
+    private var _value: String = null
+    
+    def source: String = _source
+    def value: String = _value
+
+    parse
+    def parse {
+      val idx = s.indexOf(":")
+      if (idx == -1) throw new IllegalArgumentException(s)
+
+      _source = s.substring(0, idx)
+      _value = s.substring(idx + 1)
+      
+      if (!Array("offer", "address", "interface").contains(_source))
+        throw new IllegalArgumentException(s)
+      
+      if (_source == "offer" && _value != "hostname")
+        throw new IllegalArgumentException(s)
+    }
+    
+    def resolve(offer: Offer): String = {
+      _source match {
+        case "offer" => offer.getHostname
+        case "address" => resolveAddress(_value)
+        case "interface" => resolveInterfaceAddress(_value)
+      }
+    }
+
+    def resolveAddress(addressOrMask: String): String = {
+      if (!addressOrMask.endsWith("*")) return addressOrMask
+      val prefix = addressOrMask.substring(0, addressOrMask.length - 1)
+      
+      for (ni <- NetworkInterface.getNetworkInterfaces) {
+        val address = ni.getInetAddresses.find(_.getHostAddress.startsWith(prefix)).getOrElse(null)
+        if (address != null) return address.getHostAddress
+      }
+      
+      null
+    }
+
+    def resolveInterfaceAddress(name: String): String = {
+      val ni = NetworkInterface.getNetworkInterfaces.find(_.getName == name).getOrElse(null)
+      if (ni == null) return null
+
+      val addresses: util.Enumeration[InetAddress] = ni.getInetAddresses
+      val address = addresses.find(_.isInstanceOf[Inet4Address]).getOrElse(null)
+      if (address != null) address.getHostAddress else null
+    }
+
+
+    override def hashCode(): Int = 31 * _source.hashCode + _value.hashCode
+
+    override def equals(o: scala.Any): Boolean = {
+      if (!o.isInstanceOf[BindAddress]) return false
+      val address = o.asInstanceOf[BindAddress]
+      _source == address._source && _value == address._value
+    }
+
+    override def toString: String = s
   }
 
   object Str {
