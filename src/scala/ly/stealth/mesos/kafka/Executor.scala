@@ -68,9 +68,11 @@ object Executor extends org.apache.mesos.Executor {
     def runBroker0 {
       try {
         val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
-        val options = Util.parseMap(data.get("options"))
-        val log4jOptions = Util.parseMap(data.get("log4jOptions"))
-        server.start(options, log4jOptions)
+        val broker = new Broker()
+        broker.fromJson(Util.parseJson(data.get("broker")))
+
+        val defaults = Util.parseMap(data.get("defaults"))
+        server.start(broker, defaults)
 
         var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
         driver.sendStatusUpdate(status)

@@ -177,7 +177,7 @@ class MesosTestCase {
     id: String = "" + UUID.randomUUID(),
     name: String = "Task",
     slaveId: String = "" + UUID.randomUUID(),
-    data: String = null
+    data: String = Util.formatMap(Collections.singletonMap("broker", new Broker().toJson))
   ): TaskInfo = {
     val builder = TaskInfo.newBuilder()
     .setName(id)
@@ -329,7 +329,7 @@ class TestBrokerServer extends BrokerServer {
 
   def isStarted: Boolean = started.get()
 
-  def start(options: util.Map[String, String], log4jOptions: util.Map[String, String]): Unit = {
+  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Unit = {
     if (failOnStart) throw new RuntimeException("failOnStart")
     started.set(true)
   }

@@ -73,21 +73,20 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(1000, range.getBegin)
     assertEquals(1000, range.getEnd)
 
-    // options
+    // data
     val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
-    val options = Util.parseMap(data.get("options"))
-    assertEquals(broker.id, options.get("broker.id"))
-    assertEquals("" + 1000, options.get("port"))
-    assertEquals(Config.zk, options.get("zookeeper.connect"))
+    
+    val readBroker: Broker = new Broker()
+    readBroker.fromJson(Util.parseJson(data.get("broker")))
+    BrokerTest.assertBrokerEquals(broker, readBroker)
 
-    assertEquals("kafka-logs", options.get("log.dirs"))
-    assertEquals(offer.getHostname, options.get("host.name"))
+    val defaults = Util.parseMap(data.get("defaults"))
+    assertEquals(broker.id, defaults.get("broker.id"))
+    assertEquals("" + 1000, defaults.get("port"))
+    assertEquals(Config.zk, defaults.get("zookeeper.connect"))
 
-    assertEquals("1", options.get("a"))
-
-    // log4j options
-    val log4jOptions = Util.parseMap(data.get("log4jOptions"))
-    assertEquals(broker.log4jOptions, log4jOptions)
+    assertEquals("kafka-logs", defaults.get("log.dirs"))
+    assertEquals(offer.getHostname, defaults.get("host.name"))
   }
 
   @Test

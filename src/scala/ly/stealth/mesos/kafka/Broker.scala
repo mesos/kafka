@@ -48,6 +48,10 @@ class Broker(_id: String = "0") {
     if (defaults != null) result.putAll(defaults)
     
     result.putAll(options)
+
+    if (bindAddress != null)
+      result.put("host.name", bindAddress.resolve())
+
     for ((k, v) <- result)
       result.put(k, v.replace("$id", id))
 

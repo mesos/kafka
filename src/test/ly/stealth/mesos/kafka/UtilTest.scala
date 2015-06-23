@@ -22,7 +22,6 @@ import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
 import java.util
-import org.apache.mesos.Protos.{SlaveID, FrameworkID, OfferID, Offer}
 
 class UtilTest {
   @Test
@@ -276,12 +275,16 @@ class UtilTest {
   @Test
   def BindAddress_resolve {
     // address without mask
-    assertEquals("host", new BindAddress("host").resolve(null))
+    assertEquals("host", new BindAddress("host").resolve())
 
     // address with mask
-    assertEquals("127.0.0.1", new BindAddress("127.0.0.*").resolve(null))
+    assertEquals("127.0.0.1", new BindAddress("127.0.0.*").resolve())
 
     // interface
-    assertEquals("127.0.0.1", new BindAddress("if:lo").resolve(null))
+    assertEquals("127.0.0.1", new BindAddress("if:lo").resolve())
+
+    // unresolvable
+    try { new BindAddress("255.255.*").resolve(); fail() }
+    catch { case e: IllegalStateException => }
   }
 }

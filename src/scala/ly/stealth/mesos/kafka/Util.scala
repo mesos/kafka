@@ -260,10 +260,11 @@ object Util {
         throw new IllegalArgumentException(s)
     }
     
-    def resolve(offer: Offer): String = {
+    def resolve(): String = {
       _source match {
         case null => resolveAddress(_value)
         case "if" => resolveInterfaceAddress(_value)
+        case _ => throw new IllegalStateException("Failed to resolve " + s)
       }
     }
 
@@ -275,17 +276,19 @@ object Util {
         val address = ni.getInetAddresses.find(_.getHostAddress.startsWith(prefix)).getOrElse(null)
         if (address != null) return address.getHostAddress
       }
-      
-      null
+
+      throw new IllegalStateException("Failed to resolve " + s)
     }
 
     def resolveInterfaceAddress(name: String): String = {
       val ni = NetworkInterface.getNetworkInterfaces.find(_.getName == name).getOrElse(null)
-      if (ni == null) return null
+      if (ni == null) throw new IllegalStateException("Failed to resolve " + s)
 
       val addresses: util.Enumeration[InetAddress] = ni.getInetAddresses
       val address = addresses.find(_.isInstanceOf[Inet4Address]).getOrElse(null)
-      if (address != null) address.getHostAddress else null
+      if (address != null) return address.getHostAddress
+
+      throw new IllegalStateException("Failed to resolve " + s)
     }
 
 

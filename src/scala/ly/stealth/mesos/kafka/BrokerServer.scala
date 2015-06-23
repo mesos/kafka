@@ -26,7 +26,7 @@ import scala.collection.JavaConversions._
 
 abstract class BrokerServer {
   def isStarted: Boolean
-  def start(options: util.Map[String, String] = new util.HashMap(), log4jOptions: util.Map[String, String] = new util.HashMap()): Unit
+  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Unit
   def stop(): Unit
   def waitFor(): Unit
 }
@@ -37,11 +37,11 @@ class KafkaServer extends BrokerServer {
 
   def isStarted: Boolean = server != null
 
-  def start(options: util.Map[String, String], log4jOptions: util.Map[String, String] = new util.HashMap()): Unit = {
+  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Unit = {
     if (isStarted) throw new IllegalStateException("started")
 
-    BrokerServer.Distro.configureLog4j(log4jOptions)
-    server = BrokerServer.Distro.newServer(options)
+    BrokerServer.Distro.configureLog4j(broker.log4jOptions)
+    server = BrokerServer.Distro.newServer(broker.options(defaults))
 
     logger.info("Starting KafkaServer")
     server.getClass.getMethod("startup").invoke(server)
