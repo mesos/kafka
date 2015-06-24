@@ -167,15 +167,18 @@ object HttpServer {
         try { options = Util.parseMap(request.getParameter("options"), nullValues = false).filterKeys(Broker.isOptionOverridable).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
+      var log4jOptions: util.Map[String, String] = null
+      if (request.getParameter("log4jOptions") != null)
+        try { log4jOptions = Util.parseMap(request.getParameter("log4jOptions")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid log4jOptions: " + e.getMessage) }
+
+      var jvmOptions: String = request.getParameter("jvmOptions")
+
       var constraints: util.Map[String, Constraint] = null
       if (request.getParameter("constraints") != null)
         try { constraints = Util.parseMap(request.getParameter("constraints"), nullValues = false).mapValues(new Constraint(_)).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
 
-      var log4jOptions: util.Map[String, String] = null
-      if (request.getParameter("log4jOptions") != null)
-        try { log4jOptions = Util.parseMap(request.getParameter("log4jOptions")) }
-        catch { case e: IllegalArgumentException => errors.add("Invalid log4jOptions: " + e.getMessage) }
 
       var failoverDelay: Period = null
       if (request.getParameter("failoverDelay") != null)
@@ -225,6 +228,7 @@ object HttpServer {
         if (constraints != null) broker.constraints = constraints
         if (options != null) broker.options = options
         if (log4jOptions != null) broker.log4jOptions = log4jOptions
+        if (jvmOptions != null) broker.jvmOptions = if (jvmOptions != "") jvmOptions else null
 
         if (failoverDelay != null) broker.failover.delay = failoverDelay
         if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay

@@ -290,11 +290,12 @@ Option                Description
 --failover-max-delay  max failover delay. See failoverDelay.
 --failover-max-tries  max failover tries. Default - none
 --heap <Long>         heap amount in Mb
+--jvm-options         jvm options string (-Xms128m -XX:PermSize=48m)
 --log4j-options       log4j options or file. Examples:
                        log4j.logger.kafka=DEBUG\, kafkaAppender
                        file:log4j.properties
 --mem <Long>          mem amount in Mb
---options             broker options or file. Examples:
+--options             options or file. Examples:
                        log.dirs=/tmp/kafka/$id,num.io.threads=16
                        file:server.properties
 --port                port or range (31092, 31090..31100). Default - auto
@@ -338,11 +339,12 @@ Option                Description
 --failover-max-delay  max failover delay. See failoverDelay.
 --failover-max-tries  max failover tries. Default - none
 --heap <Long>         heap amount in Mb
+--jvm-options         jvm options string (-Xms128m -XX:PermSize=48m)
 --log4j-options       log4j options or file. Examples:
                        log4j.logger.kafka=DEBUG\, kafkaAppender
                        file:log4j.properties
 --mem <Long>          mem amount in Mb
---options             broker options or file. Examples:
+--options             options or file. Examples:
                        log.dirs=/tmp/kafka/$id,num.io.threads=16
                        file:server.properties
 --port                port or range (31092, 31090..31100). Default - auto
