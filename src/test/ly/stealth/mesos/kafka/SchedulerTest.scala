@@ -29,6 +29,7 @@ class SchedulerTest extends MesosTestCase {
   def newExecutor {
     val broker = new Broker("1")
     broker.heap = 512
+    broker.jvmOptions = "-Xms64m"
 
     val executor = Scheduler.newExecutor(broker)
     val command = executor.getCommand
@@ -36,6 +37,7 @@ class SchedulerTest extends MesosTestCase {
 
     val cmd: String = command.getValue
     assertTrue(cmd, cmd.contains("-Xmx" + broker.heap + "m"))
+    assertTrue(cmd, cmd.contains(broker.jvmOptions))
     assertTrue(cmd, cmd.contains(Executor.getClass.getName.replace("$", "")))
   }
 
