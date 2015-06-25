@@ -70,8 +70,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       )
 
       val data = new util.HashMap[String, String]()
-      data.put("options", Util.formatMap(broker.options(defaults)))
-      data.put("log4jOptions", Util.formatMap(broker.log4jOptions))
+      data.put("broker", "" + broker.toJson)
+      data.put("defaults", Util.formatMap(defaults))
       ByteString.copyFromUtf8(Util.formatMap(data))
     }
 

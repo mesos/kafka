@@ -284,6 +284,7 @@ Usage: add <id-expr> [options]
 
 Option                Description
 ------                -----------
+--bind-address        broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto
 --constraints         constraints (hostname=like:master,rack=like:1.*). See below.
 --cpus <Double>       cpu amount (0.5, 1, 2)
 --failover-delay      failover delay (10s, 5m, 3h)
@@ -332,6 +333,7 @@ Usage: update <id-expr> [options]
 
 Option                Description
 ------                -----------
+--bind-address        broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto
 --constraints         constraints (hostname=like:master,rack=like:1.*). See below.
 --cpus <Double>       cpu amount (0.5, 1, 2)
 --failover-delay      failover delay (10s, 5m, 3h)

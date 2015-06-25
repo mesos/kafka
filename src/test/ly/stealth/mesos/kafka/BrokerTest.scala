@@ -19,11 +19,10 @@ package ly.stealth.mesos.kafka
 
 import org.junit.{Before, Test}
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.Period
+import ly.stealth.mesos.kafka.Util.{BindAddress, Period, parseMap}
 import java.util.Date
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{State, Task, Failover}
-import Util.parseMap
 
 class BrokerTest extends MesosTestCase {
   var broker: Broker = null
@@ -45,6 +44,13 @@ class BrokerTest extends MesosTestCase {
     // defaults
     broker.options = parseMap("a=2")
     assertEquals(parseMap("a=2,b=1"), broker.options(parseMap("a=2,b=1")))
+
+    // bind-address
+    broker.options = parseMap("host.name=123")
+    assertEquals(parseMap("host.name=123"), broker.options())
+
+    broker.bindAddress = new BindAddress("127.0.0.1")
+    assertEquals(parseMap("host.name=127.0.0.1"), broker.options())
   }
 
   @Test
@@ -230,6 +236,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
     broker.port = new Util.Range("0..100")
+    broker.bindAddress = new Util.BindAddress("192.168.0.1")
 
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
@@ -365,6 +372,7 @@ object BrokerTest {
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
     assertEquals(expected.port, actual.port)
+    assertEquals(expected.bindAddress, actual.bindAddress)
 
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)

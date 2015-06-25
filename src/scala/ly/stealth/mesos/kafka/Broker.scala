@@ -24,7 +24,7 @@ import scala.collection
 import org.apache.mesos.Protos.{Resource, Offer}
 import java.util.{TimeZone, Collections, Date, UUID}
 import ly.stealth.mesos.kafka.Broker.Failover
-import Util.{Period, Range, Str}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
 import java.text.SimpleDateFormat
 
 class Broker(_id: String = "0") {
@@ -35,6 +35,7 @@ class Broker(_id: String = "0") {
   var mem: Long = 2048
   var heap: Long = 1024
   var port: Range = null
+  var bindAddress: BindAddress = null
 
   var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
@@ -47,6 +48,10 @@ class Broker(_id: String = "0") {
     if (defaults != null) result.putAll(defaults)
     
     result.putAll(options)
+
+    if (bindAddress != null)
+      result.put("host.name", bindAddress.resolve())
+
     for ((k, v) <- result)
       result.put(k, v.replace("$id", id))
 
@@ -155,6 +160,7 @@ class Broker(_id: String = "0") {
     mem = node("mem").asInstanceOf[Number].longValue()
     heap = node("heap").asInstanceOf[Number].longValue()
     if (node.contains("port")) port = new Range(node("port").asInstanceOf[String])
+    if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
 
     if (node.contains("constraints")) constraints = Util.parseMap(node("constraints").asInstanceOf[String])
                                                     .mapValues(new Constraint(_)).view.force
@@ -178,6 +184,7 @@ class Broker(_id: String = "0") {
     obj("mem") = mem
     obj("heap") = heap
     if (port != null) obj("port") = "" + port
+    if (bindAddress != null) obj("bindAddress") = "" + bindAddress
 
     if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
     if (!options.isEmpty) obj("options") = Util.formatMap(options)

@@ -27,7 +27,7 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
-import ly.stealth.mesos.kafka.Util.{Period, Range}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 
 object HttpServer {
@@ -161,6 +161,10 @@ object HttpServer {
         try { new Range(request.getParameter("port")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid port") }
 
+      val bindAddress: String = request.getParameter("bindAddress")
+      if (bindAddress != null)
+        try { new BindAddress(request.getParameter("bindAddress")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid bindAddress") }
 
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
@@ -221,6 +225,7 @@ object HttpServer {
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
         if (port != null) broker.port = if (port != "") new Range(port) else null
+        if (bindAddress != null) broker.bindAddress = if (bindAddress != "") new BindAddress(bindAddress) else null
 
         if (constraints != null) broker.constraints = constraints
         if (options != null) broker.options = options

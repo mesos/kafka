@@ -261,6 +261,7 @@ object Cli {
     parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("port", "port or range (31092, 31090..31100). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
+    parser.accepts("bind-address", "broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
 
     parser.accepts("options", "broker options or file. Examples:\n log.dirs=/tmp/kafka/$id,num.io.threads=16\n file:server.properties").withRequiredArg()
     parser.accepts("log4j-options", "log4j options or file. Examples:\n log4j.logger.kafka=DEBUG\\, kafkaAppender\n file:log4j.properties").withRequiredArg()
@@ -301,6 +302,7 @@ object Cli {
     val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
     val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
     val port = options.valueOf("port").asInstanceOf[String]
+    val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
 
     val constraints = options.valueOf("constraints").asInstanceOf[String]
     val options_ = options.valueOf("options").asInstanceOf[String]
@@ -317,6 +319,7 @@ object Cli {
     if (mem != null) params.put("mem", "" + mem)
     if (heap != null) params.put("heap", "" + heap)
     if (port != null) params.put("port", port)
+    if (bindAddress != null) params.put("bindAddress", bindAddress)
 
     if (options_ != null) params.put("options", optionsOrFile(options_))
     if (constraints != null) params.put("constraints", constraints)
@@ -543,6 +546,7 @@ object Cli {
     printLine("state: " + broker.state(), indent)
     printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap + ", port:" + (if (broker.port != null) broker.port else "auto"), indent)
 
+    if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
     if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
     if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
     if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Util.formatMap(broker.log4jOptions), indent)
