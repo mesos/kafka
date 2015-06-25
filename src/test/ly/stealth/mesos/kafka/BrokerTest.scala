@@ -241,6 +241,7 @@ class BrokerTest extends MesosTestCase {
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
     broker.log4jOptions = parseMap("b=2")
+    broker.jvmOptions = "-Xms512m"
 
     broker.failover.registerFailure(new Date())
     broker.task = new Task("1", "slave", "executor", "host", 9092)
@@ -377,6 +378,7 @@ object BrokerTest {
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)
     assertEquals(expected.log4jOptions, actual.log4jOptions)
+    assertEquals(expected.jvmOptions, actual.jvmOptions)
 
     assertFailoverEquals(expected.failover, actual.failover)
     assertTaskEquals(expected.task, actual.task)
