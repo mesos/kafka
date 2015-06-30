@@ -280,9 +280,6 @@ class UtilTest {
     // address with mask
     assertEquals("127.0.0.1", new BindAddress("127.0.0.*").resolve())
 
-    // interface
-    assertEquals("127.0.0.1", new BindAddress("if:lo").resolve())
-
     // unresolvable
     try { new BindAddress("255.255.*").resolve(); fail() }
     catch { case e: IllegalStateException => }
