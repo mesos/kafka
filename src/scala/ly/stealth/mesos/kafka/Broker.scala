@@ -289,6 +289,7 @@ object Broker {
 
     var hostname: String = _hostname
     var port: Int = _port
+    var endpoint: Broker.Endpoint = null
     var attributes: util.Map[String, String] = _attributes
 
     @volatile var state: String = _state
@@ -298,8 +299,6 @@ object Broker {
     def stopping: Boolean = state == State.STOPPING
     def reconciling: Boolean = state == State.RECONCILING
 
-    def endpoint: String = hostname + ":" + port
-
     def fromJson(node: Map[String, Object]): Unit = {
       id = node("id").asInstanceOf[String]
       slaveId = node("slaveId").asInstanceOf[String]
@@ -307,6 +306,7 @@ object Broker {
 
       hostname = node("hostname").asInstanceOf[String]
       port = node("port").asInstanceOf[Number].intValue()
+      if (node.contains("endpoint")) endpoint = new Endpoint(node("endpoint").asInstanceOf[String])
       attributes = node("attributes").asInstanceOf[Map[String, String]]
 
       state = node("state").asInstanceOf[String]
@@ -321,12 +321,38 @@ object Broker {
 
       obj("hostname") = hostname
       obj("port") = port
+      if (endpoint != null) obj("endpoint") = "" + endpoint
       obj("attributes") = new JSONObject(attributes.toMap)
 
       obj("state") = state
 
       new JSONObject(obj.toMap)
     }
+  }
+
+  class Endpoint(s: String) {
+    var hostname: String = null
+    var port: Int = -1
+
+    {
+      val idx = s.indexOf(":")
+      if (idx == -1) throw new IllegalArgumentException(s)
+
+      hostname = s.substring(0, idx)
+      port = Integer.parseInt(s.substring(idx + 1))
+    }
+
+    def this(hostname: String, port: Int) = this(hostname + ":" + port)
+
+    override def equals(obj: scala.Any): Boolean = {
+      if (!obj.isInstanceOf[Endpoint]) return false
+      val endpoint = obj.asInstanceOf[Endpoint]
+      hostname == endpoint.hostname && port == endpoint.port
+    }
+
+    override def hashCode(): Int = 31 * hostname.hashCode + port.hashCode()
+
+    override def toString: String = hostname + ":" + port
   }
 
   object State {

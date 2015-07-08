@@ -417,6 +417,9 @@ object Util {
       if (status.getMessage != null && status.getMessage != "")
         s += " message:" + status.getMessage
 
+      if (status.getData.size > 0)
+        s += " data: " + status.getData.toStringUtf8
+
       s
     }
 

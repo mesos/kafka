@@ -22,7 +22,7 @@ import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, parseMap}
 import java.util.Date
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Broker.{State, Task, Failover}
+import ly.stealth.mesos.kafka.Broker.{Endpoint, State, Task, Failover}
 
 class BrokerTest extends MesosTestCase {
   var broker: Broker = null
@@ -354,6 +354,7 @@ class BrokerTest extends MesosTestCase {
   @Test
   def Task_toJson_fromJson {
     val task = new Task("id", "slave", "executor", "host", 9092, parseMap("a=1,b=2"), State.RUNNING)
+    task.endpoint = new Endpoint("localhost:9092")
 
     val read: Task = new Task()
     read.fromJson(Util.parseJson("" + task.toJson))
@@ -404,6 +405,7 @@ object BrokerTest {
 
     assertEquals(expected.hostname, actual.hostname)
     assertEquals(expected.port, actual.port)
+    assertEquals(expected.endpoint, actual.endpoint)
     assertEquals(expected.attributes, actual.attributes)
 
     assertEquals(expected.state, actual.state)

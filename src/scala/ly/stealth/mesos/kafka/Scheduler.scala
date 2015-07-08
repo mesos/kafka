@@ -215,6 +215,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       logger.info(s"Finished reconciling of broker ${broker.id}, task ${broker.task.id}")
 
     broker.task.state = Broker.State.RUNNING
+    if (status.getData.size() > 0) broker.task.endpoint = new Broker.Endpoint(status.getData.toStringUtf8)
     broker.failover.resetFailures()
   }
 

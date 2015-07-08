@@ -23,6 +23,7 @@ import java.io._
 import org.apache.log4j._
 import Util.Str
 import java.util
+import com.google.protobuf.ByteString
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
@@ -72,14 +73,16 @@ object Executor extends org.apache.mesos.Executor {
         broker.fromJson(Util.parseJson(data.get("broker")))
 
         val defaults = Util.parseMap(data.get("defaults"))
-        server.start(broker, defaults)
+        val endpoint = server.start(broker, defaults)
 
-        var status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build
-        driver.sendStatusUpdate(status)
+        var status = TaskStatus.newBuilder
+          .setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
+          .setData(ByteString.copyFromUtf8("" + endpoint))
+        driver.sendStatusUpdate(status.build)
 
         server.waitFor()
-        status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED).build
-        driver.sendStatusUpdate(status)
+        status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED)
+        driver.sendStatusUpdate(status.build)
       } catch {
         case t: Throwable =>
           logger.warn("", t)
