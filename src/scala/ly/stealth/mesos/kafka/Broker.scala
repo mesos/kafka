@@ -279,7 +279,6 @@ object Broker {
     _slaveId: String = null,
     _executorId: String = null,
     _hostname: String = null,
-    _port: Int = -1,
     _attributes: util.Map[String, String] = Collections.emptyMap(),
     _state: String = State.STARTING
   ) {
@@ -288,7 +287,6 @@ object Broker {
     var executorId: String = _executorId
 
     var hostname: String = _hostname
-    var port: Int = _port
     var endpoint: Broker.Endpoint = null
     var attributes: util.Map[String, String] = _attributes
 
@@ -305,10 +303,11 @@ object Broker {
       executorId = node("executorId").asInstanceOf[String]
 
       hostname = node("hostname").asInstanceOf[String]
-      port = node("port").asInstanceOf[Number].intValue()
       if (node.contains("endpoint")) endpoint = new Endpoint(node("endpoint").asInstanceOf[String])
-      attributes = node("attributes").asInstanceOf[Map[String, String]]
+      if (endpoint == null && node.contains("port")) // bc
+        endpoint = new Endpoint(hostname, node("port").asInstanceOf[Number].intValue())
 
+      attributes = node("attributes").asInstanceOf[Map[String, String]]
       state = node("state").asInstanceOf[String]
     }
 
@@ -320,10 +319,9 @@ object Broker {
       obj("executorId") = executorId
 
       obj("hostname") = hostname
-      obj("port") = port
       if (endpoint != null) obj("endpoint") = "" + endpoint
-      obj("attributes") = new JSONObject(attributes.toMap)
 
+      obj("attributes") = new JSONObject(attributes.toMap)
       obj("state") = state
 
       new JSONObject(obj.toMap)

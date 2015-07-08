@@ -68,7 +68,7 @@ class ClusterTest extends MesosTestCase {
   @Test
   def toJson_fromJson {
     val broker0 = cluster.addBroker(new Broker("0"))
-    broker0.task = new Broker.Task("1", "slave", "executor", "host", 9092, _state = State.RUNNING)
+    broker0.task = new Broker.Task("1", "slave", "executor", "host", _state = State.RUNNING)
     cluster.addBroker(new Broker("1"))
     cluster.frameworkId = "id"
 

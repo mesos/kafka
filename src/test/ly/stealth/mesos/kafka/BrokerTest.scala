@@ -244,7 +244,7 @@ class BrokerTest extends MesosTestCase {
     broker.jvmOptions = "-Xms512m"
 
     broker.failover.registerFailure(new Date())
-    broker.task = new Task("1", "slave", "executor", "host", 9092)
+    broker.task = new Task("1", "slave", "executor", "host")
 
     val read: Broker = new Broker()
     read.fromJson(Util.parseJson("" + broker.toJson))
@@ -353,7 +353,7 @@ class BrokerTest extends MesosTestCase {
   // Task
   @Test
   def Task_toJson_fromJson {
-    val task = new Task("id", "slave", "executor", "host", 9092, parseMap("a=1,b=2"), State.RUNNING)
+    val task = new Task("id", "slave", "executor", "host", parseMap("a=1,b=2"), State.RUNNING)
     task.endpoint = new Endpoint("localhost:9092")
 
     val read: Task = new Task()
@@ -404,7 +404,6 @@ object BrokerTest {
     assertEquals(expected.slaveId, actual.slaveId)
 
     assertEquals(expected.hostname, actual.hostname)
-    assertEquals(expected.port, actual.port)
     assertEquals(expected.endpoint, actual.endpoint)
     assertEquals(expected.attributes, actual.attributes)
 

@@ -135,7 +135,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def onBrokerStatus {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host", 9092)
+    broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host")
     assertEquals(Broker.State.STARTING, broker.task.state)
 
     // broker started
