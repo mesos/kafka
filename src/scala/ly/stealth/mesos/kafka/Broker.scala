@@ -23,7 +23,7 @@ import scala.util.parsing.json.JSONObject
 import scala.collection
 import org.apache.mesos.Protos.{Resource, Offer}
 import java.util.{TimeZone, Collections, Date, UUID}
-import ly.stealth.mesos.kafka.Broker.Failover
+import ly.stealth.mesos.kafka.Broker.{Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
 import java.text.SimpleDateFormat
 
@@ -42,6 +42,7 @@ class Broker(_id: String = "0") {
   var log4jOptions: util.Map[String, String] = new util.LinkedHashMap()
   var jvmOptions: String = null
 
+  var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
 
   def options(defaults: util.Map[String, String] = null): util.Map[String, String] = {
@@ -111,9 +112,23 @@ class Broker(_id: String = "0") {
     -1
   }
 
-  def shouldStart(now: Date = new Date()): Boolean = active && task == null && !failover.isWaitingDelay(now)
+  def shouldStart(hostname: String, now: Date = new Date()): Boolean =
+    active && task == null &&
+    stickiness.allowsHostname(hostname, now) && !failover.isWaitingDelay(now)
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
+  
+  def registerStart(hostname: String): Unit = {
+    stickiness.registerStart(hostname)
+    failover.resetFailures()
+  }
+
+  def registerStop(now: Date = new Date(), failed: Boolean = false): Unit = {
+    if (!failed || failover.failures == 0) stickiness.registerStop(now)
+
+    if (failed) failover.registerFailure(now)
+    else failover.resetFailures()
+  }
 
   def state(now: Date = new Date()): String = {
     if (task != null && !task.starting) return task.state
@@ -169,6 +184,7 @@ class Broker(_id: String = "0") {
     if (node.contains("log4jOptions")) log4jOptions = Util.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
 
+    if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
     if (node.contains("task")) {
@@ -193,6 +209,7 @@ class Broker(_id: String = "0") {
     if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
     if (jvmOptions != null) obj("jvmOptions") = jvmOptions
 
+    obj("stickiness") = stickiness.toJson
     obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson
 
@@ -212,15 +229,52 @@ object Broker {
 
   def isOptionOverridable(name: String): Boolean = !List("broker.id", "port", "zookeeper.connect").contains(name)
 
+  class Stickiness(_period: Period = new Period("10m")) {
+    var period: Period = _period
+    @volatile var hostname: String = null
+    @volatile var stopTime: Date = null
+
+    def expires: Date = if (stopTime != null) new Date(stopTime.getTime + period.ms) else null
+
+    def registerStart(hostname: String): Unit = {
+      this.hostname = hostname
+      stopTime = null
+    }
+
+    def registerStop(now: Date = new Date()): Unit = {
+      this.stopTime = now
+    }
+
+    def allowsHostname(hostname: String, now: Date = new Date()): Boolean = {
+      if (this.hostname == null) return true
+      if (stopTime == null || now.getTime - stopTime.getTime >= period.ms) return true
+      this.hostname == hostname
+    }
+
+    def fromJson(node: Map[String, Object]): Unit = {
+      period = new Period(node("period").asInstanceOf[String])
+      if (node.contains("stopTime")) stopTime = dateTimeFormat.parse(node("stopTime").asInstanceOf[String])
+      if (node.contains("hostname")) hostname = node("hostname").asInstanceOf[String]
+    }
+
+    def toJson: JSONObject = {
+      val obj = new collection.mutable.LinkedHashMap[String, Any]()
+
+      obj("period") = "" + period
+      if (stopTime != null) obj("stopTime") = dateTimeFormat.format(stopTime)
+      if (hostname != null) obj("hostname") = hostname
+
+      new JSONObject(obj.toMap)
+    }
+  }
+
   class Failover(_delay: Period = new Period("1m"), _maxDelay: Period = new Period("10m"), _stickyPeriod: Period = new Period("10m")) {
     var delay: Period = _delay
     var maxDelay: Period = _maxDelay
     var maxTries: Integer = null
-    var stickyPeriod: Period = _stickyPeriod
 
     @volatile var failures: Int = 0
     @volatile var failureTime: Date = null
-    @volatile var successHostname: String = null
 
     def currentDelay: Period = {
       if (failures == 0) return new Period("0")
@@ -247,11 +301,6 @@ object Broker {
       failures += 1
       failureTime = now
     }
-    
-    def registerSuccess(hostname: String): Unit = {
-      resetFailures()
-      successHostname = hostname
-    }
 
     def resetFailures(): Unit = {
       failures = 0
@@ -262,11 +311,9 @@ object Broker {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
-      stickyPeriod = if (node.contains("stickyPeriod")) new Period(node("stickyPeriod").asInstanceOf[String]) else new Period("10m")
 
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
       if (node.contains("failureTime")) failureTime = dateTimeFormat.parse(node("failureTime").asInstanceOf[String])
-      if (node.contains("successHostname")) successHostname = node("successHostname").asInstanceOf[String]
     }
 
     def toJson: JSONObject = {
@@ -275,11 +322,9 @@ object Broker {
       obj("delay") = "" + delay
       obj("maxDelay") = "" + maxDelay
       if (maxTries != null) obj("maxTries") = maxTries
-      obj("stickyPeriod") = "" + stickyPeriod
 
       if (failures != 0) obj("failures") = failures
       if (failureTime != null) obj("failureTime") = dateTimeFormat.format(failureTime)
-      if (successHostname != null) obj("successHostname") = successHostname
 
       new JSONObject(obj.toMap)
     }
