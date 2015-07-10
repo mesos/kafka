@@ -156,7 +156,7 @@ class BrokerTest extends MesosTestCase {
     broker.task = null
     assertTrue(broker.shouldStart(host))
 
-    // sticky hostname
+    // stickiness
     broker.registerStart(host)
     broker.registerStop(new Date(0))
     assertTrue(broker.shouldStart(host, new Date(0)))

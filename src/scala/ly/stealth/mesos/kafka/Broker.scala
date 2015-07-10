@@ -268,7 +268,7 @@ object Broker {
     }
   }
 
-  class Failover(_delay: Period = new Period("1m"), _maxDelay: Period = new Period("10m"), _stickyPeriod: Period = new Period("10m")) {
+  class Failover(_delay: Period = new Period("1m"), _maxDelay: Period = new Period("10m")) {
     var delay: Period = _delay
     var maxDelay: Period = _maxDelay
     var maxTries: Integer = null
