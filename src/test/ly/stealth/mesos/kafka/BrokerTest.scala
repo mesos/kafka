@@ -341,6 +341,7 @@ class BrokerTest extends MesosTestCase {
   @Test
   def Failover_toJson_fromJson {
     val failover = new Failover(new Period("1s"), new Period("5s"))
+    failover.stickyPeriod = new Period("5m")
     failover.maxTries = 10
     failover.registerFailure(new Date(0))
 
@@ -390,6 +391,7 @@ object BrokerTest {
     assertEquals(expected.delay, actual.delay)
     assertEquals(expected.maxDelay, actual.maxDelay)
     assertEquals(expected.maxTries, actual.maxTries)
+    assertEquals(expected.stickyPeriod, actual.stickyPeriod)
 
     assertEquals(expected.failures, actual.failures)
     assertEquals(expected.failureTime, actual.failureTime)

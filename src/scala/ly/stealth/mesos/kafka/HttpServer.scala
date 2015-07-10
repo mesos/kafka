@@ -199,6 +199,11 @@ object HttpServer {
         try { Integer.valueOf(failoverMaxTries) }
         catch { case e: NumberFormatException => errors.add("Invalid failoverMaxTries") }
 
+      var failoverStickyPeriod: Period = null
+      if (request.getParameter("failoverStickyPeriod") != null)
+        try { failoverStickyPeriod = new Period(request.getParameter("failoverStickyPeriod")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid failoverStickyPeriod") }
+
 
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
@@ -238,6 +243,7 @@ object HttpServer {
         if (failoverDelay != null) broker.failover.delay = failoverDelay
         if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay
         if (failoverMaxTries != null) broker.failover.maxTries = if (failoverMaxTries != "") Integer.valueOf(failoverMaxTries) else null
+        if (failoverStickyPeriod != null) broker.failover.stickyPeriod = failoverStickyPeriod
 
         if (add) cluster.addBroker(broker)
       }

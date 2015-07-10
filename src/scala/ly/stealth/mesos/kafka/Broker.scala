@@ -212,10 +212,11 @@ object Broker {
 
   def isOptionOverridable(name: String): Boolean = !List("broker.id", "port", "zookeeper.connect").contains(name)
 
-  class Failover(_delay: Period = new Period("10s"), _maxDelay: Period = new Period("60s")) {
+  class Failover(_delay: Period = new Period("1m"), _maxDelay: Period = new Period("10m"), _stickyPeriod: Period = new Period("10m")) {
     var delay: Period = _delay
     var maxDelay: Period = _maxDelay
     var maxTries: Integer = null
+    var stickyPeriod: Period = _stickyPeriod
 
     @volatile var failures: Int = 0
     @volatile var failureTime: Date = null
@@ -255,6 +256,7 @@ object Broker {
       delay = new Period(node("delay").asInstanceOf[String])
       maxDelay = new Period(node("maxDelay").asInstanceOf[String])
       if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
+      stickyPeriod = if (node.contains("stickyPeriod")) new Period(node("stickyPeriod").asInstanceOf[String]) else new Period("10m")
 
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
       if (node.contains("failureTime")) failureTime = dateTimeFormat.parse(node("failureTime").asInstanceOf[String])
@@ -266,6 +268,7 @@ object Broker {
       obj("delay") = "" + delay
       obj("maxDelay") = "" + maxDelay
       if (maxTries != null) obj("maxTries") = maxTries
+      obj("stickyPeriod") = "" + stickyPeriod
 
       if (failures != 0) obj("failures") = failures
       if (failureTime != null) obj("failureTime") = dateTimeFormat.format(failureTime)

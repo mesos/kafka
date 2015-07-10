@@ -208,7 +208,7 @@ broker:
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   options: log.dirs=/mnt/array1/broker0
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m, sticky-period:10m
 
 # ./kafka-mesos.sh start 0
 Broker 0 started
@@ -226,19 +226,19 @@ brokers:
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m, sticky-period:10m
 
   id: 1
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m, sticky-period:10m
 
   id: 2
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m, sticky-period:10m
 
 #./kafka-mesos.sh start 0
 Broker 0 started
@@ -259,16 +259,20 @@ clusterStorage=zk:/kafka-mesos
 Failed Broker Recovery
 ------------------------
 When the broker fails, kafka mesos scheduler assumes that the failure is recoverable. Scheduler will try
-to restart broker on any matched slave after waiting failover-delay (i.e. 30s, 2m). Initially waiting
-delay is equal to failover-delay setting. After each serial failure it doubles until it reaches failover-max-delay value.
+to restart broker after waiting failover-delay (i.e. 30s, 2m). Initially waiting delay is equal to failover-delay setting.
+After each serial failure it doubles until it reaches failover-max-delay value.
 
 If failover-max-tries is defined and serial failure count exceeds it, broker will be deactivated.
+
+After failure but during failover-sticky-period time Scheduler would restart broker on the same node as before failure.
+After passing that time Scheduler would restart broker on any matched slave.
 
 Following failover settings exists:
 ```
 --failover-delay    - initial failover delay to wait after failure, required
 --failover-max-delay - max failover delay, required
 --failover-max-tries - max failover tries to deactivate broker, optional
+--failover-sticky-period - period during which failover will try to preserve same node for failed broker
 ```
 
 Navigating the CLI
@@ -290,6 +294,7 @@ Option                Description
 --failover-delay      failover delay (10s, 5m, 3h)
 --failover-max-delay  max failover delay. See failoverDelay.
 --failover-max-tries  max failover tries. Default - none
+--failover-sticky-period  sticky period to preserve same node for broker (5m, 10m, 1h)
 --heap <Long>         heap amount in Mb
 --jvm-options         jvm options string (-Xms128m -XX:PermSize=48m)
 --log4j-options       log4j options or file. Examples:
@@ -340,6 +345,7 @@ Option                Description
 --failover-delay      failover delay (10s, 5m, 3h)
 --failover-max-delay  max failover delay. See failoverDelay.
 --failover-max-tries  max failover tries. Default - none
+--failover-sticky-period  sticky period to preserve same node for broker (5m, 10m, 1h)
 --heap <Long>         heap amount in Mb
 --jvm-options         jvm options string (-Xms128m -XX:PermSize=48m)
 --log4j-options       log4j options or file. Examples:

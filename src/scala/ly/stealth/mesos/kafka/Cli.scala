@@ -271,6 +271,7 @@ object Cli {
     parser.accepts("failover-delay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
     parser.accepts("failover-max-delay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
     parser.accepts("failover-max-tries", "max failover tries. Default - none").withRequiredArg().ofType(classOf[String])
+    parser.accepts("failover-sticky-period", "sticky period to preserve same node for broker (5m, 10m, 1h)").withRequiredArg().ofType(classOf[String])
 
     if (help) {
       val command = if (add) "add" else "update"
@@ -313,6 +314,7 @@ object Cli {
     val failoverDelay = options.valueOf("failover-delay").asInstanceOf[String]
     val failoverMaxDelay = options.valueOf("failover-max-delay").asInstanceOf[String]
     val failoverMaxTries = options.valueOf("failover-max-tries").asInstanceOf[String]
+    val failoverStickyPeriod = options.valueOf("failover-sticky-period").asInstanceOf[String]
 
     val params = new util.LinkedHashMap[String, String]
     params.put("id", id)
@@ -331,6 +333,7 @@ object Cli {
     if (failoverDelay != null) params.put("failoverDelay", failoverDelay)
     if (failoverMaxDelay != null) params.put("failoverMaxDelay", failoverMaxDelay)
     if (failoverMaxTries != null) params.put("failoverMaxTries", failoverMaxTries)
+    if (failoverStickyPeriod != null) params.put("failoverStickyPeriod", failoverStickyPeriod)
 
     var json: Map[String, Object] = null
     try { json = sendRequest("/brokers/" + (if (add) "add" else "update"), params) }
@@ -559,6 +562,7 @@ object Cli {
     failover += " delay:" + broker.failover.delay
     failover += ", max-delay:" + broker.failover.maxDelay
     if (broker.failover.maxTries != null) failover += ", max-tries:" + broker.failover.maxTries
+    failover += ", sticky-period:" + broker.failover.stickyPeriod
     printLine(failover, indent)
 
     val task = broker.task
