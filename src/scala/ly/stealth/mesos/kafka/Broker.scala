@@ -253,7 +253,7 @@ object Broker {
       successHostname = hostname
     }
 
-    def resetFailures(): Unit = { // todo remove me?
+    def resetFailures(): Unit = {
       failures = 0
       failureTime = null
     }
