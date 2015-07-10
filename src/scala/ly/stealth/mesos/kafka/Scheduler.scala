@@ -215,7 +215,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       logger.info(s"Finished reconciling of broker ${broker.id}, task ${broker.task.id}")
 
     broker.task.state = Broker.State.RUNNING
-    broker.failover.resetFailures()
+    broker.failover.registerSuccess(broker.task.hostname)
   }
 
   private[kafka] def onBrokerStopped(broker: Broker, status: TaskStatus, now: Date = new Date()): Unit = {

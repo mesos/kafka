@@ -220,6 +220,7 @@ object Broker {
 
     @volatile var failures: Int = 0
     @volatile var failureTime: Date = null
+    @volatile var successHostname: String = null
 
     def currentDelay: Period = {
       if (failures == 0) return new Period("0")
@@ -246,8 +247,13 @@ object Broker {
       failures += 1
       failureTime = now
     }
+    
+    def registerSuccess(hostname: String): Unit = {
+      resetFailures()
+      successHostname = hostname
+    }
 
-    def resetFailures(): Unit = {
+    def resetFailures(): Unit = { // todo remove me?
       failures = 0
       failureTime = null
     }
@@ -260,6 +266,7 @@ object Broker {
 
       if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
       if (node.contains("failureTime")) failureTime = dateTimeFormat.parse(node("failureTime").asInstanceOf[String])
+      if (node.contains("successHostname")) successHostname = node("successHostname").asInstanceOf[String]
     }
 
     def toJson: JSONObject = {
@@ -272,6 +279,7 @@ object Broker {
 
       if (failures != 0) obj("failures") = failures
       if (failureTime != null) obj("failureTime") = dateTimeFormat.format(failureTime)
+      if (successHostname != null) obj("successHostname") = successHostname
 
       new JSONObject(obj.toMap)
     }

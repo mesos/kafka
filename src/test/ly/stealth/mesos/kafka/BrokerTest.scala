@@ -320,7 +320,7 @@ class BrokerTest extends MesosTestCase {
   }
 
   @Test
-  def Failover_registerFailure_resetFailures {
+  def Failover_registerFailure_registerSuccess {
     val failover = new Failover()
     assertEquals(0, failover.failures)
     assertNull(failover.failureTime)
@@ -333,9 +333,14 @@ class BrokerTest extends MesosTestCase {
     assertEquals(2, failover.failures)
     assertEquals(new Date(2), failover.failureTime)
 
-    failover.resetFailures()
+    failover.registerSuccess("localhost")
     assertEquals(0, failover.failures)
     assertNull(failover.failureTime)
+    assertEquals("localhost", failover.successHostname)
+
+    failover.registerFailure()
+    assertEquals(1, failover.failures)
+    assertEquals("localhost", failover.successHostname)
   }
 
   @Test
@@ -343,6 +348,7 @@ class BrokerTest extends MesosTestCase {
     val failover = new Failover(new Period("1s"), new Period("5s"))
     failover.stickyPeriod = new Period("5m")
     failover.maxTries = 10
+    failover.registerSuccess("localhost")
     failover.registerFailure(new Date(0))
 
     val read: Failover = new Failover()
@@ -395,6 +401,7 @@ object BrokerTest {
 
     assertEquals(expected.failures, actual.failures)
     assertEquals(expected.failureTime, actual.failureTime)
+    assertEquals(expected.successHostname, actual.successHostname)
   }
 
   def assertTaskEquals(expected: Task, actual: Task) {
