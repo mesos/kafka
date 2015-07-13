@@ -166,6 +166,11 @@ object HttpServer {
         try { new BindAddress(request.getParameter("bindAddress")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid bindAddress") }
 
+      var stickinessPeriod: Period = null
+      if (request.getParameter("stickinessPeriod") != null)
+        try { stickinessPeriod = new Period(request.getParameter("stickinessPeriod")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid stickinessPeriod") }
+
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
         try { options = Util.parseMap(request.getParameter("options"), nullValues = false).filterKeys(Broker.isOptionOverridable).view.force }
@@ -229,6 +234,7 @@ object HttpServer {
         if (heap != null) broker.heap = heap
         if (port != null) broker.port = if (port != "") new Range(port) else null
         if (bindAddress != null) broker.bindAddress = if (bindAddress != "") new BindAddress(bindAddress) else null
+        if (stickinessPeriod != null) broker.stickiness.period = stickinessPeriod
 
         if (constraints != null) broker.constraints = constraints
         if (options != null) broker.options = options

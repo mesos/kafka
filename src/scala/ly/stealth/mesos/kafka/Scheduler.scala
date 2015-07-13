@@ -173,7 +173,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     if (isReconciling) return "reconciling"
 
     var reason = ""
-    for (broker <- cluster.getBrokers.filter(_.shouldStart())) {
+    for (broker <- cluster.getBrokers.filter(_.shouldStart(offer.getHostname))) {
       val diff = broker.matches(offer, otherTasksAttributes)
 
       if (diff == null) {
@@ -215,16 +215,16 @@ object Scheduler extends org.apache.mesos.Scheduler {
       logger.info(s"Finished reconciling of broker ${broker.id}, task ${broker.task.id}")
 
     broker.task.state = Broker.State.RUNNING
-    broker.failover.resetFailures()
+    broker.registerStart(broker.task.hostname)
   }
 
   private[kafka] def onBrokerStopped(broker: Broker, status: TaskStatus, now: Date = new Date()): Unit = {
     broker.task = null
+
     val failed = broker.active && status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
+    broker.registerStop(now, failed)
 
     if (failed) {
-      broker.failover.registerFailure(now)
-
       var msg = s"Broker ${broker.id} failed ${broker.failover.failures}"
       if (broker.failover.maxTries != null) msg += "/" + broker.failover.maxTries
 
