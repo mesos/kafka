@@ -566,7 +566,7 @@ object Cli {
       printLine("task: ", indent)
       printLine("id: " + broker.task.id, indent + 1)
       printLine("state: " + task.state, indent + 1)
-      printLine("endpoint: " + task.endpoint, indent + 1)
+      if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
       if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
     }
   }

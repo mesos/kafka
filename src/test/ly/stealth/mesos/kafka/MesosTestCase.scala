@@ -191,12 +191,17 @@ class MesosTestCase {
 
   def taskStatus(
     id: String = "" + UUID.randomUUID(),
-    state: TaskState
+    state: TaskState,
+    data: String = null
   ): TaskStatus = {
-    TaskStatus.newBuilder()
-    .setTaskId(TaskID.newBuilder().setValue(id))
-    .setState(state)
-    .build()
+    val builder = TaskStatus.newBuilder()
+      .setTaskId(TaskID.newBuilder().setValue(id))
+      .setState(state)
+
+    if (data != null)
+      builder.setData(ByteString.copyFromUtf8(data))
+
+    builder.build
   }
   
   private def _schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()
@@ -329,9 +334,10 @@ class TestBrokerServer extends BrokerServer {
 
   def isStarted: Boolean = started.get()
 
-  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Unit = {
+  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
     if (failOnStart) throw new RuntimeException("failOnStart")
     started.set(true)
+    new Broker.Endpoint("localhost", 9092)
   }
 
   def stop(): Unit = {

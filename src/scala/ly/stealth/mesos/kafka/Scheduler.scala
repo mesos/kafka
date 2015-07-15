@@ -215,6 +215,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       logger.info(s"Finished reconciling of broker ${broker.id}, task ${broker.task.id}")
 
     broker.task.state = Broker.State.RUNNING
+    if (status.getData.size() > 0) broker.task.endpoint = new Broker.Endpoint(status.getData.toStringUtf8)
     broker.failover.resetFailures()
   }
 
@@ -255,7 +256,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (attribute.hasText) attributes.put(attribute.getName, attribute.getText.getValue)
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
-    broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, port, attributes)
+    broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, attributes)
 
     logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${offer.getHostname + Str.id(offer.getId.getValue)}\n ${Str.task(task_)}")
   }

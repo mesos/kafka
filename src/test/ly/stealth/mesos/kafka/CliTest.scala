@@ -135,7 +135,7 @@ class CliTest extends MesosTestCase {
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
     assertTrue(broker.active)
 
-    broker.task = new Broker.Task("id", "slave", "executor", "host", 1000, _state = Broker.State.RUNNING)
+    broker.task = new Broker.Task("id", "slave", "executor", "host", _state = Broker.State.RUNNING)
     try { exec("stop 0 --timeout=1ms"); fail() }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
     assertFalse(broker.active)

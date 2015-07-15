@@ -135,12 +135,13 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def onBrokerStatus {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host", 9092)
+    broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host")
     assertEquals(Broker.State.STARTING, broker.task.state)
 
     // broker started
-    Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING))
+    Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, "localhost:9092"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
+    assertEquals("localhost:9092", "" + broker.task.endpoint)
 
     // broker finished
     Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_FINISHED))
@@ -154,8 +155,9 @@ class SchedulerTest extends MesosTestCase {
     broker.task = new Broker.Task("task")
     assertEquals(Broker.State.STARTING, broker.task.state)
 
-    Scheduler.onBrokerStarted(broker, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING))
+    Scheduler.onBrokerStarted(broker, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, "localhost:9092"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
+    assertEquals("localhost:9092", "" + broker.task.endpoint)
   }
 
   @Test
