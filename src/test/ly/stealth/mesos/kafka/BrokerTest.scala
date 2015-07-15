@@ -22,7 +22,7 @@ import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, parseMap}
 import java.util.Date
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Broker.{Endpoint, State, Task, Failover}
+import ly.stealth.mesos.kafka.Broker.{Endpoint, Stickiness, State, Task, Failover}
 
 class BrokerTest extends MesosTestCase {
   var broker: Broker = null
@@ -143,28 +143,36 @@ class BrokerTest extends MesosTestCase {
 
   @Test
   def shouldStart {
+    val host = "host"
     // active
     broker.active = false
-    assertFalse(broker.shouldStart())
+    assertFalse(broker.shouldStart(host))
     broker.active = true
-    assertTrue(broker.shouldStart())
+    assertTrue(broker.shouldStart(host))
 
     // has task
     broker.task = new Task()
-    assertFalse(broker.shouldStart())
+    assertFalse(broker.shouldStart(host))
     broker.task = null
-    assertTrue(broker.shouldStart())
+    assertTrue(broker.shouldStart(host))
+
+    // stickiness
+    broker.registerStart(host)
+    broker.registerStop(new Date(0))
+    assertTrue(broker.shouldStart(host, new Date(0)))
+    assertFalse(broker.shouldStart(host + "1", new Date(0)))
+    assertTrue(broker.shouldStart(host + "1", new Date(broker.stickiness.period.ms)))
 
     // failover waiting delay
     val now = new Date(0)
     broker.failover.delay = new Period("1s")
-    broker.failover.registerFailure(now)
+    broker.registerStop(now, failed = true)
     assertTrue(broker.failover.isWaitingDelay(now))
 
-    assertFalse(broker.shouldStart(now = now))
-    assertTrue(broker.shouldStart(now = new Date(now.getTime + broker.failover.delay.ms)))
+    assertFalse(broker.shouldStart(host, now = now))
+    assertTrue(broker.shouldStart(host, now = new Date(now.getTime + broker.failover.delay.ms)))
     broker.failover.resetFailures()
-    assertTrue(broker.shouldStart(now = now))
+    assertTrue(broker.shouldStart(host, now = now))
   }
 
   @Test
@@ -258,6 +266,52 @@ class BrokerTest extends MesosTestCase {
     assertEquals("0", Broker.idFromTaskId(Broker.nextTaskId(new Broker("0"))))
     assertEquals("100", Broker.idFromTaskId(Broker.nextTaskId(new Broker("100"))))
   }
+  
+  // Stickiness
+  @Test
+  def Stickiness_allowsHostname {
+    val stickiness = new Stickiness()
+    assertTrue(stickiness.allowsHostname("host0", new Date(0)))
+    assertTrue(stickiness.allowsHostname("host1", new Date(0)))
+
+    stickiness.registerStart("host0")
+    stickiness.registerStop(new Date(0))
+    assertTrue(stickiness.allowsHostname("host0", new Date(0)))
+    assertFalse(stickiness.allowsHostname("host1", new Date(0)))
+    assertTrue(stickiness.allowsHostname("host1", new Date(stickiness.period.ms)))
+  }
+
+  @Test
+  def Stickiness_registerStart_registerStop {
+    val stickiness = new Stickiness()
+    assertNull(stickiness.hostname)
+    assertNull(stickiness.stopTime)
+
+    stickiness.registerStart("host")
+    assertEquals("host", stickiness.hostname)
+    assertNull(stickiness.stopTime)
+
+    stickiness.registerStop(new Date(0))
+    assertEquals("host", stickiness.hostname)
+    assertEquals(new Date(0), stickiness.stopTime)
+
+    stickiness.registerStart("host1")
+    assertEquals("host1", stickiness.hostname)
+    assertNull(stickiness.stopTime)
+  }
+
+  @Test
+  def Stickiness_toJson_fromJson {
+    val stickiness = new Stickiness()
+    stickiness.registerStart("localhost")
+    stickiness.registerStop(new Date(0))
+
+    val read: Stickiness = new Stickiness()
+    read.fromJson(Util.parseJson("" + stickiness.toJson))
+
+    BrokerTest.assertStickinessEquals(stickiness, read)
+  }
+  
 
   // Failover
   @Test
@@ -336,12 +390,16 @@ class BrokerTest extends MesosTestCase {
     failover.resetFailures()
     assertEquals(0, failover.failures)
     assertNull(failover.failureTime)
+
+    failover.registerFailure()
+    assertEquals(1, failover.failures)
   }
 
   @Test
   def Failover_toJson_fromJson {
     val failover = new Failover(new Period("1s"), new Period("5s"))
     failover.maxTries = 10
+    failover.resetFailures()
     failover.registerFailure(new Date(0))
 
     val read: Failover = new Failover()
@@ -394,6 +452,14 @@ object BrokerTest {
 
     assertEquals(expected.failures, actual.failures)
     assertEquals(expected.failureTime, actual.failureTime)
+  }
+
+  def assertStickinessEquals(expected: Stickiness, actual: Stickiness) {
+    if (checkNulls(expected, actual)) return
+
+    assertEquals(expected.period, actual.period)
+    assertEquals(expected.stopTime, actual.stopTime)
+    assertEquals(expected.hostname, actual.hostname)
   }
 
   def assertTaskEquals(expected: Task, actual: Task) {

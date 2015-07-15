@@ -24,7 +24,7 @@ import java.io._
 import java.util
 import scala.collection.JavaConversions._
 import java.util.{Properties, Collections}
-import ly.stealth.mesos.kafka.Util.Period
+import ly.stealth.mesos.kafka.Util.{Str, Period}
 
 object Cli {
   var api: String = null
@@ -262,6 +262,7 @@ object Cli {
     parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
     parser.accepts("port", "port or range (31092, 31090..31100). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
     parser.accepts("bind-address", "broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
+    parser.accepts("stickiness-period", "stickiness period to preserve same node for broker (5m, 10m, 1h)").withRequiredArg().ofType(classOf[String])
 
     parser.accepts("options", "options or file. Examples:\n log.dirs=/tmp/kafka/$id,num.io.threads=16\n file:server.properties").withRequiredArg()
     parser.accepts("log4j-options", "log4j options or file. Examples:\n log4j.logger.kafka=DEBUG\\, kafkaAppender\n file:log4j.properties").withRequiredArg()
@@ -304,6 +305,7 @@ object Cli {
     val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
     val port = options.valueOf("port").asInstanceOf[String]
     val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
+    val stickinessPeriod = options.valueOf("stickiness-period").asInstanceOf[String]
 
     val constraints = options.valueOf("constraints").asInstanceOf[String]
     val options_ = options.valueOf("options").asInstanceOf[String]
@@ -322,6 +324,7 @@ object Cli {
     if (heap != null) params.put("heap", "" + heap)
     if (port != null) params.put("port", port)
     if (bindAddress != null) params.put("bindAddress", bindAddress)
+    if (stickinessPeriod != null) params.put("stickinessPeriod", stickinessPeriod)
 
     if (options_ != null) params.put("options", optionsOrFile(options_))
     if (constraints != null) params.put("constraints", constraints)
@@ -560,6 +563,12 @@ object Cli {
     failover += ", max-delay:" + broker.failover.maxDelay
     if (broker.failover.maxTries != null) failover += ", max-tries:" + broker.failover.maxTries
     printLine(failover, indent)
+
+    var stickiness = "stickiness:"
+    stickiness += " period:" + broker.stickiness.period
+    if (broker.stickiness.hostname != null) stickiness += ", hostname:" + broker.stickiness.hostname
+    if (broker.stickiness.stopTime != null) stickiness += ", expires:" + Str.dateTime(broker.stickiness.expires)
+    printLine(stickiness, indent)
 
     val task = broker.task
     if (task != null) {
