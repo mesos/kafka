@@ -24,7 +24,7 @@ import java.io._
 import java.util
 import scala.collection.JavaConversions._
 import java.util.{Properties, Collections}
-import ly.stealth.mesos.kafka.Util.{Str, Period}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Str, Period}
 
 object Cli {
   var api: String = null
@@ -143,6 +143,9 @@ object Cli {
     parser.accepts("api", "Api url. Example: http://master:7000")
       .withRequiredArg().ofType(classOf[String])
 
+    parser.accepts("bind-address", "Scheduler bind address (master, 0.0.0.0, 192.168.50.*, if:eth1). Default - all")
+      .withRequiredArg().ofType(classOf[String])
+
     parser.accepts("zk",
       """Kafka zookeeper.connect. Examples:
         | - master:2181
@@ -220,6 +223,11 @@ object Cli {
     val api = options.valueOf("api").asInstanceOf[String]
     if (api != null) Config.api = api
     else if (Config.api == null) throw new Error(s"Undefined api. $provideOption")
+
+    val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
+    if (bindAddress != null)
+      try { Config.bindAddress = new BindAddress(bindAddress) }
+      catch { case e: IllegalArgumentException => throw new Error("Invalid bind-address") }
 
     val zk = options.valueOf("zk").asInstanceOf[String]
     if (zk != null) Config.zk = zk
