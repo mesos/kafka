@@ -1,7 +1,7 @@
 apply plugin: 'scala'
 apply plugin: 'idea'
 
-version = '0.9.1.0'
+version = '0.9.1.1'
 
 jar.archiveName = "kafka-mesos-${version}.jar"
 
