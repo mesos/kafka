@@ -47,6 +47,7 @@ object HttpServer {
     server = new Server(threadPool)
     val connector = new ServerConnector(server)
     connector.setPort(Config.apiPort)
+    if (Config.bindAddress != null) connector.setHost(Config.bindAddress.resolve())
     connector.setIdleTimeout(60 * 1000)
 
     val handler = new ServletContextHandler
@@ -181,7 +182,7 @@ object HttpServer {
         try { log4jOptions = Util.parseMap(request.getParameter("log4jOptions")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid log4jOptions: " + e.getMessage) }
 
-      var jvmOptions: String = request.getParameter("jvmOptions")
+      val jvmOptions: String = request.getParameter("jvmOptions")
 
       var constraints: util.Map[String, Constraint] = null
       if (request.getParameter("constraints") != null)
