@@ -161,9 +161,10 @@ object Cluster {
   class ZkStorage(val path: String) extends Storage {
     {
       val (zkConnect, chroot) = Config.zk.span(_ != '/')
-      if (chroot != "") {
+      val storagePath = chroot + path
+      if (storagePath != "") {
         val client = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer)
-        try { client.createPersistent(chroot, false) }
+        try { client.createPersistent(storagePath, true) }
         finally { client.close() }
       }
     }
