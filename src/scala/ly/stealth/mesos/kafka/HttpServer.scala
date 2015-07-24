@@ -19,16 +19,17 @@ package ly.stealth.mesos.kafka
 
 import java.io._
 import org.apache.log4j.Logger
-import org.eclipse.jetty.server.{ServerConnector, Server}
+import org.eclipse.jetty.server._
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.eclipse.jetty.servlet.{ServletHolder, ServletContextHandler}
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 import java.util
 import scala.collection.JavaConversions._
-import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
+import scala.util.parsing.json.JSONArray
+import scala.util.parsing.json.JSONObject
 
 object HttpServer {
   var jar: File = null
@@ -52,6 +53,7 @@ object HttpServer {
 
     val handler = new ServletContextHandler
     handler.addServlet(new ServletHolder(new Servlet()), "/")
+    handler.setErrorHandler(new ErrorHandler())
 
     server.setHandler(handler)
     server.addConnector(connector)
@@ -89,8 +91,7 @@ object HttpServer {
       try { handle(request, response) }
       catch {
         case e: Exception =>
-          logger.warn("", e)
-          response.sendError(500, "" + e) // specify error message
+          response.sendError(500, "" + e)
           throw e
       }
     }
@@ -102,7 +103,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
-      else response.sendError(404)
+      else response.sendError(404, "uri not found")
     }
 
     def downloadFile(file: File, response: HttpServletResponse): Unit = {
@@ -118,6 +119,7 @@ object HttpServer {
     }
 
     def handleBrokersApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
       var uri: String = request.getRequestURI.substring("/api/brokers".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
@@ -127,7 +129,7 @@ object HttpServer {
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
       else if (uri == "rebalance") handleRebalance(request, response)
-      else response.sendError(404)
+      else response.sendError(404, "uri not found")
     }
 
     def handleStatus(response: HttpServletResponse): Unit = {
@@ -357,7 +359,6 @@ object HttpServer {
         try { timeout = new Period(request.getParameter("timeout")) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
-
       def startRebalance: (String, String) = {
         try { rebalancer.start(ids, topics) }
         catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
@@ -385,6 +386,29 @@ object HttpServer {
       result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
+    }
+  }
+
+  class ErrorHandler extends handler.ErrorHandler () {
+    override def handle(target: String, baseRequest: Request, request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val code: Int = response.getStatus
+      val error: String = response match {
+        case response: Response => response.getReason
+        case _ => ""
+      }
+
+      val writer: PrintWriter = response.getWriter
+
+      if (request.getAttribute("jsonResponse") != null) {
+        response.setContentType("application/json; charset=utf-8")
+        writer.println("" + new JSONObject(Map("code" -> code, "error" -> error)))
+      } else {
+        response.setContentType("text/plain; charset=utf-8")
+        writer.println(code + " - " + error)
+      }
+
+      writer.flush()
+      baseRequest.setHandled(true)
     }
   }
 }
