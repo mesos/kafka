@@ -19,16 +19,17 @@ package ly.stealth.mesos.kafka
 
 import java.io._
 import org.apache.log4j.Logger
-import org.eclipse.jetty.server.{ServerConnector, Server}
+import org.eclipse.jetty.server._
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.eclipse.jetty.servlet.{ServletHolder, ServletContextHandler}
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 import java.util
 import scala.collection.JavaConversions._
-import scala.util.parsing.json.{JSONArray, JSONObject}
 import scala.collection.mutable.ListBuffer
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
+import scala.util.parsing.json.JSONArray
+import scala.util.parsing.json.JSONObject
 
 object HttpServer {
   var jar: File = null
@@ -52,6 +53,7 @@ object HttpServer {
 
     val handler = new ServletContextHandler
     handler.addServlet(new ServletHolder(new Servlet()), "/")
+    handler.setErrorHandler(new ErrorHandler())
 
     server.setHandler(handler)
     server.addConnector(connector)
@@ -90,7 +92,7 @@ object HttpServer {
       catch {
         case e: Exception =>
           logger.warn("", e)
-          sendErrorResponse(response, 500, new util.ArrayList[String](){""+e})
+          response.sendError(500, "" + e)
           throw e
       }
     }
@@ -102,7 +104,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
-      else sendErrorResponse(response, 404, "uri not found")
+      else response.sendError(404, "uri not found")
     }
 
     def downloadFile(file: File, response: HttpServletResponse): Unit = {
@@ -118,6 +120,7 @@ object HttpServer {
     }
 
     def handleBrokersApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
       var uri: String = request.getRequestURI.substring("/api/brokers".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
@@ -127,7 +130,7 @@ object HttpServer {
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
       else if (uri == "rebalance") handleRebalance(request, response)
-      else sendErrorResponse(response, 404, "uri not found")
+      else response.sendError(404, "uri not found")
     }
 
     def handleStatus(response: HttpServletResponse): Unit = {
@@ -206,11 +209,11 @@ object HttpServer {
         catch { case e: NumberFormatException => errors.add("Invalid failoverMaxTries") }
 
 
-      if (!errors.isEmpty) { sendErrorResponse(response, 400, errors); return }
+      if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => sendErrorResponse(response, 400, "invalid id-expr"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -227,7 +230,7 @@ object HttpServer {
         brokers.add(broker)
       }
 
-      if (!errors.isEmpty) { sendErrorResponse(response, 400, errors); return }
+      if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       for (broker <- brokers) {
         if (cpus != null) broker.cpus = cpus
@@ -260,17 +263,17 @@ object HttpServer {
       val cluster = Scheduler.cluster
 
       val idExpr = request.getParameter("id")
-      if (idExpr == null) { sendErrorResponse(response, 400, "id required"); return }
+      if (idExpr == null) { response.sendError(400, "id required"); return }
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => sendErrorResponse(response, 400, "invalid id-expr"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
         val broker = Scheduler.cluster.getBroker(id)
-        if (broker == null) { sendErrorResponse(response, 400, s"broker $id not found"); return }
-        if (broker.active) { sendErrorResponse(response, 400, s"broker $id is active"); return }
+        if (broker == null) { response.sendError(400, s"broker $id not found"); return }
+        if (broker.active) { response.sendError(400, s"broker $id is active"); return }
         brokers.add(broker)
       }
 
@@ -290,22 +293,22 @@ object HttpServer {
       var timeout: Period = new Period("60s")
       if (request.getParameter("timeout") != null)
         try { timeout = new Period(request.getParameter("timeout")) }
-        catch { case ignore: IllegalArgumentException => sendErrorResponse(response, 400, "invalid timeout"); return }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
       val force: Boolean = request.getParameter("force") != null
 
       val idExpr: String = request.getParameter("id")
-      if (idExpr == null) { sendErrorResponse(response, 400, "id required"); return }
+      if (idExpr == null) { response.sendError(400, "id required"); return }
 
       var ids: util.List[String] = null
       try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => sendErrorResponse(response, 400, "invalid id-expr"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
         val broker = cluster.getBroker(id)
-        if (broker == null) { sendErrorResponse(response, 400, "broker " + id + " not found"); return }
-        if (!force && broker.active == start) { sendErrorResponse(response, 400, "broker " + id + " is" + (if (start) "" else " not") +  " active"); return }
+        if (broker == null) { response.sendError(400, "broker " + id + " not found"); return }
+        if (!force && broker.active == start) { response.sendError(400, "broker " + id + " is" + (if (start) "" else " not") +  " active"); return }
         brokers.add(broker)
       }
 
@@ -342,20 +345,20 @@ object HttpServer {
       var ids: util.List[String] = null
       if (idExpr != null)
         try { ids = cluster.expandIds(idExpr) }
-        catch { case e: IllegalArgumentException => sendErrorResponse(response, 400, "invalid id-expr"); return }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
-      if (ids != null && rebalancer.running) { sendErrorResponse(response, 400, "rebalance is already running"); return }
+      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
 
       val topicExpr = if (request.getParameter("topics") != null) request.getParameter("topics") else "*"
       var topics: util.Map[String, Integer] = null
       try { topics = rebalancer.expandTopics(topicExpr)}
-      catch { case e: IllegalArgumentException => sendErrorResponse(response, 400, "invalid topics"); return }
-      if (topics != null && topics.isEmpty) { sendErrorResponse(response, 400, "no topics specified"); return }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+      if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
 
       var timeout: Period = new Period("0")
       if (request.getParameter("timeout") != null)
         try { timeout = new Period(request.getParameter("timeout")) }
-        catch { case e: IllegalArgumentException => sendErrorResponse(response, 400, "invalid timeout"); return }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
       def startRebalance: (String, String) = {
         try { rebalancer.start(ids, topics) }
@@ -385,17 +388,28 @@ object HttpServer {
 
       response.getWriter.println(JSONObject(result.toMap))
     }
+  }
 
-    def sendErrorResponse(response: HttpServletResponse, statusCode: Int, error: String): Unit = {
-      val errors: util.ArrayList[String] = new util.ArrayList[String]()
-      errors.add(error)
-      sendErrorResponse(response, statusCode, errors)
+  class ErrorHandler extends handler.ErrorHandler () {
+    override def handle(target: String, baseRequest: Request, request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val code: Int = response.getStatus
+      val error: String = response match {
+        case response: Response => response.getReason
+        case _ => ""
+      }
+
+      val writer: PrintWriter = response.getWriter
+
+      if (request.getAttribute("jsonResponse") != null) {
+        response.setContentType("application/json; charset=utf-8")
+        writer.println("" + new JSONObject(Map("code" -> code, "error" -> error)))
+      } else {
+        response.setContentType("text/plain; charset=utf-8")
+        writer.println(code + " - " + error)
+      }
+
+      writer.flush()
+      baseRequest.setHandled(true)
     }
-
-    def sendErrorResponse(response: HttpServletResponse, statusCode: Int, errors: util.ArrayList[String]): Unit = {
-      response.getWriter.println("" + new JSONObject(Map("status_code" -> statusCode, "message" -> errors.mkString("; "))))
-      response.setStatus(statusCode)
-    }
-
   }
 }
