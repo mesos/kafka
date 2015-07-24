@@ -91,7 +91,6 @@ object HttpServer {
       try { handle(request, response) }
       catch {
         case e: Exception =>
-          logger.warn("", e)
           response.sendError(500, "" + e)
           throw e
       }
