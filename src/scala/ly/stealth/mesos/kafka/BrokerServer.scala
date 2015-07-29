@@ -80,6 +80,11 @@ object BrokerServer {
       val config: Object = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object]
       val server: Object = serverClass.getConstructor(configClass).newInstance(config).asInstanceOf[Object]
 
+      val metricsReporter = loader.loadClass("kafka.metrics.KafkaMetricsReporter$").getField("MODULE$").get(null)
+      val metricsReporterClass = metricsReporter.getClass
+      val verifiableProps = config.getClass.getMethod("props").invoke(config)
+      metricsReporterClass.getMethod("startReporters", verifiableProps.getClass).invoke(metricsReporter, verifiableProps)
+
       server
     }
     
