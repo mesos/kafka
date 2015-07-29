@@ -159,17 +159,21 @@ object Cluster {
   }
 
   class ZkStorage(val path: String) extends Storage {
-    {
-      val (zkConnect, chroot) = Config.zk.span(_ != '/')
-      val storagePath = chroot + path
-      if (storagePath != "") {
-        val client = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer)
-        try { client.createPersistent(storagePath, true) }
-        finally { client.close() }
-      }
-    }
+    createChrootIfRequired()
 
     def zkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
+
+    private def createChrootIfRequired(): Unit = {
+      val slashIdx: Int = Config.zk.indexOf('/')
+      if (slashIdx == -1) return
+
+      val chroot = Config.zk.substring(slashIdx)
+      val zkConnect = Config.zk.substring(0, slashIdx)
+
+      val client = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer)
+      try { client.createPersistent(chroot, true) }
+      finally { client.close() }
+    }
 
     protected def loadJson: String = {
       val zkClient = this.zkClient
