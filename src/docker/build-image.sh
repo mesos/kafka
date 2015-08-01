@@ -52,4 +52,6 @@ cp $base_dir/kafka-mesos*.jar $tmp_dir
 cp $base_dir/kafka-mesos*.sh $tmp_dir
 
 # build docker image
-sudo docker build -t $docker_tag .
+sudo="sudo"
+if docker info &> /dev/null; then sudo=""; fi # skip sudo if possible
+$sudo docker build -t $docker_tag .
