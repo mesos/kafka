@@ -103,6 +103,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
+      else if (uri.startsWith("/api/topics")) handleTopicsApi(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -385,6 +386,74 @@ object HttpServer {
       if (error != null) result("error") = error
       result("state") = rebalancer.state
 
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+
+    def handleTopicsApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/topics".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "status") handleTopicStatus(request, response)
+      else if (uri == "list") handleTopicList(request, response)
+      else if (uri == "create") handleTopicCreate(request, response)
+      else if (uri == "alter") handleTopicAlter(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleTopicStatus(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+
+    def handleTopicList(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+      val topic: Topic = cluster.topic
+
+      val nameExpr: String = request.getParameter("name")
+      val topicList:List[String]  = if (nameExpr == null) {
+                          topic.getTopicLists()
+                        } else {
+                          topic.getTopic(nameExpr)
+                        }
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("topics") = new JSONArray(topicList)
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleTopicCreate(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+      val topic: Topic = cluster.topic
+
+      val name: String = request.getParameter("name")
+      val partitions: String = request.getParameter("partitions")
+      val replication: String = request.getParameter("replication")
+      val options: String = request.getParameter("options")
+
+      topic.createTopic(name, partitions, replication, options)
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("status") = "Created"
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleTopicAlter(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+
+      val cluster: Cluster = Scheduler.cluster
+      val topic: Topic = cluster.topic
+
+      val name: String = request.getParameter("name")
+      val partitions: String = request.getParameter("partitions")
+      val replication: String = request.getParameter("replication")
+      val options: String = request.getParameter("options")
+
+      topic.alterTopic(name, partitions, replication, options)
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("status") = "Altered"
       response.getWriter.println(JSONObject(result.toMap))
     }
   }
