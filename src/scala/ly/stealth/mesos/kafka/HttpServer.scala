@@ -396,22 +396,15 @@ object HttpServer {
       var uri: String = request.getRequestURI.substring("/api/topics".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "status") handleTopicStatus(request, response)
       else if (uri == "list") handleTopicList(request, response)
       else if (uri == "create") handleTopicCreate(request, response)
       else if (uri == "alter") handleTopicAlter(request, response)
       else response.sendError(404, "uri not found")
     }
 
-    def handleTopicStatus(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      response.getWriter.println(JSONObject(result.toMap))
-    }
-
-
     def handleTopicList(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
-      val topic: Topic = cluster.topic
+      val topic: Topics = cluster.topics
 
       val nameExpr: String = request.getParameter("name")
       val topicList:List[String]  = if (nameExpr == null) {
@@ -427,7 +420,7 @@ object HttpServer {
 
     def handleTopicCreate(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
-      val topic: Topic = cluster.topic
+      val topic: Topics = cluster.topics
 
       val name: String = request.getParameter("name")
       val partitions: String = request.getParameter("partitions")
@@ -443,7 +436,7 @@ object HttpServer {
     def handleTopicAlter(request: HttpServletRequest, response: HttpServletResponse): Unit = {
 
       val cluster: Cluster = Scheduler.cluster
-      val topic: Topic = cluster.topic
+      val topic: Topics = cluster.topics
 
       val name: String = request.getParameter("name")
       val partitions: String = request.getParameter("partitions")
