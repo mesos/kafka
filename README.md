@@ -52,7 +52,7 @@ Before running `./kafka-mesos.sh`, set the location of libmesos:
 
     # export MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so
 
-If the host running scheduler has several IP addresses you may also need toC
+If the host running scheduler has several IP addresses you may also need to
 
     # export LIBPROCESS_IP=<IP_ACCESSIBLE_FROM_MASTER>
 
