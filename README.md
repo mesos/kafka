@@ -16,11 +16,12 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 * [Starting 3 brokers](#starting-3-brokers)
 * [High Availability Scheduler State](#high-availability-scheduler-state)
 * [Failed Broker Recovery](#failed-broker-recovery)
+* [Passing multiple options](#passing-multiple-options)
 
 
 [Navigating the CLI](#navigating-the-cli)
 * [Adding brokers to the cluster](#adding-brokers-to-the-cluster)
-* [Updating broker configurations](#updating-the-broker-configurations)
+* [Updating broker configurations](#updating-broker-configurations)
 * [Starting brokers](#starting-brokers-in-the-cluster-)
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
@@ -51,7 +52,7 @@ Before running `./kafka-mesos.sh`, set the location of libmesos:
 
     # export MESOS_NATIVE_JAVA_LIBRARY=/usr/local/lib/libmesos.so
 
-If the host running scheduler has several IP addresses you may also need to
+If the host running scheduler has several IP addresses you may also need toC
 
     # export LIBPROCESS_IP=<IP_ACCESSIBLE_FROM_MASTER>
 
@@ -284,6 +285,25 @@ Following stickiness settings exists:
 ```
 --stickiness-period  - period of time during which broker would be restarted on the same node
 ```
+
+Passing multiple options
+-----------------------
+A common use case is to supply multiple `log.dirs` in addition to providing other options. To achieve this you may use comma escaping like this:
+
+```
+./kafka-mesos.sh update 0 --options log.dirs=/mnt/array1/broker0\\,/mnt/array2/broker0,num.io.threads=16
+Broker updated
+
+broker:
+  id: 0
+  active: false
+  state: stopped
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  options: log.dirs=/mnt/array1/broker0\,/mnt/array2/broker0,num.io.threads=16
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0, expires:2015-07-29 11:54:39Z
+```
+
 
 Navigating the CLI
 ==================
