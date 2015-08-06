@@ -54,33 +54,55 @@ class Topics {
     topics.toList
   }
 
-  def createTopic(topic: String, partitions: String = "1", replicationFactor: String = "1", topicConfig: String): Unit = {
-
-    val errors = new util.ArrayList[String]()
-
-    var options: util.Map[String, String] = null
-
+  def optionsToArgs(options: util.Map[String, String]): Option[Array[String]] = {
     try {
-      options = Util.parseMap(topicConfig, nullValues = false)
-      val config: List[String] = options.map { case (k,v) => (String.format("%s=%s",k,v)) }(collection.breakOut)
+      val c: List[String] = options.map { case (k,v) => (String.format("%s=%s",k,v)) }(collection.breakOut)
+      val config: Array[String]  = c.flatMap(x => List("c", x)).toArray[String]
+      Some(config)
+    } catch {
+      case e: Exception => None
     }
-    catch {
-      case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage)
-    }
-
-    //TODO get the configs working add --config key/value
-    val cmd = Array("--zookeeper",Config.zk, "--create","--topic",topic,"--partitions", partitions,
-                    "--replication-factor",replicationFactor)
-    TopicCommand.createTopic(zkClient, new TopicCommandOptions(cmd))
   }
 
+  def createTopic(topic: String, partitions: String = "1", replicationFactor: String = "1", topicConfig: util.Map[String, String] ): Unit = {
 
-  def alterTopic(topic: String, partitions: String = "1", replicationFactor: String = "1", topicConfig: String): Unit = {
     val cmd = Array("--zookeeper",Config.zk, "--create","--topic",topic,"--partitions", partitions,
       "--replication-factor",replicationFactor)
 
-    //TODO get the configs working add --config key/value
+    val config = optionsToArgs(topicConfig)
+
+    val command = config match {
+      case Some(value) => cmd ++ value
+      case None => cmd
+    }
+
+    TopicCommand.createTopic(zkClient, new TopicCommandOptions(command))
+  }
+
+
+  def alterTopic(topic: String, partitions: String = "1", replicationFactor: String = "1", topicConfig: util.Map[String, String]): Unit = {
+    val cmd = Array("--zookeeper",Config.zk, "--create","--topic",topic,"--partitions", partitions,
+      "--replication-factor",replicationFactor)
+
+    val config = optionsToArgs(topicConfig)
+
+    val command = config match {
+      case Some(value) => cmd ++ value
+      case None => cmd
+    }
+
     TopicCommand.alterTopic(zkClient, new TopicCommandOptions(cmd))
+  }
+
+  def describeTopic(topic: String): Unit = {
+
+    val cmd = Array("--zookeeper",Config.zk, "--describe")
+
+    val command = if(topic != null) {
+      cmd ++ Array("--topic",topic)
+    } else cmd
+
+    TopicCommand.describeTopic(zkClient, new TopicCommandOptions(command))
   }
 }
 
