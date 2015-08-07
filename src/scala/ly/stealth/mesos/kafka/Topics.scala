@@ -57,7 +57,7 @@ class Topics {
   def optionsToArgs(options: util.Map[String, String]): Option[Array[String]] = {
     try {
       val c: List[String] = options.map { case (k,v) => (String.format("%s=%s",k,v)) }(collection.breakOut)
-      val config: Array[String]  = c.flatMap(x => List("c", x)).toArray[String]
+      val config: Array[String]  = c.flatMap(x => List("--config", x)).toArray[String]
       Some(config)
     } catch {
       case e: Exception => None
@@ -80,9 +80,8 @@ class Topics {
   }
 
 
-  def alterTopic(topic: String, partitions: String = "1", replicationFactor: String = "1", topicConfig: util.Map[String, String]): Unit = {
-    val cmd = Array("--zookeeper",Config.zk, "--create","--topic",topic,"--partitions", partitions,
-      "--replication-factor",replicationFactor)
+  def alterTopic(topic: String, partitions: String = "1", topicConfig: util.Map[String, String]): Unit = {
+    val cmd = Array("--zookeeper",Config.zk, "--alter","--topic",topic,"--partitions", partitions)
 
     val config = optionsToArgs(topicConfig)
 

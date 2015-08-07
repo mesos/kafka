@@ -434,6 +434,7 @@ object HttpServer {
       //handle faults with options here
       try {
         val o: util.Map[String, String] = Util.parseMap(options, nullValues = false)
+        println(o)
         topic.createTopic(name, partitions, replication, o)
       } catch {
         case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage)
@@ -473,13 +474,12 @@ object HttpServer {
 
       val name: String = request.getParameter("name")
       val partitions: String = request.getParameter("partitions")
-      val replication: String = request.getParameter("replication")
       val options: String = request.getParameter("options")
 
       val errors = new util.ArrayList[String]()
       try {
         val o: util.Map[String, String] = Util.parseMap(options, nullValues = false)
-        topic.alterTopic(name, partitions, replication, o)
+        topic.alterTopic(name, partitions, o)
       } catch {
         case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage)
       }
