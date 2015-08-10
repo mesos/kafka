@@ -38,20 +38,33 @@ import org.apache.log4j.Logger
 class Topics {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private def zkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
+  private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 
   def getTopicLists(): List[String] = {
-    val optsList = Array[String]()
-    val topics = ZkUtils.getAllTopics(zkClient)
-    logger.info("All Topics : " + topics.toString())
-    topics.toList
+
+    val zkClient = newZkClient
+    try {
+      val optsList = Array[String]()
+      val topics = ZkUtils.getAllTopics(zkClient)
+      logger.info("All Topics : " + topics.toString())
+      topics.toList
+    } finally {
+      zkClient.close()
+    }
   }
 
   def getTopic(nameExp: String): List[String] = {
-    val optsList = Array[String]()
-    val topics = ZkUtils.getAllTopics(zkClient)
-    topics.filter(x => x.matches(nameExp))
-    topics.toList
+
+    val zkClient = newZkClient
+
+    try {
+      val optsList = Array[String]()
+      val topics = ZkUtils.getAllTopics(zkClient)
+      topics.filter(x => x.matches(nameExp))
+      topics.toList
+    } finally {
+      zkClient.close()
+    }
   }
 
   def optionsToArgs(options: util.Map[String, String]): Option[Array[String]] = {
@@ -66,42 +79,58 @@ class Topics {
 
   def createTopic(topic: String, partitions: String = "1", replicationFactor: String = "1", topicConfig: util.Map[String, String] ): Unit = {
 
-    val cmd = Array("--zookeeper",Config.zk, "--create","--topic",topic,"--partitions", partitions,
-      "--replication-factor",replicationFactor)
+    val zkClient = newZkClient
+    try {
+      val cmd: Array[String] = Array("--zookeeper", zkClient.toString, "--create", "--topic", topic, "--partitions", partitions,
+        "--replication-factor", replicationFactor)
 
-    val config = optionsToArgs(topicConfig)
+      val config: Option[Array[String]] = optionsToArgs(topicConfig)
 
-    val command = config match {
-      case Some(value) => cmd ++ value
-      case None => cmd
+      val command: Array[String]= config match {
+        case Some(value) => cmd ++ value
+        case None => cmd
+      }
+
+      TopicCommand.createTopic(zkClient, new TopicCommandOptions(command))
+
+    } finally {
+      zkClient.close()
     }
-
-    TopicCommand.createTopic(zkClient, new TopicCommandOptions(command))
   }
 
 
   def alterTopic(topic: String, partitions: String = "1", topicConfig: util.Map[String, String]): Unit = {
-    val cmd = Array("--zookeeper",Config.zk, "--alter","--topic",topic,"--partitions", partitions)
 
-    val config = optionsToArgs(topicConfig)
+    val zkClient = newZkClient
+    try {
+      val cmd = Array("--zookeeper", Config.zk, "--alter", "--topic", topic, "--partitions", partitions)
 
-    val command = config match {
-      case Some(value) => cmd ++ value
-      case None => cmd
+      val config = optionsToArgs(topicConfig)
+
+      val command = config match {
+        case Some(value) => cmd ++ value
+        case None => cmd
+      }
+
+      TopicCommand.alterTopic(zkClient, new TopicCommandOptions(cmd))
+    } finally {
+      zkClient.close()
     }
-
-    TopicCommand.alterTopic(zkClient, new TopicCommandOptions(cmd))
   }
 
   def describeTopic(topic: String): Unit = {
+    val zkClient = newZkClient
+    try {
+      val cmd = Array("--zookeeper", Config.zk, "--describe")
 
-    val cmd = Array("--zookeeper",Config.zk, "--describe")
+      val command = if (topic != null) {
+        cmd ++ Array("--topic", topic)
+      } else cmd
 
-    val command = if(topic != null) {
-      cmd ++ Array("--topic",topic)
-    } else cmd
-
-    TopicCommand.describeTopic(zkClient, new TopicCommandOptions(command))
+      TopicCommand.describeTopic(zkClient, new TopicCommandOptions(command))
+    } finally {
+      zkClient.close()
+    }
   }
 }
 
