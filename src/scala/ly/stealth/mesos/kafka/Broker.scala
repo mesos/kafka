@@ -19,13 +19,15 @@ package ly.stealth.mesos.kafka
 
 import java.util
 import scala.collection.JavaConversions._
-import scala.util.parsing.json.JSONObject
 import scala.collection
-import org.apache.mesos.Protos.{Resource, Offer}
-import java.util.{TimeZone, Collections, Date, UUID}
+import org.apache.mesos.Protos.Offer
+import java.util._
 import ly.stealth.mesos.kafka.Broker.{Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
 import java.text.SimpleDateFormat
+import scala.List
+import scala.collection.Map
+import scala.util.parsing.json.JSONObject
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -64,19 +66,17 @@ class Broker(_id: String = "0") {
 
   def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {
     // check resources
-    val offerResources = new util.HashMap[String, Resource]()
-    for (resource <- offer.getResourcesList) offerResources.put(resource.getName, resource)
+    var offerCpus: Double = 0
+    var offerMem: Long = 0
 
-    val port = getSuitablePort(offer)
-    if (port == -1) return "no suitable port"
+    for (resource <- offer.getResourcesList) {
+      if (resource.getName == "cpus") offerCpus += resource.getScalar.getValue
+      if (resource.getName == "mem") offerMem += resource.getScalar.getValue.toLong
+    }
 
-    val cpusResource = offerResources.get("cpus")
-    if (cpusResource == null) return "no cpus"
-    if (cpusResource.getScalar.getValue < cpus) return s"cpus ${cpusResource.getScalar.getValue} < $cpus"
-
-    val memResource = offerResources.get("mem")
-    if (memResource == null) return "no mem"
-    if (memResource.getScalar.getValue < mem) return s"mem ${memResource.getScalar.getValue.toLong} < $mem"
+    if (offerCpus < cpus) return s"cpus $offerCpus < $cpus"
+    if (offerMem < mem) return s"mem $offerMem < $mem"
+    if (getSuitablePort(offer) == -1) return "no suitable port"
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -94,11 +94,15 @@ class Broker(_id: String = "0") {
   }
 
   def getSuitablePort(offer: Offer): Int = {
-    val portsResource = offer.getResourcesList.find(_.getName == "ports").getOrElse(null)
-    if (portsResource == null) return -1
+    val ports = new util.ArrayList[Range]()
+    for (resource <- offer.getResourcesList.filter(_.getName == "ports"))
+      ports.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
 
-    val ports = portsResource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt))
     if (ports.isEmpty) return -1
+
+    Collections.sort(ports, new Comparator[Range] {
+      def compare(x: Range, y: Range): Int = x.start - y.start
+    })
 
     if (port == null)
       return ports.get(0).start
