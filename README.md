@@ -12,7 +12,7 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 [Typical Operations](#typical-operations)
 * [Run the scheduler with Docker](https://github.com/mesos/kafka/tree/master/src/docker#intro)   
 * [Run the scheduler on Marathon](https://github.com/mesos/kafka/tree/master/src/docker#running-image-in-marathon)  
-* [Changing the location of data stored](#changing-the-location-of-data-stored)
+* [Changing the location where data is stored](#changing-the-location-where-data-is-stored)
 * [Starting 3 brokers](#starting-3-brokers)
 * [High Availability Scheduler State](#high-availability-scheduler-state)
 * [Failed Broker Recovery](#failed-broker-recovery)
@@ -22,7 +22,7 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 [Navigating the CLI](#navigating-the-cli)
 * [Adding brokers to the cluster](#adding-brokers-to-the-cluster)
 * [Updating broker configurations](#updating-broker-configurations)
-* [Starting brokers](#starting-brokers-in-the-cluster-)
+* [Starting brokers](#starting-brokers-in-the-cluster)
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
 * [Rebalancing brokers in the cluster](#rebalancing-brokers-in-the-cluster)
@@ -61,7 +61,7 @@ Scheduler Configuration
 
 The scheduler is configured through the command line or `kafka-mesos.properties` file.
 
-Following options are available:
+The following options are available:
 ```
 # ./kafka-mesos.sh help scheduler
 Start scheduler 
@@ -121,7 +121,7 @@ Note: you can also use Marathon to launch the scheduler process so it gets resta
 Starting and using 1 broker
 ---------------------------
 
-First lets start up and use 1 broker with the default settings. Further in the readme you can see how to change these from the defaults.
+First let's start up and use 1 broker with the default settings. Further in the readme you can see how to change these from the defaults.
 
 ```
 # ./kafka-mesos.sh add 0
@@ -149,14 +149,14 @@ cluster:
     resources: cpus:1.00, mem:2048, heap:1024, port:auto
     failover: delay:10s, max-delay:60s
 ```
-Now lets start the broker.
+Now let's start the broker.
 
 ```
 # ./kafka-mesos.sh start 0
 Broker 0 started
 ```
 
-Now, we don't know where the broker is and we need that for producers and consumers to connect to the cluster.
+We don't know yet where the broker is, and we need that for producers and consumers to connect to the cluster.
 
 ```
 # ./kafka-mesos.sh status
@@ -176,26 +176,26 @@ cluster:
       attributes: rack=r1
 ```
 
-Great!!! Now lets produce and consume from the cluster. Lets use [kafkacat](https://github.com/edenhill/kafkacat) a nice third party c library command line tool for Kafka.
+Great! Now let's produce and consume from the cluster. Let's use [kafkacat](https://github.com/edenhill/kafkacat), a nice third party c library command line tool for Kafka.
 
 ```
 # echo "test"|kafkacat -P -b "172.16.25.62:31000" -t testTopic -p 0
 ```
 
-And lets read it back.
+And let's read it back.
 
 ```
 # kafkacat -C -b "172.16.25.62:31000" -t testTopic -p 0 -e
 test
 ```
 
-This is an beta version.
+This is a beta version.
 
 Typical Operations
 ===================
 
-Changing the location of data stored
--------------------------------------
+Changing the location where data is stored
+------------------------------------------
 
 ```
 # ./kafka-mesos.sh stop 0
@@ -255,7 +255,7 @@ Broker 2 started
 
 High Availability Scheduler State
 -------------------------
-The scheduler supports storing the state of the cluster in Zookeeper. It currently shares a znode within the mesos ensemble. To turn this on in properties 
+The scheduler supports storing the cluster state in Zookeeper. It currently shares a znode within the mesos ensemble. To turn this on in properties 
 
 ```
 clusterStorage=zk:/kafka-mesos
@@ -263,13 +263,13 @@ clusterStorage=zk:/kafka-mesos
 
 Failed Broker Recovery
 ------------------------
-When the broker fails, kafka mesos scheduler assumes that the failure is recoverable. Scheduler will try
-to restart broker after waiting failover-delay (i.e. 30s, 2m). Initially waiting delay is equal to failover-delay setting.
-After each serial failure it doubles until it reaches failover-max-delay value.
+When a broker fails, kafka mesos scheduler assumes that the failure is recoverable. The scheduler will try
+to restart the broker after waiting failover-delay (i.e. 30s, 2m). The initial waiting delay is equal to failover-delay setting.
+After each consecutive failure this delay is doubled until it reaches failover-max-delay value.
 
-If failover-max-tries is defined and serial failure count exceeds it, broker will be deactivated.
+If failover-max-tries is defined and the consecutive failure count exceeds it, the broker will be deactivated.
 
-Following failover settings exists:
+The following failover settings exists:
 ```
 --failover-delay     - initial failover delay to wait after failure, required
 --failover-max-delay - max failover delay, required
@@ -278,17 +278,17 @@ Following failover settings exists:
 
 Broker Placement Stickiness
 ---------------------------
-If broker is started during stickiness-period time from it's stop time, scheduler will place the broker on the same node
-as it was during last successful start. This is related both to failover and manual restarts.
+If a broker is started within a stickiness-period interval from it's stop time, the scheduler will place it on the same node
+it was on during the last successful start. This applies both to failover and manual restarts.
 
-Following stickiness settings exists:
+The following stickiness settings exists:
 ```
 --stickiness-period  - period of time during which broker would be restarted on the same node
 ```
 
 Passing multiple options
 -----------------------
-A common use case is to supply multiple `log.dirs` in addition to providing other options. To achieve this you may use comma escaping like this:
+A common use case is to supply multiple `log.dirs`, or provide other options. To do this you may use comma escaping like this:
 
 ```
 ./kafka-mesos.sh update 0 --options log.dirs=/mnt/array1/broker0\\,/mnt/array2/broker0,num.io.threads=16
@@ -521,7 +521,7 @@ id-expr examples:
 Using the REST API
 ========================
 
-The scheduler REST API fully exposes all features of the CLI using following request format:
+The scheduler REST API fully exposes all of the features of the CLI with the following request format:
 ```
 /api/brokers/<cli command>/id={broker.id}&<setting>=<value>
 ```
