@@ -20,9 +20,10 @@ package ly.stealth.mesos.kafka
 import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, parseMap}
-import java.util.Date
+import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Stickiness, State, Task, Failover}
+import java.util
 
 class BrokerTest extends MesosTestCase {
   var broker: Broker = null
@@ -57,44 +58,19 @@ class BrokerTest extends MesosTestCase {
   def matches {
     // cpus
     broker.cpus = 0.5
-    assertNull(broker.matches(offer(cpus = 0.5)))
-    assertEquals("cpus 0.49 < 0.5", broker.matches(offer(cpus = 0.49)))
+    assertNull(broker.matches(offer(resources = "cpus:0.2,cpus(role):0.3,ports:1000")))
+    assertEquals("cpus < 0.5", broker.matches(offer(resources = "cpus:0.2,cpus(role):0.2")))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
-    assertNull(broker.matches(offer(mem = 100)))
-    assertEquals("mem 99 < 100", broker.matches(offer(mem = 99)))
+    assertNull(broker.matches(offer(resources = "mem:70,mem(role):30,ports:1000")))
+    assertEquals("mem < 100", broker.matches(offer(resources = "mem:70,mem(role):29")))
     broker.mem = 0
 
     // port
-    assertNull(broker.matches(offer(ports = "100")))
-    assertEquals("no suitable port", broker.matches(offer(ports = "")))
-  }
-
-  @Test
-  def getSuitablePort {
-    // no port restrictions
-    assertEquals(-1, broker.getSuitablePort(offer(ports = "")))
-    assertEquals(100, broker.getSuitablePort(offer(ports = "100..100")))
-    assertEquals(100, broker.getSuitablePort(offer(ports = "100..200")))
-
-    // single port restriction
-    broker.port = new Util.Range(92)
-    assertEquals(-1, broker.getSuitablePort(offer(ports = "0..91")))
-    assertEquals(-1, broker.getSuitablePort(offer(ports = "93..100")))
-    assertEquals(92, broker.getSuitablePort(offer(ports = "90..100")))
-
-    // port range restriction
-    broker.port = new Util.Range("92..100")
-    assertEquals(-1, broker.getSuitablePort(offer(ports = "0..91")))
-    assertEquals(-1, broker.getSuitablePort(offer(ports = "101..200")))
-    assertEquals(92, broker.getSuitablePort(offer(ports = "0..100")))
-    assertEquals(92, broker.getSuitablePort(offer(ports = "0..92")))
-
-    assertEquals(100, broker.getSuitablePort(offer(ports = "100..200")))
-    assertEquals(95, broker.getSuitablePort(offer(ports = "0..90,95..96,101..200")))
-    assertEquals(96, broker.getSuitablePort(offer(ports = "0..90,96,101..200")))
+    assertNull(broker.matches(offer(resources = "ports:1000")))
+    assertEquals("no suitable port", broker.matches(offer(resources = "")))
   }
 
   @Test
@@ -139,6 +115,77 @@ class BrokerTest extends MesosTestCase {
     assertNull(broker.matches(offer(attributes = "rack=1")))
     assertNull(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
     assertEquals("rack doesn't match groupBy", broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
+  }
+
+  @Test
+  def getReservations {
+    broker.cpus = 2
+    broker.mem = 100
+
+    // shared resources
+    var reservation = broker.getReservation(offer(resources = "cpus:3, mem:200, ports:1000..2000"))
+    assertEquals(resources("cpus:2, mem:100, ports:1000"), reservation.toResources)
+
+    // role resources
+    reservation = broker.getReservation(offer(resources = "cpus(role):3, mem(role):200, ports(role):1000..2000"))
+    assertEquals(resources("cpus(role):2, mem(role):100, ports(role):1000"), reservation.toResources)
+
+    // mixed resources
+    reservation = broker.getReservation(offer(resources = "cpus:2, cpus(role):1, mem:100, mem(role):99, ports:1000..2000, ports(role):3000"))
+    assertEquals(resources("cpus:1, cpus(role):1, mem:1, mem(role):99, ports(role):3000"), reservation.toResources)
+
+    // not enough resources
+    reservation = broker.getReservation(offer(resources = "cpus:0.5, cpus(role):0.5, mem:1, mem(role):1, ports:1000"))
+    assertEquals(resources("cpus:0.5, cpus(role):0.5, mem:1, mem(role):1, ports:1000"), reservation.toResources)
+
+    // no port
+    reservation = broker.getReservation(offer(resources = ""))
+    assertEquals(-1, reservation.port)
+
+    // two non-default roles
+    try {
+      broker.getReservation(offer(resources = "cpus(r1):0.5,mem(r2):100"))
+      fail()
+    } catch {
+      case e: IllegalArgumentException =>
+        val m: String = e.getMessage
+        assertTrue(m, m.contains("r1") && m.contains("r2"))
+    }
+  }
+
+
+  @Test
+  def getSuitablePort {
+    def ranges(s: String): util.List[Util.Range] = {
+      if (s.isEmpty) return Collections.emptyList()
+      s.split(",").toList.map(s => new Util.Range(s.trim))
+    }
+
+    // no port restrictions
+    assertEquals(-1, broker.getSuitablePort(ranges("")))
+    assertEquals(100, broker.getSuitablePort(ranges("100..100")))
+    assertEquals(100, broker.getSuitablePort(ranges("100..200")))
+
+    // order
+    assertEquals(10, broker.getSuitablePort(ranges("30,10,20,40")))
+    assertEquals(50, broker.getSuitablePort(ranges("100..200, 50..60")))
+
+    // single port restriction
+    broker.port = new Util.Range(92)
+    assertEquals(-1, broker.getSuitablePort(ranges("0..91")))
+    assertEquals(-1, broker.getSuitablePort(ranges("93..100")))
+    assertEquals(92, broker.getSuitablePort(ranges("90..100")))
+
+    // port range restriction
+    broker.port = new Util.Range("92..100")
+    assertEquals(-1, broker.getSuitablePort(ranges("0..91")))
+    assertEquals(-1, broker.getSuitablePort(ranges("101..200")))
+    assertEquals(92, broker.getSuitablePort(ranges("0..100")))
+    assertEquals(92, broker.getSuitablePort(ranges("0..92")))
+
+    assertEquals(100, broker.getSuitablePort(ranges("100..200")))
+    assertEquals(95, broker.getSuitablePort(ranges("0..90,95..96,101..200")))
+    assertEquals(96, broker.getSuitablePort(ranges("0..90,96,101..200")))
   }
 
   @Test
@@ -265,6 +312,22 @@ class BrokerTest extends MesosTestCase {
   def idFromTaskId {
     assertEquals("0", Broker.idFromTaskId(Broker.nextTaskId(new Broker("0"))))
     assertEquals("100", Broker.idFromTaskId(Broker.nextTaskId(new Broker("100"))))
+  }
+
+  // Reservation
+  @Test
+  def Reservation_toResources {
+    // shared
+    var reservation = new Broker.Reservation(null, _sharedCpus =  0.5, _sharedMem = 100, _sharedPort = 1000)
+    assertEquals(resources("cpus:0.5, mem:100, ports:1000"), reservation.toResources)
+
+    // role
+    reservation = new Broker.Reservation("role", _roleCpus =  0.5, _roleMem = 100, _rolePort = 1000)
+    assertEquals(resources("cpus(role):0.5, mem(role):100, ports(role):1000"), reservation.toResources)
+
+    // shared + role
+    reservation = new Broker.Reservation("role", _sharedCpus = 0.3, _roleCpus =  0.7, _sharedMem = 50, _roleMem = 100, _sharedPort = 1000, _rolePort = 2000)
+    assertEquals(resources("cpus:0.3, cpus(role):0.7, mem:50, mem(role):100, ports:1000, ports(role):2000"), reservation.toResources)
   }
   
   // Stickiness

@@ -377,7 +377,10 @@ object Util {
       val order: util.List[String] = "cpus mem disk ports".split(" ").toList
       for (resource <- resources.sortBy(r => order.indexOf(r.getName))) {
         if (!s.isEmpty) s += " "
-        s += resource.getName + ":"
+
+        s += resource.getName
+        if (resource.getRole != "*") s += "(" + resource.getRole + ")"
+        s += ":"
 
         if (resource.hasScalar)
           s += "%.2f".format(resource.getScalar.getValue)
