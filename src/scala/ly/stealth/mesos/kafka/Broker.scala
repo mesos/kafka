@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import java.util
 import scala.collection.JavaConversions._
 import scala.collection
-import org.apache.mesos.Protos.Offer
+import org.apache.mesos.Protos.{Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
@@ -66,17 +66,10 @@ class Broker(_id: String = "0") {
 
   def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {
     // check resources
-    var offerCpus: Double = 0
-    var offerMem: Long = 0
-
-    for (resource <- offer.getResourcesList) {
-      if (resource.getName == "cpus") offerCpus += resource.getScalar.getValue
-      if (resource.getName == "mem") offerMem += resource.getScalar.getValue.toLong
-    }
-
-    if (offerCpus < cpus) return s"cpus $offerCpus < $cpus"
-    if (offerMem < mem) return s"mem $offerMem < $mem"
-    if (getSuitablePort(offer) == -1) return "no suitable port"
+    val reservation: Broker.Reservation = getReservation(offer)
+    if (reservation.cpus < cpus) return s"cpus < $cpus"
+    if (reservation.mem < mem) return s"mem < $mem"
+    if (reservation.port == -1) return "no suitable port"
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -93,25 +86,65 @@ class Broker(_id: String = "0") {
     null
   }
 
-  def getSuitablePort(offer: Offer): Int = {
-    val ports = new util.ArrayList[Range]()
-    for (resource <- offer.getResourcesList.filter(_.getName == "ports"))
-      ports.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
+  def getReservation(offer: Offer): Broker.Reservation = {
+    var sharedCpus: Double = 0
+    var roleCpus: Double = 0
+    var reservedSharedCpus: Double = 0
+    var reservedRoleCpus: Double = 0
 
+    var sharedMem: Long = 0
+    var roleMem: Long = 0
+    var reservedSharedMem: Long = 0
+    var reservedRoleMem: Long = 0
+
+    val sharedPorts: util.List[Range] = new util.ArrayList[Range]()
+    val rolePorts: util.List[Range] = new util.ArrayList[Range]()
+    var reservedSharedPort: Long = -1
+    var reservedRolePort: Long = -1
+
+    var role: String = null
+
+    for (resource <- offer.getResourcesList) {
+      if (resource.getRole == "*") {
+        if (resource.getName == "cpus") sharedCpus = resource.getScalar.getValue
+        if (resource.getName == "mem") sharedMem = resource.getScalar.getValue.toLong
+        if (resource.getName == "ports") sharedPorts.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
+      } else {
+        if (role != null && role != resource.getRole)
+          throw new IllegalArgumentException(s"Offer contains 2 non-default roles: $role, ${resource.getRole}")
+
+        role = resource.getRole
+        if (resource.getName == "cpus") roleCpus = resource.getScalar.getValue
+        if (resource.getName == "mem") roleMem = resource.getScalar.getValue.toLong
+        if (resource.getName == "ports") rolePorts.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
+      }
+    }
+
+    reservedRoleCpus = Math.min(cpus, roleCpus)
+    reservedSharedCpus = Math.min(cpus - reservedRoleCpus, sharedCpus)
+
+    reservedRoleMem = Math.min(mem, roleMem)
+    reservedSharedMem = Math.min(mem - reservedRoleMem, sharedMem)
+
+    reservedRolePort = getSuitablePort(rolePorts)
+    if (reservedRolePort == -1)
+      reservedSharedPort = getSuitablePort(sharedPorts)
+
+    new Broker.Reservation(role, reservedSharedCpus, reservedRoleCpus, reservedSharedMem, reservedRoleMem, reservedSharedPort, reservedRolePort)
+  }
+
+  private[kafka] def getSuitablePort(ports: util.List[Range]): Int = {
     if (ports.isEmpty) return -1
 
-    Collections.sort(ports, new Comparator[Range] {
-      def compare(x: Range, y: Range): Int = x.start - y.start
-    })
-
+    val ports_ = ports.sortBy(r => r.start)
     if (port == null)
-      return ports.get(0).start
+      return ports_.get(0).start
 
-    for (range <- ports) {
+    for (range <- ports_) {
       val overlap = range.overlap(port)
-        if (overlap != null)
-          return overlap.start
-      }
+      if (overlap != null)
+        return overlap.start
+    }
 
     -1
   }
@@ -411,6 +444,49 @@ object Broker {
     override def hashCode(): Int = 31 * hostname.hashCode + port.hashCode()
 
     override def toString: String = hostname + ":" + port
+  }
+  
+  class Reservation(
+     _role: String = null,
+     _sharedCpus: Double = 0.0, _roleCpus: Double = 0.0,
+     _sharedMem: Long = 0, _roleMem: Long = 0,
+     _sharedPort: Long = -1, _rolePort: Long = -1
+  ) {
+    val role: String = _role
+
+    val sharedCpus: Double = _sharedCpus
+    val roleCpus: Double = _roleCpus
+    def cpus: Double = sharedCpus + roleCpus
+
+    val sharedMem: Long = _sharedMem
+    val roleMem: Long = _roleMem
+    def mem: Long = sharedMem + roleMem
+
+    val sharedPort: Long = _sharedPort
+    val rolePort: Long = _rolePort
+    def port: Long = if (rolePort != -1) rolePort else sharedPort
+
+    def toResources: util.List[Resource] = {
+      def cpus(value: Double, role: String): Resource = Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(value)).setRole(role).build()
+      def mem(value: Long, role: String): Resource = Resource.newBuilder.setName("mem").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(value)).setRole(role).build()
+      def port(value: Long, role: String): Resource =
+        Resource.newBuilder.setName("ports").setType(Value.Type.RANGES).setRanges(
+          Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(value).setEnd(value))
+        ).setRole(role).build()
+
+      val resources: util.List[Resource] = new util.ArrayList[Resource]()
+
+      if (sharedCpus > 0) resources.add(cpus(sharedCpus, "*"))
+      if (roleCpus > 0) resources.add(cpus(roleCpus, role))
+
+      if (sharedMem > 0) resources.add(mem(sharedMem, "*"))
+      if (roleMem > 0) resources.add(mem(roleMem, role))
+
+      if (sharedPort != -1) resources.add(port(sharedPort, "*"))
+      if (rolePort != -1) resources.add(port(rolePort, role))
+
+      resources
+    }
   }
 
   object State {

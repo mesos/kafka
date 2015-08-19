@@ -58,11 +58,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build()
   }
 
-  private[kafka] def newTask(broker: Broker, offer: Offer, port: Int): TaskInfo = {
+  private[kafka] def newTask(broker: Broker, offer: Offer, reservation: Broker.Reservation): TaskInfo = {
     def taskData: ByteString = {
       val defaults: Map[String, String] = Map(
         "broker.id" -> broker.id,
-        "port" -> ("" + port),
+        "port" -> ("" + reservation.port),
         "log.dirs" -> "kafka-logs",
         "log.retention.bytes" -> ("" + 10l * 1024 * 1024 * 1024),
 
@@ -83,13 +83,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .setData(taskData)
       .setExecutor(newExecutor(broker))
 
-    taskBuilder
-      .addResources(Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.cpus)))
-      .addResources(Resource.newBuilder.setName("mem").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(broker.mem)))
-      .addResources(Resource.newBuilder.setName("ports").setType(Value.Type.RANGES).setRanges(
-      Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(port).setEnd(port)))
-      )
-
+    taskBuilder.addAllResources(reservation.toResources)
     taskBuilder.build
   }
 
@@ -245,10 +239,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private def isReconciling: Boolean = cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
 
   private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
-    val port = broker.getSuitablePort(offer)
-    if (port == -1) throw new IllegalStateException("no suitable port")
-
-    val task_ = newTask(broker, offer, port)
+    val reservation = broker.getReservation(offer)
+    val task_ = newTask(broker, offer, reservation)
     val id = task_.getTaskId.getValue
 
     val attributes = new util.LinkedHashMap[String, String]()

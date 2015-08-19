@@ -18,10 +18,9 @@
 package ly.stealth.mesos.kafka
 
 import java.util
-import scala.collection.JavaConversions._
 import org.junit.Test
 import org.junit.Assert._
-import org.apache.mesos.Protos.{TaskState, Resource}
+import org.apache.mesos.Protos.TaskState
 import java.util.Date
 
 class SchedulerTest extends MesosTestCase {
@@ -49,31 +48,15 @@ class SchedulerTest extends MesosTestCase {
     broker.cpus = 0.5
     broker.mem = 256
 
-    val offer = this.offer(slaveId = "slave", hostname = "host")
+    val offer = this.offer(slaveId = "slave", hostname = "host", resources = s"cpus:${broker.cpus},mem:${broker.mem},ports:1000")
+    val reservation = broker.getReservation(offer)
 
-    val task = Scheduler.newTask(broker, offer, 1000)
+    val task = Scheduler.newTask(broker, offer, reservation)
     assertEquals("slave", task.getSlaveId.getValue)
     assertNotNull(task.getExecutor)
 
     // resources
-    val resources = new util.HashMap[String, Resource]()
-    for (resource <- task.getResourcesList) resources.put(resource.getName, resource)
-
-    val cpuResource = resources.get("cpus")
-    assertNotNull(cpuResource)
-    assertEquals(broker.cpus, cpuResource.getScalar.getValue, 0.001)
-
-    val memResource = resources.get("mem")
-    assertNotNull(memResource)
-    assertEquals(broker.mem, memResource.getScalar.getValue.toInt)
-
-    val portsResource = resources.get("ports")
-    assertNotNull(portsResource)
-    assertEquals(1, portsResource.getRanges.getRangeCount)
-
-    val range = portsResource.getRanges.getRangeList.get(0)
-    assertEquals(1000, range.getBegin)
-    assertEquals(1000, range.getEnd)
+    assertEquals(resources(s"cpus:${broker.cpus}, mem:${broker.mem}, ports:1000"), task.getResourcesList)
 
     // data
     val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
@@ -94,7 +77,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def syncBrokers {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem)
+    val offer = this.offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}, ports:1000")
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
@@ -123,13 +106,13 @@ class SchedulerTest extends MesosTestCase {
     assertEquals("reconciling", Scheduler.acceptOffer(null))
 
     broker.task = null
-    assertEquals(s"broker ${broker.id}: cpus 0.4 < ${broker.cpus}", Scheduler.acceptOffer(offer(cpus = 0.4, mem = broker.mem)))
-    assertEquals(s"broker ${broker.id}: mem 99 < ${broker.mem}", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = 99)))
+    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(resources = s"cpus:0.4, mem:${broker.mem}")))
+    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}, mem:99")))
 
-    assertNull(Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem)))
+    assertNull(Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}, ports:1000")))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
-    assertEquals("", Scheduler.acceptOffer(offer(cpus = broker.cpus, mem = broker.mem)))
+    assertEquals("", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}")))
   }
 
   @Test
@@ -194,7 +177,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
-    val offer = this.offer(cpus = broker.cpus, mem = broker.mem, attributes = "a=1,b=2")
+    val offer = this.offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}", attributes = "a=1,b=2")
 
     Scheduler.launchTask(broker, offer)
     assertEquals(1, schedulerDriver.launchedTasks.size())

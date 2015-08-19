@@ -19,7 +19,7 @@ package ly.stealth.mesos.kafka
 
 import org.apache.mesos.Protos._
 import java.util.{Collections, UUID}
-import org.apache.mesos.Protos.Value.{Text, Scalar}
+import org.apache.mesos.Protos.Value.Text
 import scala.collection.JavaConversions._
 import org.apache.mesos.{ExecutorDriver, SchedulerDriver}
 import java.util
@@ -116,9 +116,7 @@ class MesosTestCase {
     frameworkId: String = "" + UUID.randomUUID(),
     slaveId: String = "" + UUID.randomUUID(),
     hostname: String = "host",
-    cpus: Double = 0,
-    mem: Long = 0,
-    ports: String = null,
+    resources: String = "ports:9092",
     attributes: String = null
   ): Offer = {
     val builder = Offer.newBuilder()
@@ -127,36 +125,7 @@ class MesosTestCase {
       .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
 
     builder.setHostname(hostname)
-
-    val cpusResource = Resource.newBuilder()
-      .setName("cpus")
-      .setType(Value.Type.SCALAR)
-      .setScalar(Scalar.newBuilder().setValue(cpus))
-      .build
-    builder.addResources(cpusResource)
-
-    val memResource = Resource.newBuilder()
-      .setName("mem")
-      .setType(Value.Type.SCALAR)
-      .setScalar(Scalar.newBuilder().setValue(0.0 + mem))
-      .build
-    builder.addResources(memResource)
-
-    def ranges(s: String): util.List[Value.Range] = {
-      if (s.isEmpty) return Collections.emptyList()
-
-      s.split(",").toList
-        .map(s => new Util.Range(s.trim))
-        .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
-    }
-
-    val portsResource = Resource.newBuilder()
-      .setName("ports")
-      .setType(Value.Type.RANGES)
-      .setRanges(Value.Ranges.newBuilder().addAllRange(ranges(if (ports != null) ports else "31000..32000")))
-      .build
-
-    builder.addResources(portsResource)
+    builder.addAllResources(this.resources(resources))
 
     if (attributes != null) {
       val map = Util.parseMap(attributes)
@@ -171,6 +140,52 @@ class MesosTestCase {
     }
 
     builder.build()
+  }
+
+  // parses resources definition like: cpus:0.5, cpus(kafka):0.3, mem:128, ports(kafka):1000..2000
+  def resources(s: String): util.List[Resource] = {
+    // parses range definition: 1000..1100,1102,2000..3000
+    def ranges(s: String): util.List[Value.Range] = {
+      if (s.isEmpty) return Collections.emptyList()
+      s.split(",").toList
+        .map(s => new Util.Range(s.trim))
+        .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
+    }
+
+    val resources = new util.ArrayList[Resource]()
+    if (s == null) return resources
+
+    for (r <- s.split(",").map(_.trim).filter(!_.isEmpty)) {
+      val colonIdx = r.indexOf(":")
+      if (colonIdx == -1) throw new IllegalArgumentException("invalid resource: " + r)
+
+      var name = r.substring(0, colonIdx)
+      var role = "*"
+
+      val bracketIdx = name.indexOf("(")
+      if (bracketIdx != -1) {
+        role = name.substring(bracketIdx + 1, name.length - 1)
+        name = name.substring(0, bracketIdx)
+      }
+
+      val value = r.substring(colonIdx + 1)
+
+      val builder = Resource.newBuilder()
+        .setName(name)
+        .setRole(role)
+
+      if (name == "cpus" || name == "mem")
+        builder.setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(java.lang.Double.parseDouble(value)))
+      else if (name == "ports")
+        builder.setType(Value.Type.RANGES).setRanges(
+          Value.Ranges.newBuilder.addAllRange(ranges(value))
+        )
+      else throw new IllegalArgumentException("Unsupported resource type: " + name)
+
+      resources.add(builder.build())
+    }
+
+    resources
   }
 
   def task(
@@ -203,7 +218,7 @@ class MesosTestCase {
 
     builder.build
   }
-  
+
   private def _schedulerDriver: TestSchedulerDriver = new TestSchedulerDriver()
   private def _executorDriver: TestExecutorDriver = new TestExecutorDriver()
 
