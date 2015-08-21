@@ -30,6 +30,7 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
+import scala.Console
 
 object HttpServer {
   var jar: File = null
@@ -103,6 +104,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
+      else if (uri.startsWith("/api/topics")) handleTopicsApi(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -385,6 +387,109 @@ object HttpServer {
       if (error != null) result("error") = error
       result("state") = rebalancer.state
 
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+
+    def handleTopicsApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/topics".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "describe") handleTopicDescribe(request, response)
+      else if (uri == "list") handleTopicList(request, response)
+      else if (uri == "create") handleTopicCreate(request, response)
+      else if (uri == "alter") handleTopicAlter(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleTopicList(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+      val topics: Topics = cluster.topics
+
+      val nameExpr: String = request.getParameter("name")
+      val topicList:List[String]  = if (nameExpr == null) {
+                          topics.getTopicLists()
+                        } else {
+                          topics.getTopic(nameExpr)
+                        }
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("topics") = new JSONArray(topicList)
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleTopicCreate(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+
+      val cluster: Cluster = Scheduler.cluster
+      val topic: Topics = cluster.topics
+
+      val name: String = request.getParameter("name")
+      val partitions: String = request.getParameter("partitions")
+      val replication: String = request.getParameter("replication")
+      val options: String = request.getParameter("options")
+
+      val errors = new util.ArrayList[String]()
+      //handle faults with options here
+      try {
+        val o: util.Map[String, String] = Util.parseMap(options, nullValues = false)
+        println(o)
+        topic.createTopic(name, partitions, replication, o)
+      } catch {
+        case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage)
+      }
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      if (!errors.isEmpty) {
+        result("errors") = new JSONArray(errors.toList)
+      } else {
+        result("status") = s"Topic $name Created"
+      }
+      response.getWriter.println(JSONObject(result.toMap))
+    }
+
+
+    def handleTopicDescribe(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+
+      val cluster: Cluster = Scheduler.cluster
+      val topic: Topics = cluster.topics
+
+      val name: String = request.getParameter("name")
+
+      val baos = new java.io.ByteArrayOutputStream
+      val out = new java.io.PrintStream(baos)
+      Console.withOut(out) {topic.describeTopic(name)}
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("describe") = baos.toString
+      response.getWriter.println(baos.toString)
+      baos.close()
+    }
+
+    def handleTopicAlter(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+
+      val cluster: Cluster = Scheduler.cluster
+      val topic: Topics = cluster.topics
+
+      val name: String = request.getParameter("name")
+      val partitions: String = request.getParameter("partitions")
+      val options: String = request.getParameter("options")
+
+      val errors = new util.ArrayList[String]()
+      try {
+        val o: util.Map[String, String] = Util.parseMap(options, nullValues = false)
+        topic.alterTopic(name, partitions, o)
+      } catch {
+        case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage)
+      }
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      if (!errors.isEmpty) {
+        result("errors") = new JSONArray(errors.toList)
+      } else {
+        result("status") = s"Topic $name Altered"
+      }
       response.getWriter.println(JSONObject(result.toMap))
     }
   }
