@@ -390,7 +390,6 @@ object HttpServer {
       response.getWriter.println(JSONObject(result.toMap))
     }
 
-
     def handleTopicsApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
@@ -437,17 +436,16 @@ object HttpServer {
         try { replicas = Integer.parseInt(request.getParameter("replicas")) }
         catch { case e: NumberFormatException => errors.add("Invalid replicas") }
 
-      var options: util.Map[String, String] = null
+      var options: util.Map[String, String] = new util.HashMap[String, String]()
       if (request.getParameter("options") != null)
         try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
-      topics.createTopic(name, partitions, replicas, options)
+      topics.addTopic(name, partitions, replicas, options)
       response.getWriter.println(JSONObject(Map("topic" -> "todo")))
     }
-
 
     def handleTopicDescribe(request: HttpServletRequest, response: HttpServletResponse): Unit = {
 

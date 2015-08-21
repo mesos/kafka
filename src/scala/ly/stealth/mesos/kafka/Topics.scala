@@ -77,26 +77,17 @@ class Topics {
     }
   }
 
-  def createTopic(topic: String, partitions: Int = 1, replicationFactor: Int = 1, options: util.Map[String, String]): Unit = {
+  def addTopic(name: String, partitions: Int = 1, replicas: Int = 1, options: util.Map[String, String]): Unit = {
     val zkClient = newZkClient
     try {
-      val cmd: Array[String] = Array("--zookeeper", zkClient.toString, "--create", "--topic", topic, "--partitions", "" + partitions,
-        "--replication-factor", "" + replicationFactor)
+      val config: Properties = new Properties()
+      for ((k, v) <- options) config.setProperty(k, v)
 
-      val config: Option[Array[String]] = optionsToArgs(options)
-
-      val command: Array[String]= config match {
-        case Some(value) => cmd ++ value
-        case None => cmd
-      }
-
-      TopicCommand.createTopic(zkClient, new TopicCommandOptions(command))
-
+      AdminUtils.createTopic(zkClient, name, partitions, replicas, config)
     } finally {
       zkClient.close()
     }
   }
-
 
   def alterTopic(topic: String, partitions: String = "1", topicConfig: util.Map[String, String]): Unit = {
 
