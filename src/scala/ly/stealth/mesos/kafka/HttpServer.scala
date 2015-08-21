@@ -397,9 +397,8 @@ object HttpServer {
       if (uri.startsWith("/")) uri = uri.substring(1)
 
       if (uri == "list") handleTopicList(request, response)
-      else if (uri == "add") handleAddTopic(request, response)
+      else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
       else if (uri == "describe") handleTopicDescribe(request, response)
-      else if (uri == "alter") handleTopicAlter(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -409,7 +408,7 @@ object HttpServer {
 
       val nameExpr: String = request.getParameter("name")
       val topicList:List[String]  = if (nameExpr == null) {
-                          topics.getTopicLists()
+                          topics.getTopicLists
                         } else {
                           topics.getTopic(nameExpr)
                         }
@@ -419,20 +418,21 @@ object HttpServer {
       response.getWriter.println(JSONObject(result.toMap))
     }
 
-    def handleAddTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+    def handleAddUpdateTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val topics: Topics = Scheduler.cluster.topics
+      val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
       val name: String = request.getParameter("name")
       if (name == null || name.isEmpty) errors.add("name required")
 
       var partitions: Int = 1
-      if (request.getParameter("partitions") != null)
+      if (add && request.getParameter("partitions") != null)
         try { partitions = Integer.parseInt(request.getParameter("partitions")) }
         catch { case e: NumberFormatException => errors.add("Invalid partitions") }
 
       var replicas: Int = 1
-      if (request.getParameter("replicas") != null)
+      if (add && request.getParameter("replicas") != null)
         try { replicas = Integer.parseInt(request.getParameter("replicas")) }
         catch { case e: NumberFormatException => errors.add("Invalid replicas") }
 
@@ -440,10 +440,16 @@ object HttpServer {
       if (request.getParameter("options") != null)
         try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
+      else if (!add)
+        errors.add("options required")
 
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
-      topics.addTopic(name, partitions, replicas, options)
+      if (add)
+        topics.addTopic(name, partitions, replicas, options)
+      else
+        topics.updateTopic(name, options);
+
       response.getWriter.println(JSONObject(Map("topic" -> "todo")))
     }
 
@@ -462,32 +468,6 @@ object HttpServer {
       result("describe") = baos.toString
       response.getWriter.println(baos.toString)
       baos.close()
-    }
-
-    def handleTopicAlter(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-
-      val cluster: Cluster = Scheduler.cluster
-      val topics: Topics = cluster.topics
-
-      val name: String = request.getParameter("name")
-      val partitions: String = request.getParameter("partitions")
-      val options: String = request.getParameter("options")
-
-      val errors = new util.ArrayList[String]()
-      try {
-        val o: util.Map[String, String] = Util.parseMap(options, nullValues = false)
-        topics.alterTopic(name, partitions, o)
-      } catch {
-        case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage)
-      }
-
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      if (!errors.isEmpty) {
-        result("errors") = new JSONArray(errors.toList)
-      } else {
-        result("status") = s"Topic $name Altered"
-      }
-      response.getWriter.println(JSONObject(result.toMap))
     }
   }
 

@@ -40,8 +40,7 @@ class Topics {
 
   private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 
-  def getTopicLists(): List[String] = {
-
+  def getTopicLists: List[String] = {
     val zkClient = newZkClient
     try {
       val optsList = Array[String]()
@@ -54,7 +53,6 @@ class Topics {
   }
 
   def getTopic(nameExp: String): List[String] = {
-
     val zkClient = newZkClient
 
     try {
@@ -82,27 +80,18 @@ class Topics {
     try {
       val config: Properties = new Properties()
       for ((k, v) <- options) config.setProperty(k, v)
-
       AdminUtils.createTopic(zkClient, name, partitions, replicas, config)
     } finally {
       zkClient.close()
     }
   }
 
-  def alterTopic(topic: String, partitions: String = "1", topicConfig: util.Map[String, String]): Unit = {
-
+  def updateTopic(name: String, options: util.Map[String, String]) {
     val zkClient = newZkClient
     try {
-      val cmd = Array("--zookeeper", Config.zk, "--alter", "--topic", topic, "--partitions", partitions)
-
-      val config = optionsToArgs(topicConfig)
-
-      val command = config match {
-        case Some(value) => cmd ++ value
-        case None => cmd
-      }
-
-      TopicCommand.alterTopic(zkClient, new TopicCommandOptions(cmd))
+      val config: Properties = new Properties()
+      for ((k, v) <- options) config.setProperty(k, v)
+      AdminUtils.changeTopicConfig(zkClient, name, config)
     } finally {
       zkClient.close()
     }
