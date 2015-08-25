@@ -37,7 +37,7 @@ class RebalancerTest extends MesosTestCase {
     super.before
     rebalancer = new Rebalancer()
 
-    val port = 8001
+    val port = 56789
     Config.zk = s"localhost:$port"
 
     zkDir = File.createTempFile(getClass.getName, null)
