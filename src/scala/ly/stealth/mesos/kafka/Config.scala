@@ -48,6 +48,15 @@ object Config {
     if (port == -1) 80 else port
   }
 
+  def replaceApiPort(port: Int): Unit = {
+    val prev: URI = new URI(api)
+    api = "" + new URI(
+      prev.getScheme, prev.getUserInfo,
+      prev.getHost, port,
+      prev.getPath, prev.getQuery, prev.getFragment
+    )
+  }
+
   private[kafka] def load(file: File): Unit = {
     val props: Properties = new Properties()
     val stream: FileInputStream = new FileInputStream(file)

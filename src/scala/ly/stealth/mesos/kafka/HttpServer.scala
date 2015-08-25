@@ -60,7 +60,8 @@ object HttpServer {
     server.addConnector(connector)
     server.start()
 
-    logger.info("started on port " + connector.getPort)
+    if (Config.apiPort == 0) Config.replaceApiPort(connector.getLocalPort)
+    logger.info("started on port " + connector.getLocalPort)
   }
 
   def stop() {
