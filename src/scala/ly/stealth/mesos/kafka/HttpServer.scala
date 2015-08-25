@@ -30,6 +30,7 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
+import ly.stealth.mesos.kafka.Topics.Topic
 
 object HttpServer {
   var jar: File = null
@@ -103,6 +104,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
+      else if (uri.startsWith("/api/topics")) handleTopicsApi(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -386,6 +388,67 @@ object HttpServer {
       result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleTopicsApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/topics".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "list") handleListTopics(request, response)
+      else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleListTopics(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topics: Topics = Scheduler.cluster.topics
+      val name = request.getParameter("name")
+
+      val topicNodes = new ListBuffer[JSONObject]()
+      for (topic <- topics.getTopics(name = name)) topicNodes.add(topic.toJson)
+      response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
+    }
+
+    def handleAddUpdateTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topics: Topics = Scheduler.cluster.topics
+      val add: Boolean = request.getRequestURI.endsWith("add")
+      val errors = new util.ArrayList[String]()
+
+      val name: String = request.getParameter("name")
+      if (name == null || name.isEmpty) errors.add("name required")
+
+      var partitions: Int = 1
+      if (add && request.getParameter("partitions") != null)
+        try { partitions = Integer.parseInt(request.getParameter("partitions")) }
+        catch { case e: NumberFormatException => errors.add("Invalid partitions") }
+
+      var replicas: Int = 1
+      if (add && request.getParameter("replicas") != null)
+        try { replicas = Integer.parseInt(request.getParameter("replicas")) }
+        catch { case e: NumberFormatException => errors.add("Invalid replicas") }
+
+      var options: util.Map[String, String] = new util.HashMap[String, String]()
+      if (request.getParameter("options") != null)
+        try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
+      else if (!add)
+        errors.add("options required")
+
+      val optionErr: String = topics.validateOptions(options)
+      if (optionErr != null) errors.add(optionErr)
+
+      var topic: Topic = topics.getTopic(name)
+      if (add && topic != null) errors.add("Duplicate topic")
+      if (!add && topic == null) errors.add("Topic not found")
+
+      if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
+
+      if (add) topics.addTopic(name, partitions, replicas, options)
+      else topics.updateTopic(topic, options)
+      topic = topics.getTopic(name)
+
+      response.getWriter.println(JSONObject(Map("topic" -> topic.toJson)))
     }
   }
 
