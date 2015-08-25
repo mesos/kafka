@@ -28,9 +28,15 @@ import org.I0Itec.zkclient.ZkClient
 import kafka.admin._
 import kafka.utils.{ZkUtils, ZKStringSerializer}
 import scala.util.parsing.json.JSONObject
+import ly.stealth.mesos.kafka.Topics.Topic
 
 class Topics {
   private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
+
+  def getTopic(name: String): Topics.Topic = {
+    val topics: util.List[Topic] = getTopics(name)
+    if (topics.length > 0) topics(0) else null
+  }
 
   def getTopics(name: String = null): util.List[Topics.Topic] = {
     val zkClient = newZkClient
@@ -56,23 +62,24 @@ class Topics {
     }
   }
 
-  def addTopic(name: String, partitions: Int = 1, replicas: Int = 1, options: util.Map[String, String]): Unit = {
+  def addTopic(name: String, partitions: Int = 1, replicas: Int = 1, options: util.Map[String, String]): Topic = {
     val zkClient = newZkClient
     try {
       val config: Properties = new Properties()
       for ((k, v) <- options) config.setProperty(k, v)
       AdminUtils.createTopic(zkClient, name, partitions, replicas, config)
+      getTopic(name)
     } finally {
       zkClient.close()
     }
   }
 
-  def updateTopic(name: String, options: util.Map[String, String]) {
+  def updateTopic(topic: Topic, options: util.Map[String, String]): Unit = {
     val zkClient = newZkClient
     try {
       val config: Properties = new Properties()
       for ((k, v) <- options) config.setProperty(k, v)
-      AdminUtils.changeTopicConfig(zkClient, name, config)
+      AdminUtils.changeTopicConfig(zkClient, topic.name, config)
     } finally {
       zkClient.close()
     }

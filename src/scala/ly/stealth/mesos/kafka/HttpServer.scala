@@ -30,6 +30,7 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
+import ly.stealth.mesos.kafka.Topics.Topic
 
 object HttpServer {
   var jar: File = null
@@ -434,14 +435,17 @@ object HttpServer {
       else if (!add)
         errors.add("options required")
 
+      var topic: Topic = topics.getTopic(name)
+      if (add && topic != null) errors.add("Duplicate topic")
+      if (!add && topic == null) errors.add("Topic not found")
+
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
-      if (add)
-        topics.addTopic(name, partitions, replicas, options)
-      else
-        topics.updateTopic(name, options)
+      if (add) topics.addTopic(name, partitions, replicas, options)
+      else topics.updateTopic(topic, options)
+      topic = topics.getTopic(name)
 
-      response.getWriter.println(JSONObject(Map("topic" -> "todo")))
+      response.getWriter.println(JSONObject(Map("topic" -> topic.toJson)))
     }
   }
 
