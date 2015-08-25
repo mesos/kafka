@@ -35,6 +35,7 @@ class Topics {
   private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 
   def getTopic(name: String): Topics.Topic = {
+    if (name == null) return null
     val topics: util.List[Topic] = getTopics(name)
     if (topics.length > 0) topics(0) else null
   }
