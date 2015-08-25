@@ -20,58 +20,39 @@ package ly.stealth.mesos.kafka
 import java.util
 import java.util.Properties
 
-import kafka.admin.TopicCommand.TopicCommandOptions
-
-import scala.Some
 import scala.collection.JavaConversions._
 import scala.collection.{mutable, Seq, Map}
 
 import org.I0Itec.zkclient.ZkClient
-import org.I0Itec.zkclient.exception.ZkNodeExistsException
 
 import kafka.admin._
-import kafka.common.TopicAndPartition
 import kafka.utils.{ZkUtils, ZKStringSerializer}
-import ly.stealth.mesos.kafka.Util.Period
-import org.apache.log4j.Logger
+import scala.util.parsing.json.JSONObject
 
 class Topics {
-  private val logger: Logger = Logger.getLogger(this.getClass)
-
   private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 
-  def getTopicLists: List[String] = {
-    val zkClient = newZkClient
-    try {
-      val optsList = Array[String]()
-      val topics = ZkUtils.getAllTopics(zkClient)
-      logger.info("All Topics : " + topics.toString())
-      topics.toList
-    } finally {
-      zkClient.close()
-    }
-  }
-
-  def getTopic(nameExp: String): List[String] = {
+  def getTopics(name: String = null): util.List[Topics.Topic] = {
     val zkClient = newZkClient
 
     try {
-      val optsList = Array[String]()
-      val topics = ZkUtils.getAllTopics(zkClient)
-      topics.filter(x => x.matches(nameExp))
-      topics.toList
+      var names = ZkUtils.getAllTopics(zkClient)
+      if (name != null) names = names.filter(_.matches(name))
+
+      val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtils.getPartitionAssignmentForTopics(zkClient, names)
+      val configs = AdminUtils.fetchAllTopicConfigs(zkClient)
+
+      val topics = new util.ArrayList[Topics.Topic]
+      for (name <- names.sorted)
+        topics.add(new Topics.Topic(
+          name,
+          assignments.getOrElse(name, null).mapValues(brokers => new util.ArrayList[Int](brokers)),
+          new util.TreeMap[String, String](propertiesAsScalaMap(configs.getOrElse(name, null)))
+        ))
+
+      topics
     } finally {
       zkClient.close()
-    }
-  }
-
-  def optionsToArgs(options: util.Map[String, String]): Option[Array[String]] = {
-    try {
-      val c: List[String] = options.map { case (k,v) => (String.format("%s=%s",k,v)) }(collection.breakOut)
-      val config: Array[String]  = c.flatMap(x => List("--config", x)).toArray[String]
-      Some(config)
-    } catch {
-      case e: Exception => None
     }
   }
 
@@ -96,23 +77,31 @@ class Topics {
       zkClient.close()
     }
   }
-
-  def describeTopic(topic: String): Unit = {
-    val zkClient = newZkClient
-    try {
-      val cmd = Array("--zookeeper", Config.zk, "--describe")
-
-      val command = if (topic != null) {
-        cmd ++ Array("--topic", topic)
-      } else cmd
-
-      TopicCommand.describeTopic(zkClient, new TopicCommandOptions(command))
-    } finally {
-      zkClient.close()
-    }
-  }
 }
 
 object Topics {
   class Exception(message: String) extends java.lang.Exception(message)
+  
+  class Topic(
+    _name: String,
+    _partitions: util.Map[Int, util.List[Int]],
+    _options: util.Map[String, String]
+  ) {
+    val name: String = _name
+    val partitions: util.Map[Int, util.List[Int]] = _partitions
+    val options: util.Map[String, String] = _options
+
+    def toJson: JSONObject = {
+      val obj = new collection.mutable.LinkedHashMap[String, Any]()
+      obj("name") = name
+
+      val partitionsObj = new collection.mutable.LinkedHashMap[String, Any]()
+      for ((partition, brokers) <- partitions)
+        partitionsObj.put("" + partition, brokers.mkString(", "))
+      obj("partitions") = new JSONObject(partitionsObj.toMap)
+
+      obj.put("options", new JSONObject(options.toMap))
+      new JSONObject(obj.toMap)
+    }
+  }
 }

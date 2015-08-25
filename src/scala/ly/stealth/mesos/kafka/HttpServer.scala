@@ -30,7 +30,6 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
-import scala.Console
 
 object HttpServer {
   var jar: File = null
@@ -396,26 +395,18 @@ object HttpServer {
       var uri: String = request.getRequestURI.substring("/api/topics".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "list") handleTopicList(request, response)
+      if (uri == "list") handleListTopics(request, response)
       else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
-      else if (uri == "describe") handleTopicDescribe(request, response)
       else response.sendError(404, "uri not found")
     }
 
-    def handleTopicList(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster: Cluster = Scheduler.cluster
-      val topics: Topics = cluster.topics
+    def handleListTopics(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topics: Topics = Scheduler.cluster.topics
+      val name = request.getParameter("name")
 
-      val nameExpr: String = request.getParameter("name")
-      val topicList:List[String]  = if (nameExpr == null) {
-                          topics.getTopicLists
-                        } else {
-                          topics.getTopic(nameExpr)
-                        }
-
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("topics") = new JSONArray(topicList)
-      response.getWriter.println(JSONObject(result.toMap))
+      val topicNodes = new ListBuffer[JSONObject]()
+      for (topic <- topics.getTopics(name = name)) topicNodes.add(topic.toJson)
+      response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
     }
 
     def handleAddUpdateTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -448,26 +439,9 @@ object HttpServer {
       if (add)
         topics.addTopic(name, partitions, replicas, options)
       else
-        topics.updateTopic(name, options);
+        topics.updateTopic(name, options)
 
       response.getWriter.println(JSONObject(Map("topic" -> "todo")))
-    }
-
-    def handleTopicDescribe(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-
-      val cluster: Cluster = Scheduler.cluster
-      val topics: Topics = cluster.topics
-
-      val name: String = request.getParameter("name")
-
-      val baos = new java.io.ByteArrayOutputStream
-      val out = new java.io.PrintStream(baos)
-      Console.withOut(out) {topics.describeTopic(name)}
-
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("describe") = baos.toString
-      response.getWriter.println(baos.toString)
-      baos.close()
     }
   }
 
