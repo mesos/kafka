@@ -435,6 +435,9 @@ object HttpServer {
       else if (!add)
         errors.add("options required")
 
+      val optionErr: String = topics.validateOptions(options)
+      if (optionErr != null) errors.add(optionErr)
+
       var topic: Topic = topics.getTopic(name)
       if (add && topic != null) errors.add("Duplicate topic")
       if (!add && topic == null) errors.add("Topic not found")

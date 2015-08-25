@@ -29,6 +29,7 @@ import kafka.admin._
 import kafka.utils.{ZkUtils, ZKStringSerializer}
 import scala.util.parsing.json.JSONObject
 import ly.stealth.mesos.kafka.Topics.Topic
+import kafka.log.LogConfig
 
 class Topics {
   private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
@@ -83,6 +84,15 @@ class Topics {
     } finally {
       zkClient.close()
     }
+  }
+
+  def validateOptions(options: util.Map[String, String]): String = {
+    val config: Properties = new Properties()
+    for ((k, v) <- options) config.setProperty(k, v)
+
+    try { LogConfig.validate(config) }
+    catch { case e: IllegalArgumentException => return e.getMessage }
+    null
   }
 }
 
