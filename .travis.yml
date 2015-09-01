@@ -21,5 +21,3 @@ java:
 before_install: wget https://archive.apache.org/dist/kafka/0.8.2.1/kafka_2.10-0.8.2.1.tgz
 
 install: ./gradlew jar
-
-script: ./gradlew test
