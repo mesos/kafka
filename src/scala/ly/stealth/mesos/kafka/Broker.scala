@@ -64,12 +64,16 @@ class Broker(_id: String = "0") {
 
   @volatile var task: Broker.Task = null
 
-  def matches(offer: Offer, otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {
+  def matches(offer: Offer, now: Date = new Date(), otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {
     // check resources
     val reservation: Broker.Reservation = getReservation(offer)
     if (reservation.cpus < cpus) return s"cpus < $cpus"
     if (reservation.mem < mem) return s"mem < $mem"
     if (reservation.port == -1) return "no suitable port"
+
+    // check stickiness
+    if (!stickiness.allowsHostname(offer.getHostname, now))
+      return "hostname != stickiness host"
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -150,8 +154,7 @@ class Broker(_id: String = "0") {
   }
 
   def shouldStart(hostname: String, now: Date = new Date()): Boolean =
-    active && task == null &&
-    stickiness.allowsHostname(hostname, now) && !failover.isWaitingDelay(now)
+    active && task == null && !failover.isWaitingDelay(now)
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
   
