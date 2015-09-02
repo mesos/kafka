@@ -165,10 +165,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[kafka] def acceptOffer(offer: Offer): String = {
     if (isReconciling) return "reconciling"
+    val now = new Date()
 
     var reason = ""
     for (broker <- cluster.getBrokers.filter(_.shouldStart(offer.getHostname))) {
-      val diff = broker.matches(offer, otherTasksAttributes)
+      val diff = broker.matches(offer, now, otherTasksAttributes)
 
       if (diff == null) {
         launchTask(broker, offer)

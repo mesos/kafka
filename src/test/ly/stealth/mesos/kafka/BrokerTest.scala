@@ -75,6 +75,7 @@ class BrokerTest extends MesosTestCase {
 
   @Test
   def matches_hostname {
+    val now = new Date(0)
     assertNull(broker.matches(offer(hostname = "master")))
     assertNull(broker.matches(offer(hostname = "slave")))
 
@@ -92,18 +93,35 @@ class BrokerTest extends MesosTestCase {
     // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(hostname = "master")))
-    assertEquals("hostname doesn't match unique", broker.matches(offer(hostname = "master"), _ => Array("master")))
-    assertNull(broker.matches(offer(hostname = "master"), _ => Array("slave")))
+    assertEquals("hostname doesn't match unique", broker.matches(offer(hostname = "master"), now, _ => Array("master")))
+    assertNull(broker.matches(offer(hostname = "master"), now, _ => Array("slave")))
 
     // groupBy
     broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(hostname = "master")))
-    assertNull(broker.matches(offer(hostname = "master"), _ => Array("master")))
-    assertEquals("hostname doesn't match groupBy", broker.matches(offer(hostname = "master"), _ => Array("slave")))
+    assertNull(broker.matches(offer(hostname = "master"), now, _ => Array("master")))
+    assertEquals("hostname doesn't match groupBy", broker.matches(offer(hostname = "master"), now, _ => Array("slave")))
+  }
+
+  @Test
+  def matches_stickiness {
+    val host0 = "host0"
+    val host1 = "host1"
+
+    assertNull(broker.matches(offer(hostname = host0), new Date(0)))
+    assertNull(broker.matches(offer(hostname = host1), new Date(0)))
+
+    broker.registerStart(host0)
+    broker.registerStop(new Date(0))
+
+    assertNull(broker.matches(offer(hostname = host0), new Date(0)))
+    assertEquals("hostname != stickiness host", broker.matches(offer(hostname = host1), new Date(0)))
   }
 
   @Test
   def matches_attributes {
+    val now = new Date(0)
+
     // like
     broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(attributes = "rack=1-1")))
@@ -113,8 +131,8 @@ class BrokerTest extends MesosTestCase {
     // groupBy
     broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
     assertNull(broker.matches(offer(attributes = "rack=1")))
-    assertNull(broker.matches(offer(attributes = "rack=1"), _ => Array("1")))
-    assertEquals("rack doesn't match groupBy", broker.matches(offer(attributes = "rack=2"), _ => Array("1")))
+    assertNull(broker.matches(offer(attributes = "rack=1"), now, _ => Array("1")))
+    assertEquals("rack doesn't match groupBy", broker.matches(offer(attributes = "rack=2"), now, _ => Array("1")))
   }
 
   @Test
@@ -202,13 +220,6 @@ class BrokerTest extends MesosTestCase {
     assertFalse(broker.shouldStart(host))
     broker.task = null
     assertTrue(broker.shouldStart(host))
-
-    // stickiness
-    broker.registerStart(host)
-    broker.registerStop(new Date(0))
-    assertTrue(broker.shouldStart(host, new Date(0)))
-    assertFalse(broker.shouldStart(host + "1", new Date(0)))
-    assertTrue(broker.shouldStart(host + "1", new Date(broker.stickiness.period.ms)))
 
     // failover waiting delay
     val now = new Date(0)
