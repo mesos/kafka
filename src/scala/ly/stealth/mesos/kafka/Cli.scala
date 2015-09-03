@@ -25,6 +25,7 @@ import java.util
 import scala.collection.JavaConversions._
 import java.util.{Properties, Collections}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Str, Period}
+import ly.stealth.mesos.kafka.Topics.Topic
 
 object Cli {
   var api: String = null
@@ -47,54 +48,57 @@ object Cli {
       throw new Error("command required")
     }
 
-    val command = args(0)
+    val cmd = args(0)
     args = args.slice(1, args.length)
-    if (command == "scheduler" && !noScheduler) { handleScheduler(args); return }
-    if (command == "help") { handleHelp(if (args.length > 0) args(0) else null); return }
+    if (cmd == "scheduler" && !noScheduler) { handleScheduler(args); return }
+    if (cmd == "help") { handleHelp(if (args.length > 0) args(0) else null, if (args.length > 1) args(1) else null); return }
 
     args = handleGenericOptions(args)
-    if (command == "status") { handleStatus(); return }
+    if (cmd == "status") { handleStatus(); return }
 
-    // rest of the commands require <argument>
+    // rest of the cmds require <argument>
     if (args.length < 1) {
-      handleHelp(command); out.println()
+      handleHelp(cmd); out.println()
       throw new Error("argument required")
     }
 
     val arg = args(0)
     args = args.slice(1, args.length)
 
-    command match {
-      case "add" | "update" => handleAddUpdateBroker(arg, args, command == "add")
+    cmd match {
+      case "add" | "update" => handleAddUpdateBroker(arg, args, cmd == "add")
       case "remove" => handleRemoveBroker(arg)
-      case "start" | "stop" => handleStartStopBroker(arg, args, command == "start")
+      case "start" | "stop" => handleStartStopBroker(arg, args, cmd == "start")
       case "rebalance" => handleRebalance(arg, args)
-      case _ => throw new Error("unsupported command " + command)
+      case "topics" => TopicsCli.handle(arg, args)
+      case _ => throw new Error("unsupported command " + cmd)
     }
   }
 
-  private def handleHelp(command: String = null): Unit = {
-    command match {
+  private def handleHelp(cmd: String = null, subCmd: String = null): Unit = {
+    cmd match {
       case null =>
         out.println("Usage: <command>\n")
-        printCommands()
+        printCmds()
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
-        if (noScheduler) throw new Error(s"unsupported command $command")
+        if (noScheduler) throw new Error(s"unsupported command $cmd")
         handleScheduler(null, help = true)
       case "status" =>
         handleStatus(help = true)
       case "add" | "update" => 
-        handleAddUpdateBroker(null, null, command == "add", help = true)
+        handleAddUpdateBroker(null, null, cmd == "add", help = true)
       case "remove" =>
         handleRemoveBroker(null, help = true)
       case "start" | "stop" =>
-        handleStartStopBroker(null, null, command == "start", help = true)
+        handleStartStopBroker(null, null, cmd == "start", help = true)
       case "rebalance" =>
         handleRebalance(null, null, help = true)
+      case "topics" =>
+        TopicsCli.handle(subCmd, null, help = true)
       case _ =>
-        throw new Error(s"unsupported command $command")
+        throw new Error(s"unsupported command $cmd")
     }
   }
 
@@ -282,8 +286,8 @@ object Cli {
     parser.accepts("failover-max-tries", "max failover tries. Default - none").withRequiredArg().ofType(classOf[String])
 
     if (help) {
-      val command = if (add) "add" else "update"
-      out.println(s"${command.capitalize} brokers\nUsage: $command <id-expr> [options]\n")
+      val cmd = if (add) "add" else "update"
+      out.println(s"${cmd.capitalize} brokers\nUsage: $cmd <id-expr> [options]\n")
       parser.printHelpOn(out)
 
       out.println()
@@ -388,8 +392,8 @@ object Cli {
     if (!start) parser.accepts("force", "forcibly stop").withOptionalArg().ofType(classOf[String])
 
     if (help) {
-      val command = if (start) "start" else "stop"
-      out.println(s"${command.capitalize} brokers\nUsage: $command <id-expr> [options]\n")
+      val cmd = if (start) "start" else "stop"
+      out.println(s"${cmd.capitalize} brokers\nUsage: $cmd <id-expr> [options]\n")
       parser.printHelpOn(out)
 
       out.println()
@@ -409,7 +413,7 @@ object Cli {
         throw new Error(e.getMessage)
     }
 
-    val command: String = if (start) "start" else "stop"
+    val cmd: String = if (start) "start" else "stop"
     val timeout: String = options.valueOf("timeout").asInstanceOf[String]
     val force: Boolean = options.has("force")
 
@@ -419,7 +423,7 @@ object Cli {
     if (force) params.put("force", null)
 
     var json: Map[String, Object] = null
-    try { json = sendRequest("/brokers/" + command, params) }
+    try { json = sendRequest("/brokers/" + cmd, params) }
     catch { case e: IOException => throw new Error("" + e) }
 
     val status = json("status").asInstanceOf[String]
@@ -533,7 +537,7 @@ object Cli {
     parser
   }
 
-  private def printCommands(): Unit = {
+  private def printCmds(): Unit = {
     printLine("Commands:")
     printLine("help {cmd} - print general or command-specific help", 1)
     if (!noScheduler) printLine("scheduler  - start scheduler", 1)
@@ -544,6 +548,7 @@ object Cli {
     printLine("start      - start brokers", 1)
     printLine("stop       - stop brokers", 1)
     printLine("rebalance  - rebalance topics", 1)
+    printLine("topics     - topics management commands", 1)
   }
 
   private def printCluster(cluster: Cluster): Unit = {
@@ -695,4 +700,95 @@ object Cli {
   }
 
   class Error(message: String) extends java.lang.Error(message) {}
+  
+  object TopicsCli {
+    def handle(cmd: String, args: Array[String], help: Boolean = false): Unit = {
+      if (help) {
+        handleHelp(cmd)
+        return
+      }
+
+      cmd match {
+        case "list" => handleList(args)
+        case "add" | "update" => handleAddUpdate(args, cmd == "add")
+        case _ => throw new Error("unsupported topics command " + cmd)
+      }
+    }
+
+    def handleHelp(cmd: String): Unit = {
+      cmd match {
+        case null =>
+          out.println("Topics management commands\nUsage: topics <command>\n")
+          printCmds()
+        case "list" =>
+          handleList(null, help = true)
+        case "add" | "update" =>
+          handleAddUpdate(null, cmd == "add", help = true)
+        case _ =>
+          throw new Error(s"unsupported command $cmd")
+      }
+    }
+
+    def handleList(args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("name", "name regex. Default - none").withRequiredArg().ofType(classOf[String])
+
+      if (help) {
+        out.println("List topics\nUsage: topics list [options]\n")
+        parser.printHelpOn(out)
+
+        out.println()
+        handleGenericOptions(null, help = true)
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          out.println()
+          throw new Error(e.getMessage)
+      }
+
+      val name = options.valueOf("name").asInstanceOf[String]
+
+      val params = new util.LinkedHashMap[String, String]
+      if (name != null) params.put("name", name)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/topics/list", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val topicsNodes: List[Map[String, Object]] = json("topics").asInstanceOf[List[Map[String, Object]]]
+
+      val title: String = if (topicsNodes.isEmpty) "no topics" else "topic" + (if (topicsNodes.size > 1) "s" else "") + ":"
+      out.println(title)
+
+      for (topicNode <- topicsNodes) {
+        val topic = new Topic()
+        topic.fromJson(topicNode)
+
+        printTopic(topic, 1)
+        out.println()
+      }
+    }
+
+    def handleAddUpdate(args: Array[String], add: Boolean, help: Boolean = false): Unit = {
+      // todo
+    }
+
+    private def printCmds(): Unit = {
+      printLine("Commands:")
+      printLine("list       - list topics", 1)
+      printLine("add        - add topic", 1)
+      printLine("update     - update topic", 1)
+    }
+
+    private def printTopic(topic: Topic, indent: Int): Unit = {
+      printLine("name: " + topic.name, indent)
+      printLine("partitions: " + topic.partitionsState, indent)
+      if (!topic.options.isEmpty) printLine("options: " + Util.formatMap(topic.options), indent)
+    }
+  }
 }

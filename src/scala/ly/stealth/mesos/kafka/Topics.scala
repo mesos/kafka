@@ -101,13 +101,32 @@ object Topics {
   class Exception(message: String) extends java.lang.Exception(message)
   
   class Topic(
-    _name: String,
-    _partitions: util.Map[Int, util.List[Int]],
-    _options: util.Map[String, String]
+    _name: String = null,
+    _partitions: util.Map[Int, util.List[Int]] = new util.HashMap[Int, util.List[Int]](),
+    _options: util.Map[String, String] = new util.HashMap[String, String]()
   ) {
-    val name: String = _name
-    val partitions: util.Map[Int, util.List[Int]] = _partitions
-    val options: util.Map[String, String] = _options
+    var name: String = _name
+    var partitions: util.Map[Int, util.List[Int]] = _partitions
+    var options: util.Map[String, String] = _options
+
+    def partitionsState: String = {
+      var s: String = ""
+      for ((partition, brokers) <- partitions) {
+        if (!s.isEmpty) s += ", "
+        s += partition + ":[" + brokers.mkString(",") + "]"
+      }
+      s
+    }
+
+    def fromJson(node: Map[String, Object]): Unit = {
+      name = node("name").asInstanceOf[String]
+
+      val partitionsObj: Map[String, String] = node("partitions").asInstanceOf[Map[String, String]]
+      for ((k, v) <- partitionsObj)
+        partitions.put(Integer.parseInt(k), v.split(", ").toList.map(Integer.parseInt))
+
+      options = node("options").asInstanceOf[Map[String, String]]
+    }
 
     def toJson: JSONObject = {
       val obj = new collection.mutable.LinkedHashMap[String, Any]()
