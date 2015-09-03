@@ -44,7 +44,7 @@ object Cli {
     var args = _args
 
     if (args.length == 0) {
-      handleHelp(); out.println()
+      handleHelp(); printLine()
       throw new Error("command required")
     }
 
@@ -57,7 +57,7 @@ object Cli {
 
     // rest of cmds require <subCmd>
     if (args.length < 1) {
-      handleHelp(cmd); out.println()
+      handleHelp(cmd); printLine()
       throw new Error("command required")
     }
 
@@ -65,8 +65,8 @@ object Cli {
     args = args.slice(1, args.length)
 
     cmd match {
-      case "topics" => TopicsCli.handle(subCmd, args)
-      case "brokers" => BrokersCli.handle(subCmd, args)
+      case "topic" => TopicCli.handle(subCmd, args)
+      case "broker" => BrokerCli.handle(subCmd, args)
       case _ => throw new Error("unsupported command " + cmd)
     }
   }
@@ -74,17 +74,20 @@ object Cli {
   private def handleHelp(cmd: String = null, subCmd: String = null): Unit = {
     cmd match {
       case null =>
-        out.println("Usage: <command>\n")
+        printLine("Usage: <command>\n")
         printCmds()
+
+        printLine()
+        printLine("Run `help <command>` to see details of specific command")
       case "help" =>
-        out.println("Print general or command-specific help\nUsage: help {command}")
+        printLine("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
         if (!SchedulerCli.isEnabled) throw new Error(s"unsupported command $cmd")
         SchedulerCli.handle(null, help = true)
-      case "brokers" =>
-        BrokersCli.handle(subCmd, null, help = true)
-      case "topics" =>
-        TopicsCli.handle(subCmd, null, help = true)
+      case "broker" =>
+        BrokerCli.handle(subCmd, null, help = true)
+      case "topic" =>
+        TopicCli.handle(subCmd, null, help = true)
       case _ =>
         throw new Error(s"unsupported command $cmd")
     }
@@ -96,7 +99,7 @@ object Cli {
     parser.allowsUnrecognizedOptions()
 
     if (help) {
-      out.println("Generic Options")
+      printLine("Generic Options")
       parser.printHelpOn(out)
       return args
     }
@@ -106,7 +109,7 @@ object Cli {
     catch {
       case e: OptionException =>
         parser.printHelpOn(out)
-        out.println()
+        printLine()
         throw new Error(e.getMessage)
     }
 
@@ -139,8 +142,8 @@ object Cli {
     printLine("Commands:")
     printLine("help [cmd [cmd]] - print general or command-specific help", 1)
     if (SchedulerCli.isEnabled) printLine("scheduler        - start scheduler", 1)
-    printLine("brokers          - broker management commands", 1)
-    printLine("topics           - topic management commands", 1)
+    printLine("broker           - broker management commands", 1)
+    printLine("topic            - topic management commands", 1)
   }
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
@@ -284,7 +287,7 @@ object Cli {
       val configArg = parser.nonOptions()
 
       if (help) {
-        out.println("Start scheduler \nUsage: scheduler [options] [config.properties]\n")
+        printLine("Start scheduler \nUsage: scheduler [options] [config.properties]\n")
         parser.printHelpOn(out)
         return
       }
@@ -294,7 +297,7 @@ object Cli {
       catch {
         case e: OptionException =>
           parser.printHelpOn(out)
-          out.println()
+          printLine()
           throw new Error(e.getMessage)
       }
 
@@ -304,7 +307,7 @@ object Cli {
       if (configFile == null && Config.DEFAULT_FILE.exists()) configFile = Config.DEFAULT_FILE
 
       if (configFile != null) {
-        out.println("Loading config defaults from " + configFile)
+        printLine("Loading config defaults from " + configFile)
         Config.load(configFile)
       }
 
@@ -361,13 +364,13 @@ object Cli {
 
       val log = options.valueOf("log").asInstanceOf[String]
       if (log != null) Config.log = new File(log)
-      if (Config.log != null) out.println(s"Logging to ${Config.log}")
+      if (Config.log != null) printLine(s"Logging to ${Config.log}")
 
       Scheduler.start()
     }
   }
 
-  object BrokersCli {
+  object BrokerCli {
     def handle(cmd: String, _args: Array[String], help: Boolean = false): Unit = {
       if (help) {
         handleHelp(cmd)
@@ -379,7 +382,7 @@ object Cli {
       // rest of cmds require <arg>
       var args = _args
       if (args.length < 1) {
-        handleHelp(cmd); out.println()
+        handleHelp(cmd); printLine()
         throw new Error("argument required")
       }
 
@@ -391,15 +394,18 @@ object Cli {
         case "remove" => handleRemove(arg)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
         case "rebalance" => handleRebalance(arg, args)
-        case _ => throw new Error("unsupported command " + cmd)
+        case _ => throw new Error("unsupported broker command " + cmd)
       }
     }
 
     private def handleHelp(cmd: String): Unit = {
       cmd match {
         case null =>
-          out.println("Broker management commands\nUsage: brokers <command>\n")
+          printLine("Broker management commands\nUsage: broker <command>\n")
           printCmds()
+
+          printLine()
+          printLine("Run `help broker <command>` to see details of specific command")
         case "list" =>
           handleList(help = true)
         case "add" | "update" =>
@@ -411,19 +417,19 @@ object Cli {
         case "rebalance" =>
           handleRebalance(null, null, help = true)
         case _ =>
-          throw new Error(s"unsupported command $cmd")
+          throw new Error(s"unsupported broker command $cmd")
       }
     }
 
     private def handleList(help: Boolean = false): Unit = {
       if (help) {
-        out.println("List brokers\nUsage: brokers list [options]\n")
+        printLine("List brokers\nUsage: broker list [options]\n")
         handleGenericOptions(null, help = true)
         return
       }
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/brokers/list", Collections.emptyMap()) }
+      try { json = sendRequest("/broker/list", Collections.emptyMap()) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val cluster: Cluster = new Cluster()
@@ -458,19 +464,19 @@ object Cli {
 
       if (help) {
         val cmd = if (add) "add" else "update"
-        out.println(s"${cmd.capitalize} brokers\nUsage: $cmd <id-expr> [options]\n")
+        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <id-expr> [options]\n")
         parser.printHelpOn(out)
 
-        out.println()
+        printLine()
         handleGenericOptions(null, help = true)
 
-        out.println()
+        printLine()
         printIdExprExamples()
 
-        out.println()
+        printLine()
         printConstraintExamples()
 
-        if (!add) out.println("\nNote: use \"\" arg to unset an option")
+        if (!add) printLine("\nNote: use \"\" arg to unset an option")
         return
       }
 
@@ -479,7 +485,7 @@ object Cli {
       catch {
         case e: OptionException =>
           parser.printHelpOn(out)
-          out.println()
+          printLine()
           throw new Error(e.getMessage)
       }
 
@@ -519,7 +525,7 @@ object Cli {
       if (failoverMaxTries != null) params.put("failoverMaxTries", failoverMaxTries)
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/brokers/" + (if (add) "add" else "update"), params) }
+      try { json = sendRequest("/broker/" + (if (add) "add" else "update"), params) }
       catch { case e: IOException => throw new Error("" + e) }
       val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
@@ -539,16 +545,16 @@ object Cli {
 
     private def handleRemove(id: String, help: Boolean = false): Unit = {
       if (help) {
-        out.println("Remove brokers\nUsage: remove <id-expr> [options]\n")
+        printLine("Remove brokers\nUsage: broker remove <id-expr> [options]\n")
         handleGenericOptions(null, help = true)
 
-        out.println()
+        printLine()
         printIdExprExamples()
         return
       }
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/brokers/remove", Collections.singletonMap("id", id)) }
+      try { json = sendRequest("/broker/remove", Collections.singletonMap("id", id)) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val ids = json("ids").asInstanceOf[String]
@@ -564,13 +570,13 @@ object Cli {
 
       if (help) {
         val cmd = if (start) "start" else "stop"
-        out.println(s"${cmd.capitalize} brokers\nUsage: $cmd <id-expr> [options]\n")
+        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <id-expr> [options]\n")
         parser.printHelpOn(out)
 
-        out.println()
+        printLine()
         handleGenericOptions(null, help = true)
 
-        out.println()
+        printLine()
         printIdExprExamples()
         return
       }
@@ -580,7 +586,7 @@ object Cli {
       catch {
         case e: OptionException =>
           parser.printHelpOn(out)
-          out.println()
+          printLine()
           throw new Error(e.getMessage)
       }
 
@@ -594,7 +600,7 @@ object Cli {
       if (force) params.put("force", null)
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/brokers/" + cmd, params) }
+      try { json = sendRequest("/broker/" + cmd, params) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val status = json("status").asInstanceOf[String]
@@ -615,16 +621,16 @@ object Cli {
       parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
       if (help) {
-        out.println("Rebalance topics\nUsage: rebalance <id-expr>|status [options]\n")
+        printLine("Rebalance topics\nUsage: broker rebalance <id-expr>|status [options]\n")
         parser.printHelpOn(out)
 
-        out.println()
+        printLine()
         handleGenericOptions(null, help = true)
 
-        out.println()
+        printLine()
         printTopicExprExamples()
 
-        out.println()
+        printLine()
         printIdExprExamples()
         return
       }
@@ -634,7 +640,7 @@ object Cli {
       catch {
         case e: OptionException =>
           parser.printHelpOn(out)
-          out.println()
+          printLine()
           throw new Error(e.getMessage)
       }
 
@@ -647,7 +653,7 @@ object Cli {
       if (timeout != null) params.put("timeout", timeout)
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/brokers/rebalance", params) }
+      try { json = sendRequest("/broker/rebalance", params) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val status = json("status").asInstanceOf[String]
@@ -741,7 +747,7 @@ object Cli {
     }
   }
   
-  object TopicsCli {
+  object TopicCli {
     def handle(cmd: String, _args: Array[String], help: Boolean = false): Unit = {
       var args = _args
 
@@ -757,34 +763,37 @@ object Cli {
       }
 
       if (arg == null && cmd != "list") {
-        handleHelp(cmd); out.println()
+        handleHelp(cmd); printLine()
         throw new Error("argument required")
       }
 
       cmd match {
         case "list" => handleList(arg)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
-        case _ => throw new Error("unsupported topics command " + cmd)
+        case _ => throw new Error("unsupported topic command " + cmd)
       }
     }
 
     def handleHelp(cmd: String): Unit = {
       cmd match {
         case null =>
-          out.println("Topic management commands\nUsage: topics <command>\n")
+          printLine("Topic management commands\nUsage: topic <command>\n")
           printCmds()
+
+          printLine()
+          printLine("Run `help topic <command>` to see details of specific command")
         case "list" =>
           handleList(null, help = true)
         case "add" | "update" =>
           handleAddUpdate(null, null, cmd == "add", help = true)
         case _ =>
-          throw new Error(s"unsupported command $cmd")
+          throw new Error(s"unsupported topic command $cmd")
       }
     }
 
     def handleList(name: String, help: Boolean = false): Unit = {
       if (help) {
-        out.println("List topics\nUsage: topics list [name-regex]\n")
+        printLine("List topics\nUsage: topic list [name-regex]\n")
         handleGenericOptions(null, help = true)
         return
       }
@@ -793,20 +802,20 @@ object Cli {
       if (name != null) params.put("name", name)
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/topics/list", params) }
+      try { json = sendRequest("/topic/list", params) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val topicsNodes: List[Map[String, Object]] = json("topics").asInstanceOf[List[Map[String, Object]]]
 
       val title: String = if (topicsNodes.isEmpty) "no topics" else "topic" + (if (topicsNodes.size > 1) "s" else "") + ":"
-      out.println(title)
+      printLine(title)
 
       for (topicNode <- topicsNodes) {
         val topic = new Topic()
         topic.fromJson(topicNode)
 
         printTopic(topic, 1)
-        out.println()
+        printLine()
       }
     }
 
@@ -821,10 +830,10 @@ object Cli {
       parser.accepts("options", "topic options. Example: flush.ms=60000,retention.ms=6000000").withRequiredArg().ofType(classOf[String])
 
       if (help) {
-        out.println(s"${cmd.capitalize} topic\nUsage: topics $cmd <name> [options]\n")
+        printLine(s"${cmd.capitalize} topic\nUsage: topic $cmd <name> [options]\n")
         parser.printHelpOn(out)
 
-        out.println()
+        printLine()
         handleGenericOptions(null, help = true)
         return
       }
@@ -834,7 +843,7 @@ object Cli {
       catch {
         case e: OptionException =>
           parser.printHelpOn(out)
-          out.println()
+          printLine()
           throw new Error(e.getMessage)
       }
 
@@ -849,7 +858,7 @@ object Cli {
       if (options != null) params.put("options", options_)
 
       var json: Map[String, Object] = null
-      try { json = sendRequest(s"/topics/$cmd", params) }
+      try { json = sendRequest(s"/topic/$cmd", params) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val topic: Topic = new Topic()

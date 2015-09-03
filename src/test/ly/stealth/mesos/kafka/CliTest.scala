@@ -48,11 +48,11 @@ class CliTest extends MesosTestCase {
     exec("help")
     assertOutContains("Usage:")
     assertOutContains("scheduler")
-    assertOutContains("brokers")
-    assertOutContains("topics")
+    assertOutContains("broker")
+    assertOutContains("topic")
 
     // command help
-    for (command <- "help scheduler brokers topics".split(" ")) {
+    for (command <- "help scheduler broker topic".split(" ")) {
       exec("help " + command)
       assertOutContains("Usage: " + command)
     }
@@ -64,7 +64,7 @@ class CliTest extends MesosTestCase {
     Scheduler.cluster.addBroker(new Broker("1"))
     Scheduler.cluster.addBroker(new Broker("2"))
 
-    exec("brokers list")
+    exec("broker list")
     assertOutContains("brokers:")
     assertOutContains("id: 0")
     assertOutContains("id: 1")
@@ -73,7 +73,7 @@ class CliTest extends MesosTestCase {
 
   @Test
   def add {
-    exec("brokers add 0 --cpus=0.1 --mem=128")
+    exec("broker add 0 --cpus=0.1 --mem=128")
     assertOutContains("Broker added")
     assertOutContains("id: 0")
     assertOutContains("cpus:0.10, mem:128")
@@ -88,7 +88,7 @@ class CliTest extends MesosTestCase {
   def update {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
 
-    exec("brokers update 0 --failover-delay=10s --failover-max-delay=20s --options=log.dirs=/tmp/kafka-logs")
+    exec("broker update 0 --failover-delay=10s --failover-max-delay=20s --options=log.dirs=/tmp/kafka-logs")
     assertOutContains("Broker updated")
     assertOutContains("delay:10s, max-delay:20s")
     assertOutContains("options: log.dirs=/tmp/kafka-logs")
@@ -101,7 +101,7 @@ class CliTest extends MesosTestCase {
   @Test
   def remove {
     Scheduler.cluster.addBroker(new Broker("0"))
-    exec("brokers remove 0")
+    exec("broker remove 0")
 
     assertOutContains("Broker 0 removed")
     assertNull(Scheduler.cluster.getBroker("0"))
@@ -112,17 +112,17 @@ class CliTest extends MesosTestCase {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
 
-    exec("brokers start * --timeout=0")
+    exec("broker start * --timeout=0")
     assertOutContains("Brokers 0,1")
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
-    exec("brokers stop 0 --timeout=0")
+    exec("broker stop 0 --timeout=0")
     assertOutContains("Broker 0")
     assertFalse(broker0.active)
     assertTrue(broker1.active)
 
-    exec("brokers stop 1 --timeout=0")
+    exec("broker stop 1 --timeout=0")
     assertOutContains("Broker 1")
     assertFalse(broker0.active)
     assertFalse(broker1.active)
@@ -131,12 +131,12 @@ class CliTest extends MesosTestCase {
   @Test
   def start_stop_timeout {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
-    try { exec("brokers start 0 --timeout=1ms"); fail() }
+    try { exec("broker start 0 --timeout=1ms"); fail() }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
     assertTrue(broker.active)
 
     broker.task = new Broker.Task("id", "slave", "executor", "host", _state = Broker.State.RUNNING)
-    try { exec("brokers stop 0 --timeout=1ms"); fail() }
+    try { exec("broker stop 0 --timeout=1ms"); fail() }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
     assertFalse(broker.active)
   }
@@ -150,7 +150,7 @@ class CliTest extends MesosTestCase {
     cluster.addBroker(new Broker("1"))
     assertFalse(rebalancer.running)
 
-    exec("brokers rebalance *")
+    exec("broker rebalance *")
     assertTrue(rebalancer.running)
     assertOutContains("Rebalance started")
   }
@@ -162,7 +162,7 @@ class CliTest extends MesosTestCase {
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("command required")) }
 
     // no id
-    try { exec("brokers add"); fail()  }
+    try { exec("broker add"); fail()  }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("argument required")) }
 
     // invalid command
@@ -174,7 +174,7 @@ class CliTest extends MesosTestCase {
   def connection_refused {
     HttpServer.stop()
     try {
-      try { exec("brokers add 0"); fail()  }
+      try { exec("broker add 0"); fail()  }
       catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Connection refused")) }
     } finally {
       HttpServer.start()
