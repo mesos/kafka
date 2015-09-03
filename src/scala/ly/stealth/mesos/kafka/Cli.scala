@@ -56,7 +56,7 @@ object Cli {
     args = handleGenericOptions(args)
     if (cmd == "status") { handleStatus(); return }
 
-    // rest of the cmds require <argument>
+    // rest of cmds require <arg>
     if (args.length < 1) {
       handleHelp(cmd); out.println()
       throw new Error("argument required")
@@ -702,15 +702,28 @@ object Cli {
   class Error(message: String) extends java.lang.Error(message) {}
   
   object TopicsCli {
-    def handle(cmd: String, args: Array[String], help: Boolean = false): Unit = {
+    def handle(cmd: String, _args: Array[String], help: Boolean = false): Unit = {
+      var args = _args
+
       if (help) {
         handleHelp(cmd)
         return
       }
 
+      var arg: String = null
+      if (args.length > 0 && !args(0).startsWith("-")) {
+        arg = args(0)
+        args = args.slice(1, args.length)
+      }
+
+      if (arg == null && cmd != "list") {
+        handleHelp(cmd); out.println()
+        throw new Error("argument required")
+      }
+
       cmd match {
-        case "list" => handleList(args)
-        case "add" | "update" => handleAddUpdate(args, cmd == "add")
+        case "list" => handleList(arg)
+        case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case _ => throw new Error("unsupported topics command " + cmd)
       }
     }
@@ -723,35 +736,18 @@ object Cli {
         case "list" =>
           handleList(null, help = true)
         case "add" | "update" =>
-          handleAddUpdate(null, cmd == "add", help = true)
+          handleAddUpdate(null, null, cmd == "add", help = true)
         case _ =>
           throw new Error(s"unsupported command $cmd")
       }
     }
 
-    def handleList(args: Array[String], help: Boolean = false): Unit = {
-      val parser = newParser()
-      parser.accepts("name", "name regex. Default - none").withRequiredArg().ofType(classOf[String])
-
+    def handleList(name: String, help: Boolean = false): Unit = {
       if (help) {
-        out.println("List topics\nUsage: topics list [options]\n")
-        parser.printHelpOn(out)
-
-        out.println()
+        out.println("List topics\nUsage: topics list [name-regex]\n")
         handleGenericOptions(null, help = true)
         return
       }
-
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          out.println()
-          throw new Error(e.getMessage)
-      }
-
-      val name = options.valueOf("name").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]
       if (name != null) params.put("name", name)
@@ -774,8 +770,54 @@ object Cli {
       }
     }
 
-    def handleAddUpdate(args: Array[String], add: Boolean, help: Boolean = false): Unit = {
-      // todo
+    def handleAddUpdate(name: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
+      val cmd = if (add) "add" else "update"
+
+      val parser = newParser()
+      if (add) {
+        parser.accepts("partitions", "partitions count. Default - 1").withRequiredArg().ofType(classOf[Integer])
+        parser.accepts("replicas", "replicas count. Default - 1").withRequiredArg().ofType(classOf[Integer])
+      }
+      parser.accepts("options", "topic options. Example: flush.ms=60000,retention.ms=6000000").withRequiredArg().ofType(classOf[String])
+
+      if (help) {
+        out.println(s"${cmd.capitalize} topic\nUsage: topics $cmd <name> [options]\n")
+        parser.printHelpOn(out)
+
+        out.println()
+        handleGenericOptions(null, help = true)
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          out.println()
+          throw new Error(e.getMessage)
+      }
+
+      val partitions = options.valueOf("partitions").asInstanceOf[Integer]
+      val replicas = options.valueOf("replicas").asInstanceOf[Integer]
+      val options_ = options.valueOf("options").asInstanceOf[String]
+
+      val params = new util.LinkedHashMap[String, String]
+      params.put("name", name)
+      if (partitions != null) params.put("partitions", "" + partitions)
+      if (replicas != null) params.put("replicas", "" + replicas)
+      if (options != null) params.put("options", options_)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest(s"/topics/$cmd", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val topic: Topic = new Topic()
+      topic.fromJson(json("topic").asInstanceOf[Map[String, Object]])
+
+      val addedUpdated = if (add) "added" else "updated"
+      printLine(s"Topic $addedUpdated:")
+      printTopic(topic, 1)
     }
 
     private def printCmds(): Unit = {
