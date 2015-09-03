@@ -86,13 +86,13 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_status {
+  def brokers_list {
     val cluster = Scheduler.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
     cluster.addBroker(new Broker("2"))
 
-    val json = sendRequest("/brokers/status", parseMap(null))
+    val json = sendRequest("/brokers/list", parseMap(null))
     val read = new Cluster()
     read.fromJson(json)
 

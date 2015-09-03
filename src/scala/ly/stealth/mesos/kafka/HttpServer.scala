@@ -127,7 +127,7 @@ object HttpServer {
       var uri: String = request.getRequestURI.substring("/api/brokers".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "status") handleStatus(response)
+      if (uri == "list") handleBrokerList(response)
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
@@ -135,7 +135,7 @@ object HttpServer {
       else response.sendError(404, "uri not found")
     }
 
-    def handleStatus(response: HttpServletResponse): Unit = {
+    def handleBrokerList(response: HttpServletResponse): Unit = {
       response.getWriter.println("" + Scheduler.cluster.toJson)
     }
 
