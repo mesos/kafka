@@ -50,8 +50,8 @@ object Cli {
 
     val cmd = args(0)
     args = args.slice(1, args.length)
-    if (cmd == "scheduler" && !noScheduler) { handleScheduler(args); return }
     if (cmd == "help") { handleHelp(if (args.length > 0) args(0) else null, if (args.length > 1) args(1) else null); return }
+    if (cmd == "scheduler" && SchedulerCli.isEnabled) { SchedulerCli.handle(args); return }
 
     args = handleGenericOptions(args)
 
@@ -79,8 +79,8 @@ object Cli {
       case "help" =>
         out.println("Print general or command-specific help\nUsage: help {command}")
       case "scheduler" =>
-        if (noScheduler) throw new Error(s"unsupported command $cmd")
-        handleScheduler(null, help = true)
+        if (!SchedulerCli.isEnabled) throw new Error(s"unsupported command $cmd")
+        SchedulerCli.handle(null, help = true)
       case "brokers" =>
         BrokersCli.handle(subCmd, null, help = true)
       case "topics" =>
@@ -88,152 +88,6 @@ object Cli {
       case _ =>
         throw new Error(s"unsupported command $cmd")
     }
-  }
-
-  private def handleScheduler(args: Array[String], help: Boolean = false): Unit = {
-    val parser = newParser()
-    parser.accepts("debug", "Debug mode. Default - " + Config.debug)
-      .withRequiredArg().ofType(classOf[java.lang.Boolean])
-
-    parser.accepts("storage",
-      """Storage for cluster state. Examples:
-        | - file:kafka-mesos.json
-        | - zk:/kafka-mesos
-        |Default - """.stripMargin + Config.storage)
-      .withRequiredArg().ofType(classOf[String])
-
-
-    parser.accepts("master",
-      """Master connection settings. Examples:
-        | - master:5050
-        | - master:5050,master2:5050
-        | - zk://master:2181/mesos
-        | - zk://username:password@master:2181
-        | - zk://master:2181,master2:2181/mesos""".stripMargin)
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("user", "Mesos user to run tasks. Default - none")
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("principal", "Principal (username) used to register framework. Default - none")
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("secret", "Secret (password) used to register framework. Default - none")
-      .withRequiredArg().ofType(classOf[String])
-
-
-    parser.accepts("framework-name", "Framework name. Default - " + Config.frameworkName)
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("framework-role", "Framework role. Default - " + Config.frameworkRole)
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("framework-timeout", "Framework timeout (30s, 1m, 1h). Default - " + Config.frameworkTimeout)
-      .withRequiredArg().ofType(classOf[String])
-
-
-    parser.accepts("api", "Api url. Example: http://master:7000")
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("bind-address", "Scheduler bind address (master, 0.0.0.0, 192.168.50.*, if:eth1). Default - all")
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("zk",
-      """Kafka zookeeper.connect. Examples:
-        | - master:2181
-        | - master:2181,master2:2181""".stripMargin)
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("jre", "JRE zip-file (jre-7-openjdk.zip). Default - none.")
-      .withRequiredArg().ofType(classOf[String])
-
-    parser.accepts("log", "Log file to use. Default - stdout.")
-      .withRequiredArg().ofType(classOf[String])
-
-
-    val configArg = parser.nonOptions()
-
-    if (help) {
-      out.println("Start scheduler \nUsage: scheduler [options] [config.properties]\n")
-      parser.printHelpOn(out)
-      return
-    }
-
-    var options: OptionSet = null
-    try { options = parser.parse(args: _*) }
-    catch {
-      case e: OptionException =>
-        parser.printHelpOn(out)
-        out.println()
-        throw new Error(e.getMessage)
-    }
-
-    var configFile = if (options.valueOf(configArg) != null) new File(options.valueOf(configArg)) else null
-    if (configFile != null && !configFile.exists()) throw new Error(s"config-file $configFile not found")
-
-    if (configFile == null && Config.DEFAULT_FILE.exists()) configFile = Config.DEFAULT_FILE
-
-    if (configFile != null) {
-      out.println("Loading config defaults from " + configFile)
-      Config.load(configFile)
-    }
-
-    val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
-    if (debug != null) Config.debug = debug
-
-    val storage = options.valueOf("storage").asInstanceOf[String]
-    if (storage != null) Config.storage = storage
-
-    val provideOption = "Provide either cli option or config default value"
-
-    val master = options.valueOf("master").asInstanceOf[String]
-    if (master != null) Config.master = master
-    else if (Config.master == null) throw new Error(s"Undefined master. $provideOption")
-
-    val user = options.valueOf("user").asInstanceOf[String]
-    if (user != null) Config.user = user
-
-    val principal = options.valueOf("principal").asInstanceOf[String]
-    if (principal != null) Config.principal = principal
-
-    val secret = options.valueOf("secret").asInstanceOf[String]
-    if (secret != null) Config.secret = secret
-
-
-    val frameworkName = options.valueOf("framework-name").asInstanceOf[String]
-    if (frameworkName != null) Config.frameworkName = frameworkName
-
-    val frameworkRole = options.valueOf("framework-role").asInstanceOf[String]
-    if (frameworkRole != null) Config.frameworkRole = frameworkRole
-
-    val frameworkTimeout = options.valueOf("framework-timeout").asInstanceOf[String]
-    if (frameworkTimeout != null)
-      try { Config.frameworkTimeout = new Period(frameworkTimeout) }
-      catch { case e: IllegalArgumentException => throw new Error("Invalid framework-timeout") }
-
-
-    val api = options.valueOf("api").asInstanceOf[String]
-    if (api != null) Config.api = api
-    else if (Config.api == null) throw new Error(s"Undefined api. $provideOption")
-
-    val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
-    if (bindAddress != null)
-      try { Config.bindAddress = new BindAddress(bindAddress) }
-      catch { case e: IllegalArgumentException => throw new Error("Invalid bind-address") }
-
-    val zk = options.valueOf("zk").asInstanceOf[String]
-    if (zk != null) Config.zk = zk
-    else if (Config.zk == null) throw new Error(s"Undefined zk. $provideOption")
-
-    val jre = options.valueOf("jre").asInstanceOf[String]
-    if (jre != null) Config.jre = new File(jre)
-    if (Config.jre != null && !Config.jre.exists()) throw new Error("JRE file doesn't exists")
-
-    val log = options.valueOf("log").asInstanceOf[String]
-    if (log != null) Config.log = new File(log)
-    if (Config.log != null) out.println(s"Logging to ${Config.log}")
-
-    Scheduler.start()
   }
 
   private[kafka] def handleGenericOptions(args: Array[String], help: Boolean = false): Array[String] = {
@@ -284,7 +138,7 @@ object Cli {
   private def printCmds(): Unit = {
     printLine("Commands:")
     printLine("help [cmd [cmd]] - print general or command-specific help", 1)
-    if (!noScheduler) printLine("scheduler        - start scheduler", 1)
+    if (SchedulerCli.isEnabled) printLine("scheduler        - start scheduler", 1)
     printLine("brokers          - broker management commands", 1)
     printLine("topics           - topic management commands", 1)
   }
@@ -316,8 +170,6 @@ object Cli {
 
     throw new Error("Undefined api. Provide either cli option or config default value")
   }
-
-  private[kafka] def noScheduler: Boolean = System.getenv("KM_NO_SCHEDULER") != null
 
   private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
     def queryString(params: util.Map[String, String]): String = {
@@ -364,7 +216,157 @@ object Cli {
   }
 
   class Error(message: String) extends java.lang.Error(message) {}
-  
+
+  object SchedulerCli {
+    def isEnabled: Boolean = System.getenv("KM_NO_SCHEDULER") == null
+
+    def handle(args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("debug", "Debug mode. Default - " + Config.debug)
+        .withRequiredArg().ofType(classOf[java.lang.Boolean])
+
+      parser.accepts("storage",
+        """Storage for cluster state. Examples:
+          | - file:kafka-mesos.json
+          | - zk:/kafka-mesos
+          |Default - """.stripMargin + Config.storage)
+        .withRequiredArg().ofType(classOf[String])
+
+
+      parser.accepts("master",
+        """Master connection settings. Examples:
+          | - master:5050
+          | - master:5050,master2:5050
+          | - zk://master:2181/mesos
+          | - zk://username:password@master:2181
+          | - zk://master:2181,master2:2181/mesos""".stripMargin)
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("user", "Mesos user to run tasks. Default - none")
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("principal", "Principal (username) used to register framework. Default - none")
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("secret", "Secret (password) used to register framework. Default - none")
+        .withRequiredArg().ofType(classOf[String])
+
+
+      parser.accepts("framework-name", "Framework name. Default - " + Config.frameworkName)
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("framework-role", "Framework role. Default - " + Config.frameworkRole)
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("framework-timeout", "Framework timeout (30s, 1m, 1h). Default - " + Config.frameworkTimeout)
+        .withRequiredArg().ofType(classOf[String])
+
+
+      parser.accepts("api", "Api url. Example: http://master:7000")
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("bind-address", "Scheduler bind address (master, 0.0.0.0, 192.168.50.*, if:eth1). Default - all")
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("zk",
+        """Kafka zookeeper.connect. Examples:
+          | - master:2181
+          | - master:2181,master2:2181""".stripMargin)
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("jre", "JRE zip-file (jre-7-openjdk.zip). Default - none.")
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("log", "Log file to use. Default - stdout.")
+        .withRequiredArg().ofType(classOf[String])
+
+
+      val configArg = parser.nonOptions()
+
+      if (help) {
+        out.println("Start scheduler \nUsage: scheduler [options] [config.properties]\n")
+        parser.printHelpOn(out)
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          out.println()
+          throw new Error(e.getMessage)
+      }
+
+      var configFile = if (options.valueOf(configArg) != null) new File(options.valueOf(configArg)) else null
+      if (configFile != null && !configFile.exists()) throw new Error(s"config-file $configFile not found")
+
+      if (configFile == null && Config.DEFAULT_FILE.exists()) configFile = Config.DEFAULT_FILE
+
+      if (configFile != null) {
+        out.println("Loading config defaults from " + configFile)
+        Config.load(configFile)
+      }
+
+      val debug = options.valueOf("debug").asInstanceOf[java.lang.Boolean]
+      if (debug != null) Config.debug = debug
+
+      val storage = options.valueOf("storage").asInstanceOf[String]
+      if (storage != null) Config.storage = storage
+
+      val provideOption = "Provide either cli option or config default value"
+
+      val master = options.valueOf("master").asInstanceOf[String]
+      if (master != null) Config.master = master
+      else if (Config.master == null) throw new Error(s"Undefined master. $provideOption")
+
+      val user = options.valueOf("user").asInstanceOf[String]
+      if (user != null) Config.user = user
+
+      val principal = options.valueOf("principal").asInstanceOf[String]
+      if (principal != null) Config.principal = principal
+
+      val secret = options.valueOf("secret").asInstanceOf[String]
+      if (secret != null) Config.secret = secret
+
+
+      val frameworkName = options.valueOf("framework-name").asInstanceOf[String]
+      if (frameworkName != null) Config.frameworkName = frameworkName
+
+      val frameworkRole = options.valueOf("framework-role").asInstanceOf[String]
+      if (frameworkRole != null) Config.frameworkRole = frameworkRole
+
+      val frameworkTimeout = options.valueOf("framework-timeout").asInstanceOf[String]
+      if (frameworkTimeout != null)
+        try { Config.frameworkTimeout = new Period(frameworkTimeout) }
+        catch { case e: IllegalArgumentException => throw new Error("Invalid framework-timeout") }
+
+
+      val api = options.valueOf("api").asInstanceOf[String]
+      if (api != null) Config.api = api
+      else if (Config.api == null) throw new Error(s"Undefined api. $provideOption")
+
+      val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
+      if (bindAddress != null)
+        try { Config.bindAddress = new BindAddress(bindAddress) }
+        catch { case e: IllegalArgumentException => throw new Error("Invalid bind-address") }
+
+      val zk = options.valueOf("zk").asInstanceOf[String]
+      if (zk != null) Config.zk = zk
+      else if (Config.zk == null) throw new Error(s"Undefined zk. $provideOption")
+
+      val jre = options.valueOf("jre").asInstanceOf[String]
+      if (jre != null) Config.jre = new File(jre)
+      if (Config.jre != null && !Config.jre.exists()) throw new Error("JRE file doesn't exists")
+
+      val log = options.valueOf("log").asInstanceOf[String]
+      if (log != null) Config.log = new File(log)
+      if (Config.log != null) out.println(s"Logging to ${Config.log}")
+
+      Scheduler.start()
+    }
+  }
+
   object BrokersCli {
     def handle(cmd: String, _args: Array[String], help: Boolean = false): Unit = {
       if (help) {
