@@ -106,6 +106,10 @@ class MesosTestCase {
     val defaultNamespace = new IDefaultNameSpace { def createDefaultNameSpace(zkClient: ZkClient): Unit = {} }
     zkServer = new ZkServer("" + zkDir, "" + zkDir, defaultNamespace, port)
     zkServer.start()
+
+    val zkClient: ZkClient = zkServer.getZkClient
+    zkClient.createPersistent("/brokers/ids/0", true)
+    zkClient.createPersistent("/config/changes", true)
   }
 
   def stopZkServer() {

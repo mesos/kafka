@@ -36,8 +36,6 @@ class CliTest extends MesosTestCase {
     Cli.out = new PrintStream(out, true)
 
     startZkServer()
-    zkServer.getZkClient.createPersistent("/brokers/ids/0", true)
-    zkServer.getZkClient.createPersistent("/config/changes", true)
   }
 
   @After

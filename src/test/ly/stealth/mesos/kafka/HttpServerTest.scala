@@ -35,8 +35,6 @@ class HttpServerTest extends MesosTestCase {
     Cli.api = Config.api
 
     startZkServer()
-    zkServer.getZkClient.createPersistent("/brokers/ids/0", true)
-    zkServer.getZkClient.createPersistent("/config/changes", true)
   }
   
   @After
