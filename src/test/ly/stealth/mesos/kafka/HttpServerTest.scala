@@ -29,14 +29,13 @@ class HttpServerTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.api = "http://localhost:0"
-    HttpServer.start(resolveDeps = false)
+    startHttpServer()
     Cli.api = Config.api
   }
   
   @After
   override def after {
-    HttpServer.stop()
+    stopHttpServer()
     super.after
   }
   

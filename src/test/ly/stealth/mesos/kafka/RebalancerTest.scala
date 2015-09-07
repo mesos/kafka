@@ -19,17 +19,13 @@ package ly.stealth.mesos.kafka
 
 import org.junit.{Test, After, Before}
 import org.junit.Assert._
-import java.io.File
-import org.I0Itec.zkclient.{ZkServer, ZkClient, IDefaultNameSpace}
+import org.I0Itec.zkclient.ZkClient
 import kafka.utils.{ZKStringSerializer, ZkUtils}
 import java.util
 import java.util.Collections
 
 class RebalancerTest extends MesosTestCase {
   var rebalancer: Rebalancer = null
-
-  var zkDir: File = null
-  var zkServer: ZkServer = null
   var zkClient: ZkClient = null
 
   @Before
@@ -40,13 +36,7 @@ class RebalancerTest extends MesosTestCase {
     val port = 56789
     Config.zk = s"localhost:$port"
 
-    zkDir = File.createTempFile(getClass.getName, null)
-    zkDir.delete()
-
-    val defaultNamespace = new IDefaultNameSpace { def createDefaultNameSpace(zkClient: ZkClient): Unit = {} }
-    zkServer = new ZkServer("" + zkDir, "" + zkDir, defaultNamespace, port)
-    zkServer.start()
-
+    startZkServer()
     zkClient = zkServer.getZkClient
     zkClient.setZkSerializer(ZKStringSerializer)
   }
@@ -54,14 +44,7 @@ class RebalancerTest extends MesosTestCase {
   @After
   override def after {
     super.after
-    zkServer.shutdown()
-
-    def delete(dir: File) {
-      val children: Array[File] = dir.listFiles()
-      if (children != null) children.foreach(delete)
-      dir.delete()
-    }
-    delete(zkDir)
+    stopZkServer()
   }
 
   @Test

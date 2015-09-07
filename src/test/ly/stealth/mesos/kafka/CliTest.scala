@@ -30,17 +30,22 @@ class CliTest extends MesosTestCase {
   @Before
   override def before {
     super.before
-    Config.api = "http://localhost:0"
-    HttpServer.start(resolveDeps = false)
+
+    startHttpServer()
     Cli.api = Config.api
     Cli.out = new PrintStream(out, true)
+
+    startZkServer()
+    zkServer.getZkClient.createPersistent("/brokers/ids/0", true)
+    zkServer.getZkClient.createPersistent("/config/changes", true)
   }
 
   @After
   override def after {
     Cli.out = System.out
-    HttpServer.stop()
+    stopHttpServer()
     super.after
+    stopZkServer()
   }
 
   @Test
@@ -59,7 +64,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def list{
+  def broker_list{
     Scheduler.cluster.addBroker(new Broker("0"))
     Scheduler.cluster.addBroker(new Broker("1"))
     Scheduler.cluster.addBroker(new Broker("2"))
@@ -72,7 +77,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def add {
+  def broker_add {
     exec("broker add 0 --cpus=0.1 --mem=128")
     assertOutContains("Broker added")
     assertOutContains("id: 0")
@@ -85,7 +90,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def update {
+  def broker_update {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
 
     exec("broker update 0 --failover-delay=10s --failover-max-delay=20s --options=log.dirs=/tmp/kafka-logs")
@@ -99,7 +104,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def remove {
+  def broker_remove {
     Scheduler.cluster.addBroker(new Broker("0"))
     exec("broker remove 0")
 
@@ -108,7 +113,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def start_stop {
+  def broker_start_stop {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
 
@@ -129,7 +134,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def start_stop_timeout {
+  def broker_start_stop_timeout {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
     try { exec("broker start 0 --timeout=1ms"); fail() }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
@@ -142,7 +147,7 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def rebalance {
+  def broker_rebalance {
     val cluster: Cluster = Scheduler.cluster
     val rebalancer: Rebalancer = cluster.rebalancer
 
@@ -153,6 +158,55 @@ class CliTest extends MesosTestCase {
     exec("broker rebalance *")
     assertTrue(rebalancer.running)
     assertOutContains("Rebalance started")
+  }
+
+  @Test
+  def topic_list {
+    exec("topic list")
+    assertOutContains("no topics")
+
+    exec("topic add t0")
+    exec("topic add t1")
+    exec("topic add x")
+
+    // list all
+    exec("topic list")
+    assertOutContains("topics:")
+    assertOutContains("t0")
+    assertOutContains("t1")
+    assertOutContains("x")
+
+    // name filtering
+    exec("topic list t.*")
+    assertOutContains("t0")
+    assertOutContains("t1")
+    assertOutNotContains("x")
+  }
+
+  @Test
+  def topic_add {
+    exec("topic add t0")
+    exec("topic list")
+    assertOutContains("topic:")
+    assertOutContains("name: t0")
+    assertOutContains("partitions: 0:[0]")
+
+    exec("topic add t1 --partition 2")
+    exec("topic list t1")
+    assertOutContains("topic:")
+    assertOutContains("name: t1")
+    assertOutContains("partitions: 0:[0], 1:[0]")
+  }
+
+  @Test
+  def topic_update {
+    exec("topic add t0")
+    exec("topic update t0 --options=flush.ms=5000")
+
+    exec("topic list")
+    assertOutContains("topic:")
+    assertOutContains("t0")
+    assertOutContains("flush.ms=5000")
   }
 
   @Test
@@ -182,6 +236,7 @@ class CliTest extends MesosTestCase {
   }
 
   private def assertOutContains(s: String): Unit = assertTrue("" + out, out.toString.contains(s))
+  private def assertOutNotContains(s: String): Unit = assertFalse("" + out, out.toString.contains(s))
 
   private def exec(cmd: String): Unit = {
     out.reset()
