@@ -64,7 +64,7 @@ class Topics {
     }
   }
 
-  def addTopic(name: String, partitions: Int = 1, replicas: Int = 1, options: util.Map[String, String]): Topic = {
+  def addTopic(name: String, partitions: Int = 1, replicas: Int = 1, options: util.Map[String, String] = new util.HashMap[String, String]()): Topic = {
     val zkClient = newZkClient
     try {
       val config: Properties = new Properties()

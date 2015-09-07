@@ -165,9 +165,9 @@ class CliTest extends MesosTestCase {
     exec("topic list")
     assertOutContains("no topics")
 
-    exec("topic add t0")
-    exec("topic add t1")
-    exec("topic add x")
+    Scheduler.cluster.topics.addTopic("t0")
+    Scheduler.cluster.topics.addTopic("t1")
+    Scheduler.cluster.topics.addTopic("x")
 
     // list all
     exec("topic list")
@@ -200,7 +200,7 @@ class CliTest extends MesosTestCase {
 
   @Test
   def topic_update {
-    exec("topic add t0")
+    Scheduler.cluster.topics.addTopic("t0")
     exec("topic update t0 --options=flush.ms=5000")
 
     exec("topic list")

@@ -24,6 +24,8 @@ import java.net.{HttpURLConnection, URL}
 import Util.{Period, parseMap}
 import Cli.sendRequest
 import BrokerTest.assertBrokerEquals
+import ly.stealth.mesos.kafka.Topics.Topic
+import java.util
 
 class HttpServerTest extends MesosTestCase {
   @Before
@@ -31,16 +33,21 @@ class HttpServerTest extends MesosTestCase {
     super.before
     startHttpServer()
     Cli.api = Config.api
+
+    startZkServer()
+    zkServer.getZkClient.createPersistent("/brokers/ids/0", true)
+    zkServer.getZkClient.createPersistent("/config/changes", true)
   }
   
   @After
   override def after {
     stopHttpServer()
     super.after
+    stopZkServer()
   }
   
   @Test
-  def brokers_add {
+  def broker_add {
     val json = sendRequest("/broker/add", parseMap("id=0,cpus=0.1,mem=128"))
     val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
@@ -58,7 +65,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_add_range {
+  def broker_add_range {
     val json = sendRequest("/broker/add", parseMap("id=0..4"))
     val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
@@ -67,7 +74,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_update {
+  def broker_update {
     sendRequest("/broker/add", parseMap("id=0"))
     val json = sendRequest("/broker/update", parseMap("id=0,cpus=1,heap=128,failoverDelay=5s"))
     val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
@@ -85,7 +92,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_list {
+  def broker_list {
     val cluster = Scheduler.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
@@ -102,7 +109,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_remove {
+  def broker_remove {
     val cluster = Scheduler.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
@@ -119,7 +126,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_start_stop {
+  def broker_start_stop {
     val cluster = Scheduler.cluster
     val broker0 = cluster.addBroker(new Broker("0"))
     val broker1 = cluster.addBroker(new Broker("1"))
@@ -144,7 +151,7 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def brokers_rebalance {
+  def broker_rebalance {
     val cluster = Scheduler.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
@@ -158,6 +165,65 @@ class HttpServerTest extends MesosTestCase {
     assertEquals("started", json("status"))
     assertFalse(json.contains("error"))
     assertEquals(rebalancer.state, json("state").asInstanceOf[String])
+  }
+
+  @Test
+  def topic_list {
+    var json = sendRequest("/topic/list", parseMap(""))
+    assertTrue(json("topics").asInstanceOf[List[Map[String, Object]]].isEmpty)
+
+    Scheduler.cluster.topics.addTopic("t0")
+    Scheduler.cluster.topics.addTopic("t1")
+
+    json = sendRequest("/topic/list", parseMap(""))
+    val topicNodes: List[Map[String, Object]] = json("topics").asInstanceOf[List[Map[String, Object]]]
+    assertEquals(2, topicNodes.size)
+
+    val t0Node = topicNodes(0)
+    assertEquals("t0", t0Node("name"))
+    assertEquals(Map("0" -> "0"), t0Node("partitions"))
+  }
+  
+  @Test
+  def topic_add {
+    val topics = Scheduler.cluster.topics
+
+    // add t0 topic
+    var json = sendRequest("/topic/add", parseMap("name=t0"))
+    val t0Node = json("topic").asInstanceOf[Map[String, Object]]
+    assertEquals("t0", t0Node("name"))
+    assertEquals(Map("0" -> "0"), t0Node("partitions"))
+
+    assertEquals("t0", topics.getTopic("t0").name)
+
+    // add t1 topic
+    json = sendRequest("/topic/add", parseMap("name=t1,partitions=2,options=flush.ms\\=1000"))
+    val topicNode = json("topic").asInstanceOf[Map[String, Object]]
+    assertEquals("t1", topicNode("name"))
+
+    val t1: Topic = topics.getTopic("t1")
+    assertNotNull(t1)
+    assertEquals("t1", t1.name)
+    assertEquals("flush.ms=1000", Util.formatMap(t1.options))
+
+    assertEquals(2, t1.partitions.size())
+    assertEquals(util.Arrays.asList(0), t1.partitions.get(0))
+    assertEquals(util.Arrays.asList(0), t1.partitions.get(1))
+  }
+  
+  @Test
+  def topic_update {
+    val topics = Scheduler.cluster.topics
+    topics.addTopic("t")
+
+    // update topic t
+    val json = sendRequest("/topic/update", parseMap("name=t,options=flush.ms\\=1000"))
+    val topicNode = json("topic").asInstanceOf[Map[String, Object]]
+    assertEquals("t", topicNode("name"))
+
+    val t = topics.getTopic("t")
+    assertEquals("t", t.name)
+    assertEquals("flush.ms=1000", Util.formatMap(t.options))
   }
 
   @Test
