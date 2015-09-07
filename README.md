@@ -26,6 +26,9 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
 * [Rebalancing brokers in the cluster](#rebalancing-brokers-in-the-cluster)
+* [Listing topics](#listing-topics)
+* [Adding topic](#adding-topic)
+* [Updating topic](#updating-topic)
 
 [Using the REST API](#using-the-rest-api)    
 
