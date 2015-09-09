@@ -128,6 +128,7 @@ class MesosTestCase {
   }
 
   def startHttpServer() {
+    HttpServer.initLogging()
     Config.api = "http://localhost:0"
     HttpServer.start(resolveDeps = false)
   }

@@ -41,8 +41,17 @@ class TopicsTest extends MesosTestCase {
   }
 
   @Test
+  def fairAssignment {
+    val assignment: util.Map[Int, util.List[Int]] = topics.fairAssignment(3, 2, util.Arrays.asList(0, 1, 2))
+    assertEquals(3, assignment.size())
+    assertEquals(util.Arrays.asList(0, 1), assignment.get(0))
+    assertEquals(util.Arrays.asList(1, 2), assignment.get(1))
+    assertEquals(util.Arrays.asList(2, 0), assignment.get(2))
+  }
+
+  @Test
   def addTopic {
-    topics.addTopic("t0", replicas = 1, partitions = 2, options = Util.parseMap("flush.ms=1000"))
+    topics.addTopic("t0", topics.fairAssignment(2, 1), options = Util.parseMap("flush.ms=1000"))
     topics.addTopic("t1")
 
     val _topics: util.List[Topic] = topics.getTopics()
