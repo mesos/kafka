@@ -411,19 +411,20 @@ object HttpServer {
       val cluster: Cluster = Scheduler.cluster
       val rebalancer: Rebalancer = cluster.rebalancer
 
-      val idExpr: String = request.getParameter("id")
-      var ids: util.List[String] = null
-      if (idExpr != null)
-        try { ids = cluster.expandIds(idExpr) }
-        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
-
-      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
-
-      val topicExpr = if (request.getParameter("topics") != null) request.getParameter("topics") else "*"
+      val topicExpr = request.getParameter("topics")
       var topics: util.Map[String, Integer] = null
-      try { topics = rebalancer.expandTopics(topicExpr)}
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+      if (topicExpr != null)
+        try { topics = rebalancer.expandTopics(topicExpr)}
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+
+      if (topics != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
       if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
+
+      val brokerExpr: String = if (request.getParameter("brokers") != null) request.getParameter("brokers") else "*"
+      var brokers: util.List[String] = null
+      if (brokerExpr != null)
+        try { brokers = cluster.expandIds(brokerExpr) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
 
       var timeout: Period = new Period("0")
       if (request.getParameter("timeout") != null)
@@ -431,7 +432,7 @@ object HttpServer {
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
       def startRebalance: (String, String) = {
-        try { rebalancer.start(ids, topics) }
+        try { rebalancer.start(topics, brokers) }
         catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)
@@ -444,7 +445,7 @@ object HttpServer {
       var status: String = null
       var error: String = null
 
-      if (ids != null) {
+      if (topics != null) {
         val result: (String, String) = startRebalance
         status = result._1
         error = result._2

@@ -216,7 +216,7 @@ class HttpServerTest extends MesosTestCase {
     val rebalancer: TestRebalancer = cluster.rebalancer.asInstanceOf[TestRebalancer]
     assertFalse(rebalancer.running)
 
-    val json = sendRequest("/topic/rebalance", parseMap("id=*"))
+    val json = sendRequest("/topic/rebalance", parseMap("topics=*"))
     assertTrue(rebalancer.running)
 
     assertEquals("started", json("status"))

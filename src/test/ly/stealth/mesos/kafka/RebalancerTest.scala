@@ -55,7 +55,7 @@ class RebalancerTest extends MesosTestCase {
 
     createTopic("topic", Map[Int, Seq[Int]](0 -> Seq(0), 1 -> Seq(0)))
     assertFalse(rebalancer.running)
-    rebalancer.start(util.Arrays.asList("0", "1"), Collections.singletonMap("topic", 2))
+    rebalancer.start(Collections.singletonMap("topic", 2), util.Arrays.asList("0", "1"))
 
     assertTrue(rebalancer.running)
     assertFalse(rebalancer.state.isEmpty)
@@ -66,7 +66,7 @@ class RebalancerTest extends MesosTestCase {
     createTopic("topic", Map[Int, Seq[Int]](0 -> Seq(0), 1 -> Seq(0)))
     ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, "")
 
-    try { rebalancer.start(util.Arrays.asList("0", "1"), Collections.singletonMap("t1", 2)); fail() }
+    try { rebalancer.start(Collections.singletonMap("t1", 2), util.Arrays.asList("0", "1")); fail() }
     catch { case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("in progress")) }
   }
 

@@ -46,16 +46,15 @@ class Rebalancer {
     finally { zkClient.close() }
   }
 
-  def start(_ids: util.List[String], topics: util.Map[String, Integer]): Unit = {
+  def start(topics: util.Map[String, Integer], brokers: util.List[String]): Unit = {
     if (topics.isEmpty) throw new Rebalancer.Exception("no topics")
     for ((topic, rf) <- topics) if (rf == null) throw new Rebalancer.Exception(s"no rf for topic $topic")
 
-    logger.info(s"Starting rebalance for topics ${Util.formatMap(topics, valueSep = ':')} on brokers ${_ids.mkString(",")}")
+    logger.info(s"Starting rebalance for topics ${Util.formatMap(topics, valueSep = ':')} on brokers ${brokers.mkString(",")}")
     val zkClient = newZkClient
     try {
-      val ids: util.List[Int] = _ids.map(Integer.parseInt)
       val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics.keys.toSeq)
-      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(ids, topics, assignment)
+      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(brokers.map(Integer.parseInt), topics, assignment)
 
       reassignPartitions(zkClient, reassignment)
       this.reassignment = reassignment
