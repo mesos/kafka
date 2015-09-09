@@ -358,10 +358,10 @@ object HttpServer {
 
     def handleListTopics(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val topics: Topics = Scheduler.cluster.topics
-      val name = request.getParameter("name")
+      val expr = request.getParameter("topic")
 
       val topicNodes = new ListBuffer[JSONObject]()
-      for (topic <- topics.getTopics(name = name)) topicNodes.add(topic.toJson)
+      for (topic <- topics.getTopics(name = expr)) topicNodes.add(topic.toJson)
       response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
     }
 
@@ -370,8 +370,8 @@ object HttpServer {
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
-      val name: String = request.getParameter("name")
-      if (name == null || name.isEmpty) errors.add("name required")
+      val name: String = request.getParameter("topic")
+      if (name == null || name.isEmpty) errors.add("topic required")
 
       var partitions: Int = 1
       if (add && request.getParameter("partitions") != null)

@@ -612,13 +612,13 @@ Listing topics
 
 Adding topic
 ```
-# curl "http://localhost:7000/api/topic/add?name=t"
+# curl "http://localhost:7000/api/topic/add?topic=t"
 {"topic" : {"name" : "t", "partitions" : {"0" : "1"}, "options" : {}}}
 ```
 
 Updating topic
 ```
-# curl "http://localhost:7000/api/topic/update?name=t&options=flush.ms%3D1000"
+# curl "http://localhost:7000/api/topic/update?topic=t&options=flush.ms%3D1000"
 {"topic" : {"name" : "t", "partitions" : {"0" : "0, 1"}, "options" : {"flush.ms" : "1000"}}}
 ```
 

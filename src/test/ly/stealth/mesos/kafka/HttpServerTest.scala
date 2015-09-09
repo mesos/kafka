@@ -170,7 +170,7 @@ class HttpServerTest extends MesosTestCase {
     val topics = Scheduler.cluster.topics
 
     // add t0 topic
-    var json = sendRequest("/topic/add", parseMap("name=t0"))
+    var json = sendRequest("/topic/add", parseMap("topic=t0"))
     val t0Node = json("topic").asInstanceOf[Map[String, Object]]
     assertEquals("t0", t0Node("name"))
     assertEquals(Map("0" -> "0"), t0Node("partitions"))
@@ -178,7 +178,7 @@ class HttpServerTest extends MesosTestCase {
     assertEquals("t0", topics.getTopic("t0").name)
 
     // add t1 topic
-    json = sendRequest("/topic/add", parseMap("name=t1,partitions=2,options=flush.ms\\=1000"))
+    json = sendRequest("/topic/add", parseMap("topic=t1,partitions=2,options=flush.ms\\=1000"))
     val topicNode = json("topic").asInstanceOf[Map[String, Object]]
     assertEquals("t1", topicNode("name"))
 
@@ -198,7 +198,7 @@ class HttpServerTest extends MesosTestCase {
     topics.addTopic("t")
 
     // update topic t
-    val json = sendRequest("/topic/update", parseMap("name=t,options=flush.ms\\=1000"))
+    val json = sendRequest("/topic/update", parseMap("topic=t,options=flush.ms\\=1000"))
     val topicNode = json("topic").asInstanceOf[Map[String, Object]]
     assertEquals("t", topicNode("name"))
 

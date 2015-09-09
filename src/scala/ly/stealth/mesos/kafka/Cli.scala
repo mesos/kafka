@@ -725,7 +725,7 @@ object Cli {
       }
     }
 
-    def handleList(name: String, help: Boolean = false): Unit = {
+    def handleList(expr: String, help: Boolean = false): Unit = {
       if (help) {
         printLine("List topics\nUsage: topic list [name-regex]\n")
         handleGenericOptions(null, help = true)
@@ -733,7 +733,7 @@ object Cli {
       }
 
       val params = new util.LinkedHashMap[String, String]
-      if (name != null) params.put("name", name)
+      if (expr != null) params.put("topic", expr)
 
       var json: Map[String, Object] = null
       try { json = sendRequest("/topic/list", params) }
@@ -786,7 +786,7 @@ object Cli {
       val options_ = options.valueOf("options").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]
-      params.put("name", name)
+      params.put("topic", name)
       if (partitions != null) params.put("partitions", "" + partitions)
       if (replicas != null) params.put("replicas", "" + replicas)
       if (options != null) params.put("options", options_)
