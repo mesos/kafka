@@ -311,7 +311,7 @@ Adding brokers to the cluster
 ```
 # ./kafka-mesos.sh help broker add
 Add broker
-Usage: add <id-expr> [options]
+Usage: broker add <broker-expr> [options]
 
 Option                Description
 ------                -----------
@@ -338,7 +338,7 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
@@ -362,7 +362,7 @@ Updating broker configurations
 ```
 # ./kafka-mesos.sh help broker update
 Update broker
-Usage: update <id-expr> [options]
+Usage: broker update <broker-expr> [options]
 
 Option                Description
 ------                -----------
@@ -389,7 +389,7 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
@@ -415,7 +415,7 @@ Starting brokers in the cluster
 ```
 # ./kafka-mesos.sh help broker start
 Start broker
-Usage: start <id-expr> [options]
+Usage: broker start <broker-expr> [options]
 
 Option     Description
 ------     -----------
@@ -426,7 +426,7 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
@@ -440,7 +440,7 @@ Stopping brokers in the cluster
 ```
 # ./kafka-mesos.sh help broker stop
 Stop broker
-Usage: stop <id-expr> [options]
+Usage: stop <broker-expr> [options]
 
 Option     Description
 ------     -----------
@@ -452,7 +452,7 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
@@ -466,14 +466,14 @@ Removing brokers from the cluster
 ```
 # ./kafka-mesos.sh help broker remove
 Remove broker
-Usage: remove <id-expr> [options]
+Usage: remove <broker-expr> [options]
 
 Generic Options
 Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
@@ -536,14 +536,14 @@ Option  Description
 Rebalancing topics
 ----------------------------------
 ```
-# ./kafka-mesos.sh help topic rebalance
-Rebalance
-Usage: topic rebalance <id-expr>|status [options]
+#./kafka-mesos.sh help topic rebalance
+Rebalance topics
+Usage: topic rebalance <topic-expr>|status [options]
 
 Option     Description
 ------     -----------
+--broker   <broker-expr>. Default - *. See below.
 --timeout  timeout (30s, 1m, 1h). 0s - no timeout
---topics   <topic-expr>. Default - *. See below.
 
 Generic Options
 Option  Description
@@ -559,7 +559,7 @@ topic-expr examples:
   *:2       - all topics with RF=2
   t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
@@ -572,7 +572,7 @@ Using the REST API
 
 The scheduler REST API fully exposes all of the features of the CLI with the following request format:
 ```
-/api/broker/<cli command>/id={broker.id}&<setting>=<value>
+/api/broker/<cli command>/broker={broker-expr}&<setting>=<value>
 /api/topic/<cli command>/name={topic.name}&<setting>=<value>
 ```
 
@@ -586,21 +586,21 @@ Listing brokers
 Adding a broker
 
 ```
-# curl "http://localhost:7000/api/broker/add?id=0&cpus=8&mem=43008"
+# curl "http://localhost:7000/api/broker/add?broker=0&cpus=8&mem=43008"
 {"brokers" : [{"id" : "0", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}]}
 ```
 
 Starting a broker
 
 ```
-# curl "http://localhost:7000/api/broker/start?id=0"
+# curl "http://localhost:7000/api/broker/start?broker=0"
 {"success" : true, "ids" : "0"}
 ```
 
 Stopping a broker
 
 ```
-# curl "http://localhost:7000/api/broker/stop?id=0"
+# curl "http://localhost:7000/api/broker/stop?broker=0"
 {"success" : true, "ids" : "0"}
 ```
 

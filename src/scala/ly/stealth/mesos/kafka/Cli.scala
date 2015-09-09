@@ -441,7 +441,7 @@ object Cli {
       }
     }
 
-    private def handleAddUpdate(id: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
+    private def handleAddUpdate(expr: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
       val parser = newParser()
       parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
       parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
@@ -461,14 +461,14 @@ object Cli {
 
       if (help) {
         val cmd = if (add) "add" else "update"
-        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <id-expr> [options]\n")
+        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <broker-expr> [options]\n")
         parser.printHelpOn(out)
 
         printLine()
         handleGenericOptions(null, help = true)
 
         printLine()
-        printIdExprExamples()
+        printBrokerExprExamples()
 
         printLine()
         printConstraintExamples()
@@ -503,7 +503,7 @@ object Cli {
       val failoverMaxTries = options.valueOf("failover-max-tries").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]
-      params.put("id", id)
+      params.put("broker", expr)
 
       if (cpus != null) params.put("cpus", "" + cpus)
       if (mem != null) params.put("mem", "" + mem)
@@ -540,18 +540,18 @@ object Cli {
       }
     }
 
-    private def handleRemove(id: String, help: Boolean = false): Unit = {
+    private def handleRemove(expr: String, help: Boolean = false): Unit = {
       if (help) {
-        printLine("Remove brokers\nUsage: broker remove <id-expr> [options]\n")
+        printLine("Remove brokers\nUsage: broker remove <broker-expr> [options]\n")
         handleGenericOptions(null, help = true)
 
         printLine()
-        printIdExprExamples()
+        printBrokerExprExamples()
         return
       }
 
       var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/remove", Collections.singletonMap("id", id)) }
+      try { json = sendRequest("/broker/remove", Collections.singletonMap("broker", expr)) }
       catch { case e: IOException => throw new Error("" + e) }
 
       val ids = json("ids").asInstanceOf[String]
@@ -560,21 +560,21 @@ object Cli {
       printLine(s"$brokers $ids removed")
     }
 
-    private def handleStartStop(id: String, args: Array[String], start: Boolean, help: Boolean = false): Unit = {
+    private def handleStartStop(expr: String, args: Array[String], start: Boolean, help: Boolean = false): Unit = {
       val parser = newParser()
       parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
       if (!start) parser.accepts("force", "forcibly stop").withOptionalArg().ofType(classOf[String])
 
       if (help) {
         val cmd = if (start) "start" else "stop"
-        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <id-expr> [options]\n")
+        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <broker-expr> [options]\n")
         parser.printHelpOn(out)
 
         printLine()
         handleGenericOptions(null, help = true)
 
         printLine()
-        printIdExprExamples()
+        printBrokerExprExamples()
         return
       }
 
@@ -592,7 +592,7 @@ object Cli {
       val force: Boolean = options.has("force")
 
       val params = new util.LinkedHashMap[String, String]()
-      params.put("id", id)
+      params.put("broker", expr)
       if (timeout != null) params.put("timeout", timeout)
       if (force) params.put("force", null)
 
@@ -656,8 +656,8 @@ object Cli {
       }
     }
 
-    def printIdExprExamples(): Unit = {
-      printLine("id-expr examples:")
+    def printBrokerExprExamples(): Unit = {
+      printLine("broker-expr examples:")
       printLine("0      - broker 0", 1)
       printLine("0,1    - brokers 0,1", 1)
       printLine("0..2   - brokers 0,1,2", 1)
@@ -803,9 +803,9 @@ object Cli {
       printTopic(topic, 1)
     }
 
-    private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
+    private def handleRebalance(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
       val parser = newParser()
-      parser.accepts("brokers", "<id-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
+      parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
       parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
       if (help) {
@@ -819,7 +819,7 @@ object Cli {
         printTopicExprExamples()
 
         printLine()
-        BrokerCli.printIdExprExamples()
+        BrokerCli.printBrokerExprExamples()
         return
       }
 
@@ -832,12 +832,12 @@ object Cli {
           throw new Error(e.getMessage)
       }
 
-      val brokers: String = options.valueOf("brokers").asInstanceOf[String]
+      val broker: String = options.valueOf("broker").asInstanceOf[String]
       val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]()
-      if (arg != "status") params.put("topics", arg)
-      if (brokers != null) params.put("brokers", brokers)
+      if (exprOrStatus != "status") params.put("topic", exprOrStatus)
+      if (broker != null) params.put("broker", broker)
       if (timeout != null) params.put("timeout", timeout)
 
       var json: Map[String, Object] = null

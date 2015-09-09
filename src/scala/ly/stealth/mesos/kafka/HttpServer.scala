@@ -149,8 +149,8 @@ object HttpServer {
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
-      val idExpr: String = request.getParameter("id")
-      if (idExpr == null || idExpr.isEmpty) errors.add("id required")
+      val expr: String = request.getParameter("broker")
+      if (expr == null || expr.isEmpty) errors.add("broker required")
 
       var cpus: java.lang.Double = null
       if (request.getParameter("cpus") != null)
@@ -219,8 +219,8 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      try { ids = cluster.expandIds(expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -269,12 +269,12 @@ object HttpServer {
     def handleRemoveBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster = Scheduler.cluster
 
-      val idExpr = request.getParameter("id")
-      if (idExpr == null) { response.sendError(400, "id required"); return }
+      val expr = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      try { ids = cluster.expandIds(expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -304,12 +304,12 @@ object HttpServer {
 
       val force: Boolean = request.getParameter("force") != null
 
-      val idExpr: String = request.getParameter("id")
-      if (idExpr == null) { response.sendError(400, "id required"); return }
+      val expr: String = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      try { ids = cluster.expandIds(expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -411,7 +411,7 @@ object HttpServer {
       val cluster: Cluster = Scheduler.cluster
       val rebalancer: Rebalancer = cluster.rebalancer
 
-      val topicExpr = request.getParameter("topics")
+      val topicExpr = request.getParameter("topic")
       var topics: util.Map[String, Integer] = null
       if (topicExpr != null)
         try { topics = rebalancer.expandTopics(topicExpr)}
@@ -420,11 +420,11 @@ object HttpServer {
       if (topics != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
       if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
 
-      val brokerExpr: String = if (request.getParameter("brokers") != null) request.getParameter("brokers") else "*"
+      val brokerExpr: String = if (request.getParameter("broker") != null) request.getParameter("broker") else "*"
       var brokers: util.List[String] = null
       if (brokerExpr != null)
         try { brokers = cluster.expandIds(brokerExpr) }
-        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       var timeout: Period = new Period("0")
       if (request.getParameter("timeout") != null)
