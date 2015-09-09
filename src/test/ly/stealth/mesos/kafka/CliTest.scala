@@ -145,20 +145,6 @@ class CliTest extends MesosTestCase {
   }
 
   @Test
-  def broker_rebalance {
-    val cluster: Cluster = Scheduler.cluster
-    val rebalancer: Rebalancer = cluster.rebalancer
-
-    cluster.addBroker(new Broker("0"))
-    cluster.addBroker(new Broker("1"))
-    assertFalse(rebalancer.running)
-
-    exec("broker rebalance *")
-    assertTrue(rebalancer.running)
-    assertOutContains("Rebalance started")
-  }
-
-  @Test
   def topic_list {
     exec("topic list")
     assertOutContains("no topics")
@@ -205,6 +191,20 @@ class CliTest extends MesosTestCase {
     assertOutContains("topic:")
     assertOutContains("t0")
     assertOutContains("flush.ms=5000")
+  }
+
+  @Test
+  def topic_rebalance {
+    val cluster: Cluster = Scheduler.cluster
+    val rebalancer: Rebalancer = cluster.rebalancer
+
+    cluster.addBroker(new Broker("0"))
+    cluster.addBroker(new Broker("1"))
+    assertFalse(rebalancer.running)
+
+    exec("topic rebalance *")
+    assertTrue(rebalancer.running)
+    assertOutContains("Rebalance started")
   }
 
   @Test

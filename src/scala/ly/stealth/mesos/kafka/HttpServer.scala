@@ -131,7 +131,6 @@ object HttpServer {
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
-      else if (uri == "rebalance") handleRebalance(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -339,58 +338,6 @@ object HttpServer {
       response.getWriter.println(JSONObject(result.toMap))
     }
 
-    def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val cluster: Cluster = Scheduler.cluster
-      val rebalancer: Rebalancer = cluster.rebalancer
-
-      val idExpr: String = request.getParameter("id")
-      var ids: util.List[String] = null
-      if (idExpr != null)
-        try { ids = cluster.expandIds(idExpr) }
-        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
-
-      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
-
-      val topicExpr = if (request.getParameter("topics") != null) request.getParameter("topics") else "*"
-      var topics: util.Map[String, Integer] = null
-      try { topics = rebalancer.expandTopics(topicExpr)}
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
-      if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
-
-      var timeout: Period = new Period("0")
-      if (request.getParameter("timeout") != null)
-        try { timeout = new Period(request.getParameter("timeout")) }
-        catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
-
-      def startRebalance: (String, String) = {
-        try { rebalancer.start(ids, topics) }
-        catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
-
-        if (timeout.ms > 0)
-          if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", null)
-          else return ("completed", null)
-
-        ("started", null)
-      }
-
-      var status: String = null
-      var error: String = null
-
-      if (ids != null) {
-        val result: (String, String) = startRebalance
-        status = result._1
-        error = result._2
-      } else
-        status = if (rebalancer.running) "running" else "idle"
-
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("status") = status
-      if (error != null) result("error") = error
-      result("state") = rebalancer.state
-
-      response.getWriter.println(JSONObject(result.toMap))
-    }
-
     def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
@@ -399,6 +346,7 @@ object HttpServer {
 
       if (uri == "list") handleListTopics(request, response)
       else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
+      else if (uri == "rebalance") handleRebalance(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -450,6 +398,58 @@ object HttpServer {
       topic = topics.getTopic(name)
 
       response.getWriter.println(JSONObject(Map("topic" -> topic.toJson)))
+    }
+
+    def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+      val rebalancer: Rebalancer = cluster.rebalancer
+
+      val idExpr: String = request.getParameter("id")
+      var ids: util.List[String] = null
+      if (idExpr != null)
+        try { ids = cluster.expandIds(idExpr) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+
+      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
+
+      val topicExpr = if (request.getParameter("topics") != null) request.getParameter("topics") else "*"
+      var topics: util.Map[String, Integer] = null
+      try { topics = rebalancer.expandTopics(topicExpr)}
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+      if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
+
+      var timeout: Period = new Period("0")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+      def startRebalance: (String, String) = {
+        try { rebalancer.start(ids, topics) }
+        catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
+
+        if (timeout.ms > 0)
+          if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", null)
+          else return ("completed", null)
+
+        ("started", null)
+      }
+
+      var status: String = null
+      var error: String = null
+
+      if (ids != null) {
+        val result: (String, String) = startRebalance
+        status = result._1
+        error = result._2
+      } else
+        status = if (rebalancer.running) "running" else "idle"
+
+      val result = new collection.mutable.LinkedHashMap[String, Any]()
+      result("status") = status
+      if (error != null) result("error") = error
+      result("state") = rebalancer.state
+
+      response.getWriter.println(JSONObject(result.toMap))
     }
   }
 

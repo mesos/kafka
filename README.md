@@ -481,40 +481,6 @@ id-expr examples:
   *      - any broker
 ```
 
-Rebalancing brokers in the cluster
-----------------------------------
-```
-# ./kafka-mesos.sh help broker rebalance
-Rebalance
-Usage: rebalance <id-expr>|status [options]
-
-Option     Description
-------     -----------
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
---topics   <topic-expr>. Default - *. See below.
-
-Generic Options
-Option  Description
-------  -----------
---api   Api url. Example: http://master:7000
-
-topic-expr examples:
-  t0        - topic t0 with default RF (replication-factor)
-  t0,t1     - topics t0, t1 with default RF
-  t0:3      - topic t0 with RF=3
-  t0,t1:2   - topic t0 with default RF, topic t1 with RF=2
-  *         - all topics with default RF
-  *:2       - all topics with RF=2
-  t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1
-
-id-expr examples:
-  0      - broker 0
-  0,1    - brokers 0,1
-  0..2   - brokers 0,1,2
-  0,1..2 - brokers 0,1,2
-  *      - any broker
-```
-
 Listing Topics
 --------------
 ```
@@ -565,6 +531,40 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+```
+
+Rebalancing topics
+----------------------------------
+```
+# ./kafka-mesos.sh help topic rebalance
+Rebalance
+Usage: topic rebalance <id-expr>|status [options]
+
+Option     Description
+------     -----------
+--timeout  timeout (30s, 1m, 1h). 0s - no timeout
+--topics   <topic-expr>. Default - *. See below.
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+topic-expr examples:
+  t0        - topic t0 with default RF (replication-factor)
+  t0,t1     - topics t0, t1 with default RF
+  t0:3      - topic t0 with RF=3
+  t0,t1:2   - topic t0 with default RF, topic t1 with RF=2
+  *         - all topics with default RF
+  *:2       - all topics with RF=2
+  t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1
+
+id-expr examples:
+  0      - broker 0
+  0,1    - brokers 0,1
+  0..2   - brokers 0,1,2
+  0,1..2 - brokers 0,1,2
+  *      - any broker
 ```
 
 Using the REST API

@@ -80,7 +80,7 @@ object Cli {
         printLine()
         printLine("Run `help <command>` to see details of specific command")
       case "help" =>
-        printLine("Print general or command-specific help\nUsage: help {command}")
+        printLine("Print general or command-specific help\nUsage: help [cmd [cmd]]")
       case "scheduler" =>
         if (!SchedulerCli.isEnabled) throw new Error(s"unsupported command $cmd")
         SchedulerCli.handle(null, help = true)
@@ -393,7 +393,6 @@ object Cli {
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
-        case "rebalance" => handleRebalance(arg, args)
         case _ => throw new Error("unsupported broker command " + cmd)
       }
     }
@@ -414,8 +413,6 @@ object Cli {
           handleRemove(null, help = true)
         case "start" | "stop" =>
           handleStartStop(null, null, cmd == "start", help = true)
-        case "rebalance" =>
-          handleRebalance(null, null, help = true)
         case _ =>
           throw new Error(s"unsupported broker command $cmd")
       }
@@ -615,60 +612,6 @@ object Cli {
       else printLine(s"$brokers $ids $status")
     }
 
-    private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
-      val parser = newParser()
-      parser.accepts("topics", "<topic-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
-      parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
-
-      if (help) {
-        printLine("Rebalance topics\nUsage: broker rebalance <id-expr>|status [options]\n")
-        parser.printHelpOn(out)
-
-        printLine()
-        handleGenericOptions(null, help = true)
-
-        printLine()
-        printTopicExprExamples()
-
-        printLine()
-        printIdExprExamples()
-        return
-      }
-
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
-
-      val topics: String = options.valueOf("topics").asInstanceOf[String]
-      val timeout: String = options.valueOf("timeout").asInstanceOf[String]
-
-      val params = new util.LinkedHashMap[String, String]()
-      if (arg != "status") params.put("id", arg)
-      if (topics != null) params.put("topics", topics)
-      if (timeout != null) params.put("timeout", timeout)
-
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/rebalance", params) }
-      catch { case e: IOException => throw new Error("" + e) }
-
-      val status = json("status").asInstanceOf[String]
-      val error = if (json.contains("error")) json("error").asInstanceOf[String] else ""
-      val state: String = json("state").asInstanceOf[String]
-
-      val is: String = if (status == "idle" || status == "running") "is " else ""
-      val colon: String = if (state.isEmpty &&  error.isEmpty) "" else ":"
-
-      // started|completed|failed|running|idle|timeout
-      if (status == "timeout") throw new Error("Rebalance timeout:\n" + state)
-      printLine(s"Rebalance $is$status$colon $error")
-      if (error.isEmpty && !state.isEmpty) printLine(state)
-    }
-
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list brokers", 1)
@@ -677,7 +620,6 @@ object Cli {
       printLine("remove     - remove brokers", 1)
       printLine("start      - start brokers", 1)
       printLine("stop       - stop brokers", 1)
-      printLine("rebalance  - rebalance topics", 1)
     }
 
     private def printBroker(broker: Broker, indent: Int): Unit = {
@@ -714,7 +656,7 @@ object Cli {
       }
     }
 
-    private def printIdExprExamples(): Unit = {
+    def printIdExprExamples(): Unit = {
       printLine("id-expr examples:")
       printLine("0      - broker 0", 1)
       printLine("0,1    - brokers 0,1", 1)
@@ -733,17 +675,6 @@ object Cli {
       printLine("cluster:master  - value equals 'master'", 1)
       printLine("groupBy         - all values are the same", 1)
       printLine("groupBy:3       - all values are within 3 different groups", 1)
-    }
-
-    private def printTopicExprExamples(): Unit = {
-      printLine("topic-expr examples:")
-      printLine("t0        - topic t0 with default RF (replication-factor)", 1)
-      printLine("t0,t1     - topics t0, t1 with default RF", 1)
-      printLine("t0:3      - topic t0 with RF=3", 1)
-      printLine("t0,t1:2   - topic t0 with default RF, topic t1 with RF=2", 1)
-      printLine("*         - all topics with default RF", 1)
-      printLine("*:2       - all topics with RF=2", 1)
-      printLine("t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1", 1)
     }
   }
   
@@ -770,6 +701,7 @@ object Cli {
       cmd match {
         case "list" => handleList(arg)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
+        case "rebalance" => handleRebalance(arg, args)
         case _ => throw new Error("unsupported topic command " + cmd)
       }
     }
@@ -786,6 +718,8 @@ object Cli {
           handleList(null, help = true)
         case "add" | "update" =>
           handleAddUpdate(null, null, cmd == "add", help = true)
+        case "rebalance" =>
+          handleRebalance(null, null, help = true)
         case _ =>
           throw new Error(s"unsupported topic command $cmd")
       }
@@ -869,17 +803,83 @@ object Cli {
       printTopic(topic, 1)
     }
 
+    private def handleRebalance(arg: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("topics", "<topic-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
+      parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
+
+      if (help) {
+        printLine("Rebalance topics\nUsage: topic rebalance <id-expr>|status [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        printTopicExprExamples()
+
+        printLine()
+        BrokerCli.printIdExprExamples()
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          printLine()
+          throw new Error(e.getMessage)
+      }
+
+      val topics: String = options.valueOf("topics").asInstanceOf[String]
+      val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+
+      val params = new util.LinkedHashMap[String, String]()
+      if (arg != "status") params.put("id", arg)
+      if (topics != null) params.put("topics", topics)
+      if (timeout != null) params.put("timeout", timeout)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/topic/rebalance", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val status = json("status").asInstanceOf[String]
+      val error = if (json.contains("error")) json("error").asInstanceOf[String] else ""
+      val state: String = json("state").asInstanceOf[String]
+
+      val is: String = if (status == "idle" || status == "running") "is " else ""
+      val colon: String = if (state.isEmpty &&  error.isEmpty) "" else ":"
+
+      // started|completed|failed|running|idle|timeout
+      if (status == "timeout") throw new Error("Rebalance timeout:\n" + state)
+      printLine(s"Rebalance $is$status$colon $error")
+      if (error.isEmpty && !state.isEmpty) printLine(state)
+    }
+
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list topics", 1)
       printLine("add        - add topic", 1)
       printLine("update     - update topic", 1)
+      printLine("rebalance  - rebalance topics", 1)
     }
 
     private def printTopic(topic: Topic, indent: Int): Unit = {
       printLine("name: " + topic.name, indent)
       printLine("partitions: " + topic.partitionsState, indent)
       if (!topic.options.isEmpty) printLine("options: " + Util.formatMap(topic.options), indent)
+    }
+
+    private def printTopicExprExamples(): Unit = {
+      printLine("topic-expr examples:")
+      printLine("t0        - topic t0 with default RF (replication-factor)", 1)
+      printLine("t0,t1     - topics t0, t1 with default RF", 1)
+      printLine("t0:3      - topic t0 with RF=3", 1)
+      printLine("t0,t1:2   - topic t0 with default RF, topic t1 with RF=2", 1)
+      printLine("*         - all topics with default RF", 1)
+      printLine("*:2       - all topics with RF=2", 1)
+      printLine("t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1", 1)
     }
   }
 }

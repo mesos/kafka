@@ -149,23 +149,6 @@ class HttpServerTest extends MesosTestCase {
   }
 
   @Test
-  def broker_rebalance {
-    val cluster = Scheduler.cluster
-    cluster.addBroker(new Broker("0"))
-    cluster.addBroker(new Broker("1"))
-
-    val rebalancer: TestRebalancer = cluster.rebalancer.asInstanceOf[TestRebalancer]
-    assertFalse(rebalancer.running)
-
-    val json = sendRequest("/broker/rebalance", parseMap("id=*"))
-    assertTrue(rebalancer.running)
-
-    assertEquals("started", json("status"))
-    assertFalse(json.contains("error"))
-    assertEquals(rebalancer.state, json("state").asInstanceOf[String])
-  }
-
-  @Test
   def topic_list {
     var json = sendRequest("/topic/list", parseMap(""))
     assertTrue(json("topics").asInstanceOf[List[Map[String, Object]]].isEmpty)
@@ -222,6 +205,23 @@ class HttpServerTest extends MesosTestCase {
     val t = topics.getTopic("t")
     assertEquals("t", t.name)
     assertEquals("flush.ms=1000", Util.formatMap(t.options))
+  }
+
+  @Test
+  def topic_rebalance {
+    val cluster = Scheduler.cluster
+    cluster.addBroker(new Broker("0"))
+    cluster.addBroker(new Broker("1"))
+
+    val rebalancer: TestRebalancer = cluster.rebalancer.asInstanceOf[TestRebalancer]
+    assertFalse(rebalancer.running)
+
+    val json = sendRequest("/topic/rebalance", parseMap("id=*"))
+    assertTrue(rebalancer.running)
+
+    assertEquals("started", json("status"))
+    assertFalse(json.contains("error"))
+    assertEquals(rebalancer.state, json("state").asInstanceOf[String])
   }
 
   @Test
