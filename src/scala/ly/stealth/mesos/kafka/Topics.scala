@@ -36,16 +36,15 @@ class Topics {
 
   def getTopic(name: String): Topics.Topic = {
     if (name == null) return null
-    val topics: util.List[Topic] = getTopics(name)
+    val topics: util.List[Topic] = getTopics.filter(_.name == name)
     if (topics.length > 0) topics(0) else null
   }
 
-  def getTopics(name: String = null): util.List[Topics.Topic] = {
+  def getTopics: util.List[Topics.Topic] = {
     val zkClient = newZkClient
 
     try {
       var names = ZkUtils.getAllTopics(zkClient)
-      if (name != null) names = names.filter(_.matches(name))
 
       val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtils.getPartitionAssignmentForTopics(zkClient, names)
       val configs = AdminUtils.fetchAllTopicConfigs(zkClient)

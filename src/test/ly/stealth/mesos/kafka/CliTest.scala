@@ -77,7 +77,7 @@ class CliTest extends MesosTestCase {
   @Test
   def broker_add {
     exec("broker add 0 --cpus=0.1 --mem=128")
-    assertOutContains("Broker added")
+    assertOutContains("broker added:")
     assertOutContains("id: 0")
     assertOutContains("cpus:0.10, mem:128")
 
@@ -92,7 +92,7 @@ class CliTest extends MesosTestCase {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
 
     exec("broker update 0 --failover-delay=10s --failover-max-delay=20s --options=log.dirs=/tmp/kafka-logs")
-    assertOutContains("Broker updated")
+    assertOutContains("broker updated:")
     assertOutContains("delay:10s, max-delay:20s")
     assertOutContains("options: log.dirs=/tmp/kafka-logs")
 
@@ -106,7 +106,7 @@ class CliTest extends MesosTestCase {
     Scheduler.cluster.addBroker(new Broker("0"))
     exec("broker remove 0")
 
-    assertOutContains("Broker 0 removed")
+    assertOutContains("broker 0 removed")
     assertNull(Scheduler.cluster.getBroker("0"))
   }
 
@@ -170,6 +170,9 @@ class CliTest extends MesosTestCase {
   @Test
   def topic_add {
     exec("topic add t0")
+    assertOutContains("topic added:")
+    assertOutContains("name: t0")
+
     exec("topic list")
     assertOutContains("topic:")
     assertOutContains("name: t0")
@@ -186,6 +189,8 @@ class CliTest extends MesosTestCase {
   def topic_update {
     Scheduler.cluster.topics.addTopic("t0")
     exec("topic update t0 --options=flush.ms=5000")
+    assertOutContains("topic updated:")
+    assertOutContains("name: t0")
 
     exec("topic list")
     assertOutContains("topic:")

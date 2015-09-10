@@ -539,8 +539,7 @@ object Cli {
       val addedUpdated = if (add) "added" else "updated"
       val brokers = "broker" + (if (brokerNodes.length > 1) "s" else "")
 
-      printLine(s"${brokers.capitalize} $addedUpdated\n")
-      printLine(s"$brokers:")
+      printLine(s"$brokers $addedUpdated:")
       for (brokerNode <- brokerNodes) {
         val broker: Broker = new Broker()
         broker.fromJson(brokerNode)
@@ -565,7 +564,7 @@ object Cli {
       catch { case e: IOException => throw new Error("" + e) }
 
       val ids = json("ids").asInstanceOf[String]
-      val brokers = "Broker" + (if (ids.contains(",")) "s" else "")
+      val brokers = "broker" + (if (ids.contains(",")) "s" else "")
 
       printLine(s"$brokers $ids removed")
     }
@@ -768,11 +767,15 @@ object Cli {
       parser.accepts("options", "topic options. Example: flush.ms=60000,retention.ms=6000000").withRequiredArg().ofType(classOf[String])
 
       if (help) {
-        printLine(s"${cmd.capitalize} topic\nUsage: topic $cmd <name> [options]\n")
+        printLine(s"${cmd.capitalize} topic\nUsage: topic $cmd <topic-expr> [options]\n")
         parser.printHelpOn(out)
 
         printLine()
         handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printTopicExprExamples(out)
+
         return
       }
 
@@ -799,12 +802,19 @@ object Cli {
       try { json = sendRequest(s"/topic/$cmd", params) }
       catch { case e: IOException => throw new Error("" + e) }
 
-      val topic: Topic = new Topic()
-      topic.fromJson(json("topic").asInstanceOf[Map[String, Object]])
+      val topicNodes = json("topics").asInstanceOf[List[Map[String, Object]]]
 
       val addedUpdated = if (add) "added" else "updated"
-      printLine(s"Topic $addedUpdated:")
-      printTopic(topic, 1)
+      val title = s"topic${if (topicNodes.size > 1) "s" else ""} $addedUpdated:"
+      printLine(title)
+
+      for (topicNode <- topicNodes) {
+        val topic = new Topic()
+        topic.fromJson(topicNode)
+
+        printTopic(topic, 1)
+        printLine()
+      }
     }
 
     private def handleRebalance(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {

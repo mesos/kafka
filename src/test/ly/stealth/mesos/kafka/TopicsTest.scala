@@ -31,13 +31,11 @@ class TopicsTest extends MesosTestCase {
 
   @Test
   def getTopics {
-    assertEquals(0, topics.getTopics().size)
+    assertEquals(0, topics.getTopics.size)
 
     topics.addTopic("t0")
     topics.addTopic("t1")
-    topics.addTopic("x")
-    assertEquals(3, topics.getTopics().size())
-    assertEquals(2, topics.getTopics("t.*").size)
+    assertEquals(2, topics.getTopics.size)
   }
 
   @Test
@@ -54,7 +52,7 @@ class TopicsTest extends MesosTestCase {
     topics.addTopic("t0", topics.fairAssignment(2, 1), options = Util.parseMap("flush.ms=1000"))
     topics.addTopic("t1")
 
-    val _topics: util.List[Topic] = topics.getTopics()
+    val _topics: util.List[Topic] = topics.getTopics
     assertEquals(2, _topics.size())
 
     val t0: Topic = _topics.get(0)

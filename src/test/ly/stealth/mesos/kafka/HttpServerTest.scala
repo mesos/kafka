@@ -175,7 +175,7 @@ class HttpServerTest extends MesosTestCase {
 
     // add t0 topic
     var json = sendRequest("/topic/add", parseMap("topic=t0"))
-    val t0Node = json("topic").asInstanceOf[Map[String, Object]]
+    val t0Node = json("topics").asInstanceOf[List[Map[String, Object]]](0)
     assertEquals("t0", t0Node("name"))
     assertEquals(Map("0" -> "0"), t0Node("partitions"))
 
@@ -183,7 +183,7 @@ class HttpServerTest extends MesosTestCase {
 
     // add t1 topic
     json = sendRequest("/topic/add", parseMap("topic=t1,partitions=2,options=flush.ms\\=1000"))
-    val topicNode = json("topic").asInstanceOf[Map[String, Object]]
+    val topicNode = json("topics").asInstanceOf[List[Map[String, Object]]](0)
     assertEquals("t1", topicNode("name"))
 
     val t1: Topic = topics.getTopic("t1")
@@ -203,7 +203,7 @@ class HttpServerTest extends MesosTestCase {
 
     // update topic t
     val json = sendRequest("/topic/update", parseMap("topic=t,options=flush.ms\\=1000"))
-    val topicNode = json("topic").asInstanceOf[Map[String, Object]]
+    val topicNode = json("topics").asInstanceOf[List[Map[String, Object]]](0)
     assertEquals("t", topicNode("name"))
 
     val t = topics.getTopic("t")

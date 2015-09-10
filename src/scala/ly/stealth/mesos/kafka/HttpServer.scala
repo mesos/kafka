@@ -379,7 +379,7 @@ object HttpServer {
       val names: util.List[String] = Expr.expandTopics(expr)
 
       val topicNodes = new ListBuffer[JSONObject]()
-      for (topic <- topics.getTopics())
+      for (topic <- topics.getTopics)
         if (names.contains(topic.name))
           topicNodes.add(topic.toJson)
 
@@ -391,8 +391,9 @@ object HttpServer {
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
-      val name: String = request.getParameter("topic")
-      if (name == null || name.isEmpty) errors.add("topic required")
+      val expr: String = request.getParameter("topic")
+      if (expr == null || expr.isEmpty) errors.add("topic required")
+      val names: util.List[String] = Expr.expandTopics(expr)
 
       var partitions: Int = 1
       if (add && request.getParameter("partitions") != null)
@@ -415,17 +416,23 @@ object HttpServer {
       val optionErr: String = if (options != null) topics.validateOptions(options) else null
       if (optionErr != null) errors.add(optionErr)
 
-      var topic: Topic = topics.getTopic(name)
-      if (add && topic != null) errors.add("Duplicate topic")
-      if (!add && topic == null) errors.add("Topic not found")
+      for (name <- names) {
+        val topic = topics.getTopic(name)
+        if (add && topic != null) errors.add(s"Topic $name already exists")
+        if (!add && topic == null) errors.add(s"Topic $name not found")
+      }
 
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
-      if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas), options)
-      else topics.updateTopic(topic, options)
-      topic = topics.getTopic(name)
+      val topicNodes= new ListBuffer[JSONObject]
+      for (name <- names) {
+        if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas), options)
+        else topics.updateTopic(topics.getTopic(name), options)
 
-      response.getWriter.println(JSONObject(Map("topic" -> topic.toJson)))
+        topicNodes.add(topics.getTopic(name).toJson)
+      }
+
+      response.getWriter.println(JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
     }
 
     def handleTopicRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {

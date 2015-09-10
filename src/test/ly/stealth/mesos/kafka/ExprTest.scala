@@ -54,8 +54,8 @@ class ExprTest extends MesosTestCase {
     topics.addTopic("t1")
     topics.addTopic("x")
 
-    // topic lists
     assertEquals(util.Arrays.asList(), Expr.expandTopics(""))
+    assertEquals(util.Arrays.asList("t5", "t6"), Expr.expandTopics("t5,t6"))
     assertEquals(util.Arrays.asList("t0"), Expr.expandTopics("t0"))
     assertEquals(util.Arrays.asList("t0", "t1"), Expr.expandTopics("t0, t1"))
     assertEquals(util.Arrays.asList("t0", "t1", "x"), Expr.expandTopics("*"))

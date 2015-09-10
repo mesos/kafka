@@ -59,12 +59,12 @@ object Expr {
     try { allTopics = ZkUtils.getAllTopics(zkClient) }
     finally { zkClient.close() }
 
-    for (part_ <- expr.split(",")) {
-      val part = part_.trim()
-
-      for (topic <- allTopics)
-        if (part.endsWith("*") && topic.startsWith(part.substring(0, part.length - 1)) || topic.equals(part))
-          topics.add(topic)
+    for (part <- expr.split(",").map(_.trim).filter(!_.isEmpty)) {
+      if (!part.endsWith("*")) topics.add(part)
+      else
+        for (topic <- allTopics)
+          if (topic.startsWith(part.substring(0, part.length - 1)))
+            topics.add(topic)
     }
 
     topics.toList
