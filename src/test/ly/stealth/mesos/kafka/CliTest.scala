@@ -116,17 +116,17 @@ class CliTest extends MesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
 
     exec("broker start * --timeout=0")
-    assertOutContains("Brokers 0,1")
+    assertOutContains("brokers 0,1")
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
     exec("broker stop 0 --timeout=0")
-    assertOutContains("Broker 0")
+    assertOutContains("broker 0")
     assertFalse(broker0.active)
     assertTrue(broker1.active)
 
     exec("broker stop 1 --timeout=0")
-    assertOutContains("Broker 1")
+    assertOutContains("broker 1")
     assertFalse(broker0.active)
     assertFalse(broker1.active)
   }

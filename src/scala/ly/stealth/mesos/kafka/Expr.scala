@@ -3,13 +3,23 @@ package ly.stealth.mesos.kafka
 import java.util
 import scala.collection.JavaConversions._
 import java.io.PrintStream
-import scala.collection.{Seq, mutable}
-import kafka.common.TopicAndPartition
 import kafka.utils.{ZKStringSerializer, ZkUtils}
 import org.I0Itec.zkclient.ZkClient
+import ly.stealth.mesos.kafka.Broker.Task
 
 object Expr {
-  def expandBrokers(cluster: Cluster, expr: String): util.List[String] = {
+  def expandBrokers(cluster: Cluster, _expr: String): util.List[String] = {
+    var expr: String = _expr
+    var attributes: util.Map[String, String] = null
+    
+    if (expr.endsWith("]")) {
+      val filterIdx = expr.lastIndexOf("[")
+      if (filterIdx == -1) throw new IllegalArgumentException("Invalid expr " + expr)
+      
+      attributes = Util.parseMap(expr.substring(filterIdx + 1, expr.length - 1))
+      expr = expr.substring(0, filterIdx)
+    }
+    
     val ids = new util.TreeSet[String]()
 
     for (_part <- expr.split(",")) {
@@ -37,18 +47,54 @@ object Expr {
         catch { case e: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + expr) }
         ids.add("" + id)
       }
+    }      
+    
+    if (attributes != null) {
+      val iterator = ids.iterator()
+      while (iterator.hasNext) {
+        val id = iterator.next()
+        val broker = cluster.getBroker(id)
+        
+        if (!brokerMatchesAttributes(broker, attributes))
+          iterator.remove()
+      }
     }
 
     new util.ArrayList(ids)
   }
+  
+  private def brokerMatchesAttributes(broker: Broker, attributes: util.Map[String, String]): Boolean = {
+    if (broker == null || broker.task == null) return false
+    val task: Task = broker.task
+
+    for (e <- attributes.entrySet()) {
+      val expected = e.getValue
+      val actual = if (e.getKey != "hostname") task.attributes.get(e.getKey) else task.hostname
+      if (actual == null) return false
+
+      if (expected != null) {
+        if (expected.endsWith("*") && !actual.startsWith(expected.substring(0, expected.length - 1)))
+          return false
+
+        if (!expected.endsWith("*") && actual != expected)
+          return false
+      }
+    }
+    
+    true
+  }
 
   def printBrokerExprExamples(out: PrintStream): Unit = {
     out.println("broker-expr examples:")
-    out.println("  0      - broker 0")
-    out.println("  0,1    - brokers 0,1")
-    out.println("  0..2   - brokers 0,1,2")
-    out.println("  0,1..2 - brokers 0,1,2")
-    out.println("  *      - any broker")
+    out.println("  0        - broker 0")
+    out.println("  0,1      - brokers 0,1")
+    out.println("  0..2     - brokers 0,1,2")
+    out.println("  0,1..2   - brokers 0,1,2")
+    out.println("  *        - any broker")
+    out.println("attribute filtering:")
+    out.println("  *[rack=r1]           - any broker having rack=r1")
+    out.println("  *[hostname=slave*]   - any broker on host with name starting with 'slave'")
+    out.println("  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1")
   }
 
   def expandTopics(expr: String): util.List[String] = {

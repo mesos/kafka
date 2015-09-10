@@ -46,6 +46,36 @@ class ExprTest extends MesosTestCase {
   }
 
   @Test
+  def expandBrokers_attributes {
+    val cluster = Scheduler.cluster
+    val b0: Broker = cluster.addBroker(new Broker("0"))
+    val b1: Broker = cluster.addBroker(new Broker("1"))
+    val b2: Broker = cluster.addBroker(new Broker("2"))
+    cluster.addBroker(new Broker("3"))
+
+    b0.task = new Broker.Task(_hostname = "master", _attributes = Util.parseMap("a=1"))
+    b1.task = new Broker.Task(_hostname = "slave0", _attributes = Util.parseMap("a=2,b=2"))
+    b2.task = new Broker.Task(_hostname = "slave1", _attributes = Util.parseMap("b=2"))
+
+    // exact match
+    assertEquals(util.Arrays.asList("0", "1", "2", "3"), Expr.expandBrokers(cluster, "*"))
+    assertEquals(util.Arrays.asList("0"), Expr.expandBrokers(cluster, "*[a=1]"))
+    assertEquals(util.Arrays.asList("1", "2"), Expr.expandBrokers(cluster, "*[b=2]"))
+
+    // attribute present
+    assertEquals(util.Arrays.asList("0", "1"), Expr.expandBrokers(cluster, "*[a]"))
+    assertEquals(util.Arrays.asList("1", "2"), Expr.expandBrokers(cluster, "*[b]"))
+
+    // hostname
+    assertEquals(util.Arrays.asList("0"), Expr.expandBrokers(cluster, "*[hostname=master]"))
+    assertEquals(util.Arrays.asList("1", "2"), Expr.expandBrokers(cluster, "*[hostname=slave*]"))
+
+    // not existent broker
+    assertEquals(util.Arrays.asList(), Expr.expandBrokers(cluster, "5[a]"))
+    assertEquals(util.Arrays.asList(), Expr.expandBrokers(cluster, "5[]"))
+  }
+
+  @Test
   def expandTopics {
     val cluster = Scheduler.cluster
     val topics: Topics = cluster.topics
