@@ -372,24 +372,26 @@ object Cli {
 
   object BrokerCli {
     def handle(cmd: String, _args: Array[String], help: Boolean = false): Unit = {
+      var args = _args
+
       if (help) {
         handleHelp(cmd)
         return
       }
 
-      if (cmd == "list") { handleList(); return }
+      var arg: String = null
+      if (args.length > 0 && !args(0).startsWith("-")) {
+        arg = args(0)
+        args = args.slice(1, args.length)
+      }
 
-      // rest of cmds require <arg>
-      var args = _args
-      if (args.length < 1) {
+      if (arg == null && cmd != "list") {
         handleHelp(cmd); printLine()
         throw new Error("argument required")
       }
 
-      val arg = args(0)
-      args = args.slice(1, args.length)
-
       cmd match {
+        case "list" => handleList(arg)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
@@ -406,7 +408,7 @@ object Cli {
           printLine()
           printLine("Run `help broker <command>` to see details of specific command")
         case "list" =>
-          handleList(help = true)
+          handleList(null, help = true)
         case "add" | "update" =>
           handleAddUpdate(null, null, cmd == "add", help = true)
         case "remove" =>
@@ -418,24 +420,28 @@ object Cli {
       }
     }
 
-    private def handleList(help: Boolean = false): Unit = {
+    private def handleList(expr: String, help: Boolean = false): Unit = {
       if (help) {
-        printLine("List brokers\nUsage: broker list [options]\n")
+        printLine("List brokers\nUsage: broker list [<broker-expr>] [options]\n")
         handleGenericOptions(null, help = true)
         return
       }
 
+      val params = new util.HashMap[String, String]()
+      if (expr != null) params.put("broker", expr)
+
       var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/list", Collections.emptyMap()) }
+      try { json = sendRequest("/broker/list", params) }
       catch { case e: IOException => throw new Error("" + e) }
 
-      val cluster: Cluster = new Cluster()
-      cluster.fromJson(json)
-      val brokers: util.List[Broker] = cluster.getBrokers
-
-      val title = if (brokers.isEmpty) "no brokers" else "broker" + (if (brokers.size() > 1) "s" else "") + ":"
+      val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      val title = if (brokerNodes.isEmpty) "no brokers" else "broker" + (if (brokerNodes.size > 1) "s" else "") + ":"
       printLine(title)
-      for (broker <- brokers) {
+
+      for (brokerNode <- brokerNodes) {
+        val broker = new Broker()
+        broker.fromJson(brokerNode)
+
         printBroker(broker, 1)
         printLine()
       }
@@ -731,7 +737,6 @@ object Cli {
       catch { case e: IOException => throw new Error("" + e) }
 
       val topicsNodes: List[Map[String, Object]] = json("topics").asInstanceOf[List[Map[String, Object]]]
-
       val title: String = if (topicsNodes.isEmpty) "no topics" else "topic" + (if (topicsNodes.size > 1) "s" else "") + ":"
       printLine(title)
 

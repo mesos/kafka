@@ -133,15 +133,30 @@ object HttpServer {
       var uri: String = request.getRequestURI.substring("/api/broker".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "list") handleListBrokers(response)
+      if (uri == "list") handleListBrokers(request, response)
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
       else response.sendError(404, "uri not found")
     }
 
-    def handleListBrokers(response: HttpServletResponse): Unit = {
-      response.getWriter.println("" + Scheduler.cluster.toJson)
+    def handleListBrokers(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster = Scheduler.cluster
+
+      var expr = request.getParameter("broker")
+      if (expr == null) expr = "*"
+
+      var ids: util.List[String] = null
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
+
+      val brokerNodes = new ListBuffer[JSONObject]()
+      for (id <- ids) {
+        val broker = cluster.getBroker(id)
+        if (broker != null) brokerNodes.add(cluster.getBroker(id).toJson)
+      }
+
+      response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
     def handleAddUpdateBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {

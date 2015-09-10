@@ -96,14 +96,18 @@ class HttpServerTest extends MesosTestCase {
     cluster.addBroker(new Broker("1"))
     cluster.addBroker(new Broker("2"))
 
-    val json = sendRequest("/broker/list", parseMap(null))
-    val read = new Cluster()
-    read.fromJson(json)
+    var json = sendRequest("/broker/list", parseMap(null))
+    var brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
+    assertEquals(3, brokerNodes.size)
 
-    assertEquals(3, read.getBrokers.size())
-    assertBrokerEquals(cluster.getBroker("0"), read.getBroker("0"))
-    assertBrokerEquals(cluster.getBroker("1"), read.getBroker("1"))
-    assertBrokerEquals(cluster.getBroker("2"), read.getBroker("2"))
+    val broker = new Broker()
+    broker.fromJson(brokerNodes(0))
+    assertEquals("0", broker.id)
+
+    // filtering
+    json = sendRequest("/broker/list", parseMap("broker=1"))
+    brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
+    assertEquals(1, brokerNodes.size)
   }
 
   @Test
