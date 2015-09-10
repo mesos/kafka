@@ -70,30 +70,29 @@ The following options are available:
 Start scheduler 
 Usage: scheduler [options] [config.properties]
 
-Option               Description                           
-------               -----------                           
---api                Api url. Example: http://master:7000  
---debug <Boolean>    Debug mode. Default - false           
---framework-name     Framework name. Default - kafka       
---framework-role     Framework role. Default - *           
---framework-timeout  Framework timeout (30s, 1m, 1h).      
-                       Default - 30d
+Option               Description
+------               -----------
+--api                Api url. Example: http://master:7000
+--bind-address       Scheduler bind address (master, 0.0.0.0, 192.168.50.*, if:eth1). Default - all
+--debug <Boolean>    Debug mode. Default - false
+--framework-name     Framework name. Default - kafka
+--framework-role     Framework role. Default - *
+--framework-timeout  Framework timeout (30s, 1m, 1h). Default - 30d
+--jre                JRE zip-file (jre-7-openjdk.zip). Default - none.
+--log                Log file to use. Default - stdout.
 --master             Master connection settings. Examples:
                       - master:5050
                       - master:5050,master2:5050
                       - zk://master:2181/mesos
                       - zk://username:password@master:2181
                       - zk://master:2181,master2:2181/mesos
---principal          Principal (username) used to register
-                       framework. Default - none
---secret             Secret (password) used to register
-                       framework. Default - none
+--principal          Principal (username) used to register framework. Default - none
+--secret             Secret (password) used to register framework. Default - none
 --storage            Storage for cluster state. Examples:
                       - file:kafka-mesos.json
                       - zk:/kafka-mesos
                      Default - file:kafka-mesos.json
---user               Mesos user to run tasks. Default -
-                       current system user
+--user               Mesos user to run tasks. Default - none
 --zk                 Kafka zookeeper.connect. Examples:
                       - master:2181
                       - master:2181,master2:2181
@@ -153,14 +152,7 @@ Now let's start the broker.
 
 ```
 # ./kafka-mesos.sh broker start 0
-broker 0 started
-```
-
-We don't know yet where the broker is, and we need that for producers and consumers to connect to the cluster.
-
-```
-# ./kafka-mesos.sh broker list
-brokers:
+broker started:
   id: 0
   active: true
   state: running
@@ -197,7 +189,14 @@ Changing the location where data is stored
 
 ```
 # ./kafka-mesos.sh broker stop 0
-broker 0 stopped
+broker stopped:
+  id: 0
+  active: false
+  state: stopped
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
+
 # ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0
 broker updated:
   id: 0
@@ -209,7 +208,18 @@ broker updated:
   stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
 
 # ./kafka-mesos.sh broker start 0
-Broker 0 started
+broker started:
+  id: 0
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
+  task:
+    id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
+    running: true
+    endpoint: 172.16.25.62:31000
+    attributes: rack=r1
 ```
 
 Starting 3 brokers
@@ -240,7 +250,23 @@ brokers added:
   stickiness: period:10m
 
 #./kafka-mesos.sh broker start 0..2
-broker 0,1,2 started
+brokers started:
+  id: 0
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
+  task:
+    id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
+    running: true
+    endpoint: 172.16.25.62:31000
+    attributes: rack=r1
+
+  id: 1
+  active: true
+  state: running
+  ...
 ```
 
 High Availability Scheduler State
@@ -335,6 +361,10 @@ broker-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 
 constraint examples:
   like:master     - value equals 'master'
@@ -386,6 +416,10 @@ broker-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 
 constraint examples:
   like:master     - value equals 'master'
@@ -423,6 +457,10 @@ broker-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Stopping brokers in the cluster
@@ -449,6 +487,10 @@ broker-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Removing brokers from the cluster
@@ -470,6 +512,10 @@ broker-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Listing Topics
@@ -500,6 +546,7 @@ Usage: topic add <topic-expr> [options]
 
 Option                  Description
 ------                  -----------
+--broker                <broker-expr>. Default - *. See below.
 --options               topic options. Example: flush.ms=60000,retention.ms=6000000
 --partitions <Integer>  partitions count. Default - 1
 --replicas <Integer>    replicas count. Default - 1
@@ -514,6 +561,17 @@ topic-expr examples:
   t0,t1     - topics t0, t1
   *         - any topic
   t*        - topics starting with 't'
+
+broker-expr examples:
+  0      - broker 0
+  0,1    - brokers 0,1
+  0..2   - brokers 0,1,2
+  0,1..2 - brokers 0,1,2
+  *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Updating Topic
@@ -569,6 +627,10 @@ broker-expr examples:
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Using the REST API

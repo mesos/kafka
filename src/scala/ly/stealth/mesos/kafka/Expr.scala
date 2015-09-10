@@ -86,11 +86,11 @@ object Expr {
 
   def printBrokerExprExamples(out: PrintStream): Unit = {
     out.println("broker-expr examples:")
-    out.println("  0        - broker 0")
-    out.println("  0,1      - brokers 0,1")
-    out.println("  0..2     - brokers 0,1,2")
-    out.println("  0,1..2   - brokers 0,1,2")
-    out.println("  *        - any broker")
+    out.println("  0      - broker 0")
+    out.println("  0,1    - brokers 0,1")
+    out.println("  0..2   - brokers 0,1,2")
+    out.println("  0,1..2 - brokers 0,1,2")
+    out.println("  *      - any broker")
     out.println("attribute filtering:")
     out.println("  *[rack=r1]           - any broker having rack=r1")
     out.println("  *[hostname=slave*]   - any broker on host with name starting with 'slave'")
