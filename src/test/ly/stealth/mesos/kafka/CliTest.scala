@@ -202,6 +202,7 @@ class CliTest extends MesosTestCase {
     cluster.addBroker(new Broker("1"))
     assertFalse(rebalancer.running)
 
+    cluster.topics.addTopic("t")
     exec("topic rebalance *")
     assertTrue(rebalancer.running)
     assertOutContains("Rebalance started")

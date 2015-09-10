@@ -219,7 +219,7 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(expr) }
+      try { ids = Expr.expandBrokers(cluster, expr) }
       catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
@@ -273,7 +273,7 @@ object HttpServer {
       if (expr == null) { response.sendError(400, "broker required"); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(expr) }
+      try { ids = Expr.expandBrokers(cluster, expr) }
       catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
@@ -308,7 +308,7 @@ object HttpServer {
       if (expr == null) { response.sendError(400, "broker required"); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(expr) }
+      try { ids = Expr.expandBrokers(cluster, expr) }
       catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
@@ -414,7 +414,7 @@ object HttpServer {
       val topicExpr = request.getParameter("topic")
       var topics: util.Map[String, Integer] = null
       if (topicExpr != null)
-        try { topics = rebalancer.expandTopics(topicExpr)}
+        try { topics = Expr.expandTopics(topicExpr)}
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
 
       if (topics != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
@@ -423,7 +423,7 @@ object HttpServer {
       val brokerExpr: String = if (request.getParameter("broker") != null) request.getParameter("broker") else "*"
       var brokers: util.List[String] = null
       if (brokerExpr != null)
-        try { brokers = cluster.expandIds(brokerExpr) }
+        try { brokers = Expr.expandBrokers(cluster, brokerExpr) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       var timeout: Period = new Period("0")

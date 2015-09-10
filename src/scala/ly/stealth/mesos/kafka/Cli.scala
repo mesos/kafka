@@ -468,7 +468,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        printBrokerExprExamples()
+        Expr.printBrokerExprExamples(out)
 
         printLine()
         printConstraintExamples()
@@ -546,7 +546,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        printBrokerExprExamples()
+        Expr.printBrokerExprExamples(out)
         return
       }
 
@@ -574,7 +574,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        printBrokerExprExamples()
+        Expr.printBrokerExprExamples(out)
         return
       }
 
@@ -654,15 +654,6 @@ object Cli {
         if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
         if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
       }
-    }
-
-    def printBrokerExprExamples(): Unit = {
-      printLine("broker-expr examples:")
-      printLine("0      - broker 0", 1)
-      printLine("0,1    - brokers 0,1", 1)
-      printLine("0..2   - brokers 0,1,2", 1)
-      printLine("0,1..2 - brokers 0,1,2", 1)
-      printLine("*      - any broker", 1)
     }
 
     private def printConstraintExamples(): Unit = {
@@ -816,10 +807,10 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        printTopicExprExamples()
+        Expr.printTopicExprExamples(out)
 
         printLine()
-        BrokerCli.printBrokerExprExamples()
+        Expr.printBrokerExprExamples(out)
         return
       }
 
@@ -869,17 +860,6 @@ object Cli {
       printLine("name: " + topic.name, indent)
       printLine("partitions: " + topic.partitionsState, indent)
       if (!topic.options.isEmpty) printLine("options: " + Util.formatMap(topic.options), indent)
-    }
-
-    private def printTopicExprExamples(): Unit = {
-      printLine("topic-expr examples:")
-      printLine("t0        - topic t0 with default RF (replication-factor)", 1)
-      printLine("t0,t1     - topics t0, t1 with default RF", 1)
-      printLine("t0:3      - topic t0 with RF=3", 1)
-      printLine("t0,t1:2   - topic t0 with default RF, topic t1 with RF=2", 1)
-      printLine("*         - all topics with default RF", 1)
-      printLine("*:2       - all topics with RF=2", 1)
-      printLine("t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1", 1)
     }
   }
 }

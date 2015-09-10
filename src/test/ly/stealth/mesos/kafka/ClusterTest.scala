@@ -79,29 +79,4 @@ class ClusterTest extends MesosTestCase {
     assertEquals(2, read.getBrokers.size())
     BrokerTest.assertBrokerEquals(broker0, read.getBroker("0"))
   }
-
-  @Test
-  def expandIds {
-    for (i <- 0 until 5)
-      cluster.addBroker(new Broker("" + i))
-
-    try {
-      assertEquals(util.Arrays.asList(), cluster.expandIds(""))
-      fail()
-    } catch { case e: IllegalArgumentException => }
-
-    assertEquals(util.Arrays.asList("0"), cluster.expandIds("0"))
-    assertEquals(util.Arrays.asList("0", "2", "4"), cluster.expandIds("0,2,4"))
-
-    assertEquals(util.Arrays.asList("1", "2", "3"), cluster.expandIds("1..3"))
-    assertEquals(util.Arrays.asList("0", "1", "3", "4"), cluster.expandIds("0..1,3..4"))
-
-    assertEquals(util.Arrays.asList("0", "1", "2", "3", "4"), cluster.expandIds("*"))
-
-    // duplicates
-    assertEquals(util.Arrays.asList("0", "1", "2", "3", "4"), cluster.expandIds("0..3,2..4"))
-
-    // sorting
-    assertEquals(util.Arrays.asList("2", "3", "4"), cluster.expandIds("4,3,2"))
-  }
 }

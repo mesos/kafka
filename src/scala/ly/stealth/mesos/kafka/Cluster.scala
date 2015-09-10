@@ -53,39 +53,6 @@ class Cluster {
   def load() = Cluster.storage.load(this)
   def save() = Cluster.storage.save(this)
 
-  def expandIds(expr: String): util.List[String] = {
-    val ids = new util.TreeSet[String]()
-
-    for (_part <- expr.split(",")) {
-      val part = _part.trim()
-
-      if (part.equals("*"))
-        for (broker <- brokers) ids.add(broker.id)
-      else if (part.contains("..")) {
-        val idx = part.indexOf("..")
-
-        var start: Integer = null
-        var end: Integer = null
-        try {
-          start = Integer.parseInt(part.substring(0, idx))
-          end = Integer.parseInt(part.substring(idx + 2, part.length))
-        } catch {
-          case e: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + expr)
-        }
-
-        for (id <- start.toInt until end + 1)
-          ids.add("" + id)
-      } else {
-        var id: Integer = null
-        try { id = Integer.parseInt(part) }
-        catch { case e: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + expr) }
-        ids.add("" + id)
-      }
-    }
-
-    new util.ArrayList(ids)
-  }
-
   def fromJson(root: Map[String, Object]): Unit = {
     if (root.contains("brokers")) {
       for (brokerNode <- root("brokers").asInstanceOf[List[Map[String, Object]]]) {
