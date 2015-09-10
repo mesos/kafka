@@ -802,6 +802,7 @@ object Cli {
     private def handleRebalance(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
       val parser = newParser()
       parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
+      parser.accepts("replicas", "replicas count. Default - 1").withRequiredArg().ofType(classOf[Integer])
       parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
 
       if (help) {
@@ -829,11 +830,13 @@ object Cli {
       }
 
       val broker: String = options.valueOf("broker").asInstanceOf[String]
+      val replicas: Integer = options.valueOf("replicas").asInstanceOf[Integer]
       val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]()
       if (exprOrStatus != "status") params.put("topic", exprOrStatus)
       if (broker != null) params.put("broker", broker)
+      if (replicas != null) params.put("replicas", "" + replicas)
       if (timeout != null) params.put("timeout", timeout)
 
       var json: Map[String, Object] = null

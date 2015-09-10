@@ -51,51 +51,32 @@ object Expr {
     out.println("  *      - any broker")
   }
 
-  def expandTopics(expr: String): util.Map[String, Integer] = {
+  def expandTopics(expr: String): util.List[String] = {
+    val topics = new util.TreeSet[String]()
+
     val zkClient = newZkClient
-    try {
-      val assignment: mutable.Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, ZkUtils.getAllTopics(zkClient))
-      val replicas: util.Map[String, Int] = assignment.map(e => (e._1.topic, e._2.size))
+    var allTopics: util.List[String] = null
+    try { allTopics = ZkUtils.getAllTopics(zkClient) }
+    finally { zkClient.close() }
 
-      val topics: util.Map[String, Integer] = new util.LinkedHashMap()
-      for ((topic, rf) <- Util.parseMap(expr, ',', ':', nullValues = true))
-        topics.put(topic, if (rf != null) Integer.parseInt(rf) else null)
+    for (part_ <- expr.split(",")) {
+      val part = part_.trim()
 
-      // expand wildcard
-      if (topics.containsKey("*")) {
-        for (topic <- replicas.keys.toList.sorted)
-          if (!topics.containsKey(topic)) topics.put(topic, null)
-
-        val wildcardRf: Integer = topics.remove("*")
-        if (wildcardRf != null)
-          for ((topic, rf) <- topics)
-            if (rf == null) topics.put(topic, wildcardRf)
-      }
-
-      // remove not existent topics
-      topics.keySet().retainAll(replicas.keySet())
-
-      // set default rf if needed
-      for ((topic, rf) <- topics)
-        if (rf == null) topics.put(topic, replicas.get(topic))
-
-      topics
-    } finally {
-      zkClient.close()
+      for (topic <- allTopics)
+        if (part.endsWith("*") && topic.startsWith(part.substring(0, part.length - 1)) || topic.equals(part))
+          topics.add(topic)
     }
+
+    topics.toList
   }
 
   def printTopicExprExamples(out: PrintStream): Unit = {
     out.println("topic-expr examples:")
-    out.println("  t0        - topic t0 with default RF (replication-factor)")
-    out.println("  t0,t1     - topics t0, t1 with default RF")
-    out.println("  t0:3      - topic t0 with RF=3")
-    out.println("  t0,t1:2   - topic t0 with default RF, topic t1 with RF=2")
-    out.println("  *         - all topics with default RF")
-    out.println("  *:2       - all topics with RF=2")
-    out.println("  t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1")
+    out.println("  t0        - topic t0")
+    out.println("  t0,t1     - topics t0, t1")
+    out.println("  *         - any topic")
+    out.println("  t*        - topics starting with 't'")
   }
-
 
   private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 }

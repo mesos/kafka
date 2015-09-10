@@ -23,7 +23,6 @@ import org.I0Itec.zkclient.ZkClient
 import kafka.utils.{ZKStringSerializer, ZkUtils}
 import scala.collection.JavaConversions._
 import java.util
-import java.util.Collections
 
 class RebalancerTest extends MesosTestCase {
   var rebalancer: Rebalancer = null
@@ -56,7 +55,7 @@ class RebalancerTest extends MesosTestCase {
 
     cluster.topics.addTopic("topic", Map(0 -> util.Arrays.asList(0), 1 -> util.Arrays.asList(0)))
     assertFalse(rebalancer.running)
-    rebalancer.start(Collections.singletonMap("topic", 2), util.Arrays.asList("0", "1"))
+    rebalancer.start(util.Arrays.asList("topic"), util.Arrays.asList("0", "1"))
 
     assertTrue(rebalancer.running)
     assertFalse(rebalancer.state.isEmpty)
@@ -67,7 +66,7 @@ class RebalancerTest extends MesosTestCase {
     Scheduler.cluster.topics.addTopic("topic", Map(0 -> util.Arrays.asList(0), 1 -> util.Arrays.asList(0)))
     ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, "")
 
-    try { rebalancer.start(Collections.singletonMap("t1", 2), util.Arrays.asList("0", "1")); fail() }
+    try { rebalancer.start(util.Arrays.asList("t1"), util.Arrays.asList("0", "1")); fail() }
     catch { case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("in progress")) }
   }
 }

@@ -46,15 +46,14 @@ class Rebalancer {
     finally { zkClient.close() }
   }
 
-  def start(topics: util.Map[String, Integer], brokers: util.List[String]): Unit = {
+  def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1): Unit = {
     if (topics.isEmpty) throw new Rebalancer.Exception("no topics")
-    for ((topic, rf) <- topics) if (rf == null) throw new Rebalancer.Exception(s"no rf for topic $topic")
 
-    logger.info(s"Starting rebalance for topics ${Util.formatMap(topics, valueSep = ':')} on brokers ${brokers.mkString(",")}")
+    logger.info(s"Starting rebalance for topics ${topics.mkString(",")} on brokers ${brokers.mkString(",")} with ${if (replicas == -1) "<default>" else replicas} replicas")
     val zkClient = newZkClient
     try {
-      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics.keys.toSeq)
-      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(brokers.map(Integer.parseInt), topics, assignment)
+      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
+      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(brokers.map(Integer.parseInt), topics, assignment, replicas)
 
       reassignPartitions(zkClient, reassignment)
       this.reassignment = reassignment
@@ -106,47 +105,13 @@ class Rebalancer {
     matches
   }
 
-  def expandTopics(expr: String): util.Map[String, Integer] = {
-    val zkClient = newZkClient
-    try {
-      val assignment: mutable.Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, ZkUtils.getAllTopics(zkClient))
-      val replicas: util.Map[String, Int] = assignment.map(e => (e._1.topic, e._2.size))
-
-      val topics: util.Map[String, Integer] = new util.LinkedHashMap()
-      for ((topic, rf) <- Util.parseMap(expr, ',', ':', nullValues = true))
-        topics.put(topic, if (rf != null) Integer.parseInt(rf) else null)
-
-      // expand wildcard
-      if (topics.containsKey("*")) {
-        for (topic <- replicas.keys.toList.sorted)
-          if (!topics.containsKey(topic)) topics.put(topic, null)
-
-        val wildcardRf: Integer = topics.remove("*")
-        if (wildcardRf != null)
-          for ((topic, rf) <- topics)
-            if (rf == null) topics.put(topic, wildcardRf)
-      }
-
-      // remove not existent topics
-      topics.keySet().retainAll(replicas.keySet())
-
-      // set default rf if needed
-      for ((topic, rf) <- topics)
-        if (rf == null) topics.put(topic, replicas.get(topic))
-
-      topics
-    } finally {
-      zkClient.close()
-    }
-  }
-
-  private def getReassignments(brokerIds: Seq[Int], topics: util.Map[String, Integer], assignment: Map[TopicAndPartition, Seq[Int]]): Map[TopicAndPartition, Seq[Int]] = {
+  private def getReassignments(brokerIds: Seq[Int], topics: util.List[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
     var reassignment : Map[TopicAndPartition, Seq[Int]] = new mutable.HashMap[TopicAndPartition, List[Int]]()
 
     val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
     byTopic.foreach { entry =>
       val topic = entry._1
-      val rf: Int = topics.get(topic)
+      val rf: Int = if (replicas != -1) replicas else entry._2.valuesIterator.next().size
       val partitions: Int = entry._2.size
     
       val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, rf)

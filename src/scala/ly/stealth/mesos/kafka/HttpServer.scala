@@ -427,7 +427,7 @@ object HttpServer {
       val rebalancer: Rebalancer = cluster.rebalancer
 
       val topicExpr = request.getParameter("topic")
-      var topics: util.Map[String, Integer] = null
+      var topics: util.List[String] = null
       if (topicExpr != null)
         try { topics = Expr.expandTopics(topicExpr)}
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
@@ -446,8 +446,14 @@ object HttpServer {
         try { timeout = new Period(request.getParameter("timeout")) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
+      var replicas: Int = -1
+      if (request.getParameter("replicas") != null)
+        try { replicas = Integer.parseInt(request.getParameter("replicas")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid replicas"); return  }
+
+
       def startRebalance: (String, String) = {
-        try { rebalancer.start(topics, brokers) }
+        try { rebalancer.start(topics, brokers, replicas) }
         catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)

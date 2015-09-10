@@ -50,25 +50,15 @@ class ExprTest extends MesosTestCase {
     val cluster = Scheduler.cluster
     val topics: Topics = cluster.topics
 
-    topics.addTopic("t1", Map(1 -> util.Arrays.asList(0)))
-    topics.addTopic("t2", Map(1 -> util.Arrays.asList(0, 1)))
-    topics.addTopic("t3", Map(1 -> util.Arrays.asList(0, 1, 2)))
+    topics.addTopic("t0")
+    topics.addTopic("t1")
+    topics.addTopic("x")
 
     // topic lists
-    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(Expr.expandTopics("t1,t2,t3")))
-    assertEquals("t1=1,t3=3", Util.formatMap(Expr.expandTopics("t1,t3")))
-    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(Expr.expandTopics("t0,t1,t2,t3,t4")))
-
-    // topic lists with rf
-    assertEquals("t1=1,t3=1", Util.formatMap(Expr.expandTopics("t1,t3:1")))
-
-    // wildcard
-    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(Expr.expandTopics("*")))
-    assertEquals("t1=1,t2=2,t3=3", Util.formatMap(Expr.expandTopics("t1,t2,*")))
-
-    // wildcard with rf
-    assertEquals("t1=3,t2=3,t3=3", Util.formatMap(Expr.expandTopics("*:3")))
-    assertEquals("t1=3,t2=3,t3=3", Util.formatMap(Expr.expandTopics("t1,*:3")))
-    assertEquals("t1=1,t2=3,t3=3", Util.formatMap(Expr.expandTopics("t1:1,*:3")))
+    assertEquals(util.Arrays.asList(), Expr.expandTopics(""))
+    assertEquals(util.Arrays.asList("t0"), Expr.expandTopics("t0"))
+    assertEquals(util.Arrays.asList("t0", "t1"), Expr.expandTopics("t0, t1"))
+    assertEquals(util.Arrays.asList("t0", "t1", "x"), Expr.expandTopics("*"))
+    assertEquals(util.Arrays.asList("t0", "t1"), Expr.expandTopics("t*"))
   }
 }
