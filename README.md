@@ -128,32 +128,32 @@ First let's start up and use 1 broker with the default settings. Further in the 
 
 ```
 # ./kafka-mesos.sh broker add 0
-Broker added
-
-broker:
+broker added:
   id: 0
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m
 ```
 
 You now have a cluster with 1 broker that is not started.
 
 ```
 # ./kafka-mesos.sh broker list
-brokers:
+broker:
   id: 0
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m
 ```
 Now let's start the broker.
 
 ```
 # ./kafka-mesos.sh broker start 0
-Broker 0 started
+broker 0 started
 ```
 
 We don't know yet where the broker is, and we need that for producers and consumers to connect to the cluster.
@@ -165,7 +165,8 @@ brokers:
   active: true
   state: running
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
   task:
     id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
     running: true
@@ -196,11 +197,9 @@ Changing the location where data is stored
 
 ```
 # ./kafka-mesos.sh broker stop 0
-Broker 0 stopped
+broker 0 stopped
 # ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0
-Broker updated
-
-broker:
+broker updated:
   id: 0
   active: false
   state: stopped
@@ -218,36 +217,30 @@ Starting 3 brokers
 
 ```
 #./kafka-mesos.sh broker add 0..2 --heap 1024 --mem 2048
-Brokers added
-
-brokers:
+brokers added:
   id: 0
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:1m, max-delay:10m
-  stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
+  stickiness: period:10m
 
   id: 1
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:1m, max-delay:10m
-  stickiness: period:10m, hostname:slave1, expires:2015-07-10 15:51:43+03
+  stickiness: period:10m
 
   id: 2
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:1m, max-delay:10m
-  stickiness: period:10m, hostname:slave2, expires:2015-07-10 15:51:43+03
+  stickiness: period:10m
 
-#./kafka-mesos.sh broker start 0
-Broker 0 started
-#./kafka-mesos.sh broker start 1
-Broker 1 started
-#./kafka-mesos.sh broker start 2
-Broker 2 started
+#./kafka-mesos.sh broker start 0..2
+broker 0,1,2 started
 ```
 
 High Availability Scheduler State
@@ -289,9 +282,7 @@ A common use case is to supply multiple `log.dirs`, or provide other options. To
 
 ```
 ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0\\,/mnt/array2/broker0,num.io.threads=16
-Broker updated
-
-broker:
+broker updated:
   id: 0
   active: false
   state: stopped
@@ -440,7 +431,7 @@ Stopping brokers in the cluster
 ```
 # ./kafka-mesos.sh help broker stop
 Stop broker
-Usage: stop <broker-expr> [options]
+Usage: broker stop <broker-expr> [options]
 
 Option     Description
 ------     -----------
@@ -466,7 +457,7 @@ Removing brokers from the cluster
 ```
 # ./kafka-mesos.sh help broker remove
 Remove broker
-Usage: remove <broker-expr> [options]
+Usage: broker remove <broker-expr> [options]
 
 Generic Options
 Option  Description
@@ -486,13 +477,18 @@ Listing Topics
 ```
 #./kafka-mesos.sh help topic list
 List topics
-Usage: topic list [name-regex]
+Usage: topic list [<topic-expr>]
 
 Generic Options
 Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
 ```
 
 Adding Topic
@@ -500,7 +496,7 @@ Adding Topic
 ```
 #./kafka-mesos.sh help topic add
 Add topic
-Usage: topic add <name> [options]
+Usage: topic add <topic-expr> [options]
 
 Option                  Description
 ------                  -----------
@@ -513,6 +509,11 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
 ```
 
 Updating Topic
@@ -520,7 +521,7 @@ Updating Topic
 ```
 #./kafka-mesos.sh help topic update
 Update topic
-Usage: topic update <name> [options]
+Usage: topic update <topic-expr> [options]
 
 Option     Description
 ------     -----------
@@ -531,6 +532,11 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
 ```
 
 Rebalancing topics
@@ -540,10 +546,11 @@ Rebalancing topics
 Rebalance topics
 Usage: topic rebalance <topic-expr>|status [options]
 
-Option     Description
-------     -----------
---broker   <broker-expr>. Default - *. See below.
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
+Option                Description
+------                -----------
+--broker              <broker-expr>. Default - *. See below.
+--replicas <Integer>  replicas count. Default - 1
+--timeout             timeout (30s, 1m, 1h). 0s - no timeout
 
 Generic Options
 Option  Description
@@ -551,13 +558,10 @@ Option  Description
 --api   Api url. Example: http://master:7000
 
 topic-expr examples:
-  t0        - topic t0 with default RF (replication-factor)
-  t0,t1     - topics t0, t1 with default RF
-  t0:3      - topic t0 with RF=3
-  t0,t1:2   - topic t0 with default RF, topic t1 with RF=2
-  *         - all topics with default RF
-  *:2       - all topics with RF=2
-  t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
 
 broker-expr examples:
   0      - broker 0
@@ -573,7 +577,7 @@ Using the REST API
 The scheduler REST API fully exposes all of the features of the CLI with the following request format:
 ```
 /api/broker/<cli command>/broker={broker-expr}&<setting>=<value>
-/api/topic/<cli command>/name={topic.name}&<setting>=<value>
+/api/topic/<cli command>/topic={topic-expr}&<setting>=<value>
 ```
 
 Listing brokers

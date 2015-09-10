@@ -471,7 +471,7 @@ object Cli {
 
       if (help) {
         val cmd = if (add) "add" else "update"
-        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <broker-expr> [options]\n")
+        printLine(s"${cmd.capitalize} broker\nUsage: broker $cmd <broker-expr> [options]\n")
         parser.printHelpOn(out)
 
         printLine()
@@ -551,7 +551,7 @@ object Cli {
 
     private def handleRemove(expr: String, help: Boolean = false): Unit = {
       if (help) {
-        printLine("Remove brokers\nUsage: broker remove <broker-expr> [options]\n")
+        printLine("Remove broker\nUsage: broker remove <broker-expr> [options]\n")
         handleGenericOptions(null, help = true)
 
         printLine()
@@ -576,7 +576,7 @@ object Cli {
 
       if (help) {
         val cmd = if (start) "start" else "stop"
-        printLine(s"${cmd.capitalize} brokers\nUsage: broker $cmd <broker-expr> [options]\n")
+        printLine(s"${cmd.capitalize} broker\nUsage: broker $cmd <broker-expr> [options]\n")
         parser.printHelpOn(out)
 
         printLine()
@@ -612,7 +612,7 @@ object Cli {
       val status = json("status").asInstanceOf[String]
       val ids = json("ids").asInstanceOf[String]
 
-      val brokers = "Broker" + (if (ids.contains(",")) "s" else "")
+      val brokers = "broker" + (if (ids.contains(",")) "s" else "")
       val startStop = if (start) "start" else "stop"
 
       // started|stopped|scheduled|timeout
@@ -624,11 +624,11 @@ object Cli {
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list brokers", 1)
-      printLine("add        - add brokers", 1)
-      printLine("update     - update brokers", 1)
-      printLine("remove     - remove brokers", 1)
-      printLine("start      - start brokers", 1)
-      printLine("stop       - stop brokers", 1)
+      printLine("add        - add broker", 1)
+      printLine("update     - update broker", 1)
+      printLine("remove     - remove broker", 1)
+      printLine("start      - start broker", 1)
+      printLine("stop       - stop broker", 1)
     }
 
     private def printBroker(broker: Broker, indent: Int): Unit = {
@@ -727,7 +727,7 @@ object Cli {
 
     def handleList(expr: String, help: Boolean = false): Unit = {
       if (help) {
-        printLine("List topics\nUsage: topic list [topic-expr]\n")
+        printLine("List topics\nUsage: topic list [<topic-expr>]\n")
         handleGenericOptions(null, help = true)
 
         printLine()
