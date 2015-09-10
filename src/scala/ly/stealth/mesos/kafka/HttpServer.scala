@@ -30,7 +30,6 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
-import ly.stealth.mesos.kafka.Topics.Topic
 
 object HttpServer {
   var jar: File = null
@@ -350,13 +349,12 @@ object HttpServer {
 
         if (start) "started" else "stopped"
       }
+
       val status = waitForBrokers()
+      val brokerNodes = new ListBuffer[JSONObject]()
 
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("status") = status
-      result("ids") = ids.mkString(",")
-
-      response.getWriter.println(JSONObject(result.toMap))
+      for (broker <- brokers) brokerNodes.add(broker.toJson)
+      response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
     def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {

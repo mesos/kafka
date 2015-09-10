@@ -23,7 +23,6 @@ import java.io.{FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
 import Util.{Period, parseMap}
 import Cli.sendRequest
-import BrokerTest.assertBrokerEquals
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 
@@ -134,19 +133,19 @@ class HttpServerTest extends MesosTestCase {
     val broker1 = cluster.addBroker(new Broker("1"))
 
     var json = sendRequest("/broker/start", parseMap("broker=*,timeout=0s"))
-    assertEquals("0,1", json("ids"))
+    assertEquals(2, json("brokers").asInstanceOf[List[Map[String, Object]]].size)
     assertEquals("scheduled", json("status"))
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
     json = sendRequest("/broker/stop", parseMap("broker=1,timeout=0s"))
-    assertEquals("1", json("ids"))
+    assertEquals(1, json("brokers").asInstanceOf[List[Map[String, Object]]].size)
     assertEquals("scheduled", json("status"))
     assertTrue(broker0.active)
     assertFalse(broker1.active)
 
     json = sendRequest("/broker/stop", parseMap("broker=0,timeout=0s"))
-    assertEquals("0", json("ids"))
+    assertEquals(1, json("brokers").asInstanceOf[List[Map[String, Object]]].size)
     assertEquals("scheduled", json("status"))
     assertFalse(broker0.active)
     assertFalse(broker1.active)

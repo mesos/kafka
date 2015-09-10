@@ -610,15 +610,23 @@ object Cli {
       catch { case e: IOException => throw new Error("" + e) }
 
       val status = json("status").asInstanceOf[String]
-      val ids = json("ids").asInstanceOf[String]
+      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
-      val brokers = "broker" + (if (ids.contains(",")) "s" else "")
+      val brokers = "broker" + (if (brokerNodes.size > 1) "s" else "")
       val startStop = if (start) "start" else "stop"
 
       // started|stopped|scheduled|timeout
-      if (status == "timeout") throw new Error(s"$brokers $ids scheduled to $startStop. Got timeout")
-      else if (status == "scheduled") printLine(s"$brokers $ids scheduled to $startStop")
-      else printLine(s"$brokers $ids $status")
+      if (status == "timeout") throw new Error(s"$brokers $startStop timeout")
+      else if (status == "scheduled") printLine(s"$brokers scheduled to $startStop:")
+      else printLine(s"$brokers $status:")
+
+      for (brokerNode <- brokerNodes) {
+        val broker: Broker = new Broker()
+        broker.fromJson(brokerNode)
+
+        printBroker(broker, 1)
+        printLine()
+      }
     }
 
     private def printCmds(): Unit = {

@@ -116,17 +116,21 @@ class CliTest extends MesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
 
     exec("broker start * --timeout=0")
-    assertOutContains("brokers 0,1")
+    assertOutContains("brokers scheduled to start:")
+    assertOutContains("id: 0")
+    assertOutContains("id: 1")
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
     exec("broker stop 0 --timeout=0")
-    assertOutContains("broker 0")
+    assertOutContains("broker scheduled to stop:")
+    assertOutContains("id: 0")
     assertFalse(broker0.active)
     assertTrue(broker1.active)
 
     exec("broker stop 1 --timeout=0")
-    assertOutContains("broker 1")
+    assertOutContains("broker scheduled to stop:")
+    assertOutContains("id: 1")
     assertFalse(broker0.active)
     assertFalse(broker1.active)
   }
@@ -135,12 +139,12 @@ class CliTest extends MesosTestCase {
   def broker_start_stop_timeout {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
     try { exec("broker start 0 --timeout=1ms"); fail() }
-    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker start timeout")) }
     assertTrue(broker.active)
 
     broker.task = new Broker.Task("id", "slave", "executor", "host", _state = Broker.State.RUNNING)
     try { exec("broker stop 0 --timeout=1ms"); fail() }
-    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker stop timeout")) }
     assertFalse(broker.active)
   }
 
