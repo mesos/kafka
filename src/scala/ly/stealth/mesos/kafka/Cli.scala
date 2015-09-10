@@ -761,6 +761,7 @@ object Cli {
 
       val parser = newParser()
       if (add) {
+        parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
         parser.accepts("partitions", "partitions count. Default - 1").withRequiredArg().ofType(classOf[Integer])
         parser.accepts("replicas", "replicas count. Default - 1").withRequiredArg().ofType(classOf[Integer])
       }
@@ -776,6 +777,11 @@ object Cli {
         printLine()
         Expr.printTopicExprExamples(out)
 
+        if (add) {
+          printLine()
+          Expr.printBrokerExprExamples(out)
+        }
+
         return
       }
 
@@ -788,12 +794,14 @@ object Cli {
           throw new Error(e.getMessage)
       }
 
+      val broker = options.valueOf("broker").asInstanceOf[String]
       val partitions = options.valueOf("partitions").asInstanceOf[Integer]
       val replicas = options.valueOf("replicas").asInstanceOf[Integer]
       val options_ = options.valueOf("options").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]
       params.put("topic", name)
+      if (broker != null) params.put("broker", broker)
       if (partitions != null) params.put("partitions", "" + partitions)
       if (replicas != null) params.put("replicas", "" + replicas)
       if (options != null) params.put("options", options_)

@@ -391,9 +391,14 @@ object HttpServer {
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
-      val expr: String = request.getParameter("topic")
-      if (expr == null || expr.isEmpty) errors.add("topic required")
-      val names: util.List[String] = Expr.expandTopics(expr)
+      val topicExpr: String = request.getParameter("topic")
+      if (topicExpr == null || topicExpr.isEmpty) errors.add("topic required")
+      val topicNames: util.List[String] = Expr.expandTopics(topicExpr)
+      
+      var brokerIds: util.List[Int] = null
+      if (request.getParameter("broker") != null)
+        try { brokerIds = Expr.expandBrokers(Scheduler.cluster, request.getParameter("broker")).map(Integer.parseInt) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid broker-expr") }
 
       var partitions: Int = 1
       if (add && request.getParameter("partitions") != null)
@@ -416,7 +421,7 @@ object HttpServer {
       val optionErr: String = if (options != null) topics.validateOptions(options) else null
       if (optionErr != null) errors.add(optionErr)
 
-      for (name <- names) {
+      for (name <- topicNames) {
         val topic = topics.getTopic(name)
         if (add && topic != null) errors.add(s"Topic $name already exists")
         if (!add && topic == null) errors.add(s"Topic $name not found")
@@ -425,8 +430,8 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       val topicNodes= new ListBuffer[JSONObject]
-      for (name <- names) {
-        if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas), options)
+      for (name <- topicNames) {
+        if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas, brokerIds), options)
         else topics.updateTopic(topics.getTopic(name), options)
 
         topicNodes.add(topics.getTopic(name).toJson)
