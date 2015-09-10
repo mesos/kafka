@@ -424,6 +424,10 @@ object Cli {
       if (help) {
         printLine("List brokers\nUsage: broker list [<broker-expr>] [options]\n")
         handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printBrokerExprExamples(out)
+
         return
       }
 
@@ -724,8 +728,12 @@ object Cli {
 
     def handleList(expr: String, help: Boolean = false): Unit = {
       if (help) {
-        printLine("List topics\nUsage: topic list [name-regex]\n")
+        printLine("List topics\nUsage: topic list [topic-expr]\n")
         handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printTopicExprExamples(out)
+
         return
       }
 

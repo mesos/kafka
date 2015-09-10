@@ -367,16 +367,22 @@ object HttpServer {
 
       if (uri == "list") handleListTopics(request, response)
       else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
-      else if (uri == "rebalance") handleRebalance(request, response)
+      else if (uri == "rebalance") handleTopicRebalance(request, response)
       else response.sendError(404, "uri not found")
     }
 
     def handleListTopics(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val topics: Topics = Scheduler.cluster.topics
-      val expr = request.getParameter("topic")
+
+      var expr = request.getParameter("topic")
+      if (expr == null) expr = "*"
+      val names: util.List[String] = Expr.expandTopics(expr)
 
       val topicNodes = new ListBuffer[JSONObject]()
-      for (topic <- topics.getTopics(name = expr)) topicNodes.add(topic.toJson)
+      for (topic <- topics.getTopics())
+        if (names.contains(topic.name))
+          topicNodes.add(topic.toJson)
+
       response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
     }
 
@@ -422,7 +428,7 @@ object HttpServer {
       response.getWriter.println(JSONObject(Map("topic" -> topic.toJson)))
     }
 
-    def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+    def handleTopicRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
       val rebalancer: Rebalancer = cluster.rebalancer
 

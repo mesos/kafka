@@ -161,7 +161,7 @@ class CliTest extends MesosTestCase {
     assertOutContains("x")
 
     // name filtering
-    exec("topic list t.*")
+    exec("topic list t*")
     assertOutContains("t0")
     assertOutContains("t1")
     assertOutNotContains("x")
