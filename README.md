@@ -70,30 +70,29 @@ The following options are available:
 Start scheduler 
 Usage: scheduler [options] [config.properties]
 
-Option               Description                           
-------               -----------                           
---api                Api url. Example: http://master:7000  
---debug <Boolean>    Debug mode. Default - false           
---framework-name     Framework name. Default - kafka       
---framework-role     Framework role. Default - *           
---framework-timeout  Framework timeout (30s, 1m, 1h).      
-                       Default - 30d
+Option               Description
+------               -----------
+--api                Api url. Example: http://master:7000
+--bind-address       Scheduler bind address (master, 0.0.0.0, 192.168.50.*, if:eth1). Default - all
+--debug <Boolean>    Debug mode. Default - false
+--framework-name     Framework name. Default - kafka
+--framework-role     Framework role. Default - *
+--framework-timeout  Framework timeout (30s, 1m, 1h). Default - 30d
+--jre                JRE zip-file (jre-7-openjdk.zip). Default - none.
+--log                Log file to use. Default - stdout.
 --master             Master connection settings. Examples:
                       - master:5050
                       - master:5050,master2:5050
                       - zk://master:2181/mesos
                       - zk://username:password@master:2181
                       - zk://master:2181,master2:2181/mesos
---principal          Principal (username) used to register
-                       framework. Default - none
---secret             Secret (password) used to register
-                       framework. Default - none
+--principal          Principal (username) used to register framework. Default - none
+--secret             Secret (password) used to register framework. Default - none
 --storage            Storage for cluster state. Examples:
                       - file:kafka-mesos.json
                       - zk:/kafka-mesos
                      Default - file:kafka-mesos.json
---user               Mesos user to run tasks. Default -
-                       current system user
+--user               Mesos user to run tasks. Default - none
 --zk                 Kafka zookeeper.connect. Examples:
                       - master:2181
                       - master:2181,master2:2181
@@ -128,44 +127,38 @@ First let's start up and use 1 broker with the default settings. Further in the 
 
 ```
 # ./kafka-mesos.sh broker add 0
-Broker added
-
-broker:
+broker added:
   id: 0
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m
 ```
 
 You now have a cluster with 1 broker that is not started.
 
 ```
 # ./kafka-mesos.sh broker list
-brokers:
+broker:
   id: 0
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m
 ```
 Now let's start the broker.
 
 ```
 # ./kafka-mesos.sh broker start 0
-Broker 0 started
-```
-
-We don't know yet where the broker is, and we need that for producers and consumers to connect to the cluster.
-
-```
-# ./kafka-mesos.sh broker list
-brokers:
+broker started:
   id: 0
   active: true
   state: running
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
-  failover: delay:10s, max-delay:60s
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
   task:
     id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
     running: true
@@ -196,11 +189,16 @@ Changing the location where data is stored
 
 ```
 # ./kafka-mesos.sh broker stop 0
-Broker 0 stopped
-# ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0
-Broker updated
+broker stopped:
+  id: 0
+  active: false
+  state: stopped
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
 
-broker:
+# ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0
+broker updated:
   id: 0
   active: false
   state: stopped
@@ -210,7 +208,18 @@ broker:
   stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
 
 # ./kafka-mesos.sh broker start 0
-Broker 0 started
+broker started:
+  id: 0
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
+  task:
+    id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
+    running: true
+    endpoint: 172.16.25.62:31000
+    attributes: rack=r1
 ```
 
 Starting 3 brokers
@@ -218,36 +227,46 @@ Starting 3 brokers
 
 ```
 #./kafka-mesos.sh broker add 0..2 --heap 1024 --mem 2048
-Brokers added
-
-brokers:
+brokers added:
   id: 0
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:1m, max-delay:10m
-  stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
+  stickiness: period:10m
 
   id: 1
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:1m, max-delay:10m
-  stickiness: period:10m, hostname:slave1, expires:2015-07-10 15:51:43+03
+  stickiness: period:10m
 
   id: 2
   active: false
   state: stopped
   resources: cpus:1.00, mem:2048, heap:1024, port:auto
   failover: delay:1m, max-delay:10m
-  stickiness: period:10m, hostname:slave2, expires:2015-07-10 15:51:43+03
+  stickiness: period:10m
 
-#./kafka-mesos.sh broker start 0
-Broker 0 started
-#./kafka-mesos.sh broker start 1
-Broker 1 started
-#./kafka-mesos.sh broker start 2
-Broker 2 started
+#./kafka-mesos.sh broker start 0..2
+brokers started:
+  id: 0
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
+  task:
+    id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
+    running: true
+    endpoint: 172.16.25.62:31000
+    attributes: rack=r1
+
+  id: 1
+  active: true
+  state: running
+  ...
 ```
 
 High Availability Scheduler State
@@ -289,9 +308,7 @@ A common use case is to supply multiple `log.dirs`, or provide other options. To
 
 ```
 ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0\\,/mnt/array2/broker0,num.io.threads=16
-Broker updated
-
-broker:
+broker updated:
   id: 0
   active: false
   state: stopped
@@ -311,7 +328,7 @@ Adding brokers to the cluster
 ```
 # ./kafka-mesos.sh help broker add
 Add broker
-Usage: add <id-expr> [options]
+Usage: broker add <broker-expr> [options]
 
 Option                Description
 ------                -----------
@@ -338,12 +355,16 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 
 constraint examples:
   like:master     - value equals 'master'
@@ -362,7 +383,7 @@ Updating broker configurations
 ```
 # ./kafka-mesos.sh help broker update
 Update broker
-Usage: update <id-expr> [options]
+Usage: broker update <broker-expr> [options]
 
 Option                Description
 ------                -----------
@@ -389,12 +410,16 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 
 constraint examples:
   like:master     - value equals 'master'
@@ -415,7 +440,7 @@ Starting brokers in the cluster
 ```
 # ./kafka-mesos.sh help broker start
 Start broker
-Usage: start <id-expr> [options]
+Usage: broker start <broker-expr> [options]
 
 Option     Description
 ------     -----------
@@ -426,12 +451,16 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Stopping brokers in the cluster
@@ -440,7 +469,7 @@ Stopping brokers in the cluster
 ```
 # ./kafka-mesos.sh help broker stop
 Stop broker
-Usage: stop <id-expr> [options]
+Usage: broker stop <broker-expr> [options]
 
 Option     Description
 ------     -----------
@@ -452,12 +481,16 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Removing brokers from the cluster
@@ -466,53 +499,23 @@ Removing brokers from the cluster
 ```
 # ./kafka-mesos.sh help broker remove
 Remove broker
-Usage: remove <id-expr> [options]
+Usage: broker remove <broker-expr> [options]
 
 Generic Options
 Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
-id-expr examples:
+broker-expr examples:
   0      - broker 0
   0,1    - brokers 0,1
   0..2   - brokers 0,1,2
   0,1..2 - brokers 0,1,2
   *      - any broker
-```
-
-Rebalancing brokers in the cluster
-----------------------------------
-```
-# ./kafka-mesos.sh help broker rebalance
-Rebalance
-Usage: rebalance <id-expr>|status [options]
-
-Option     Description
-------     -----------
---timeout  timeout (30s, 1m, 1h). 0s - no timeout
---topics   <topic-expr>. Default - *. See below.
-
-Generic Options
-Option  Description
-------  -----------
---api   Api url. Example: http://master:7000
-
-topic-expr examples:
-  t0        - topic t0 with default RF (replication-factor)
-  t0,t1     - topics t0, t1 with default RF
-  t0:3      - topic t0 with RF=3
-  t0,t1:2   - topic t0 with default RF, topic t1 with RF=2
-  *         - all topics with default RF
-  *:2       - all topics with RF=2
-  t0:1,*:2  - all topics with RF=2 except topic t0 with RF=1
-
-id-expr examples:
-  0      - broker 0
-  0,1    - brokers 0,1
-  0..2   - brokers 0,1,2
-  0,1..2 - brokers 0,1,2
-  *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Listing Topics
@@ -520,13 +523,18 @@ Listing Topics
 ```
 #./kafka-mesos.sh help topic list
 List topics
-Usage: topic list [name-regex]
+Usage: topic list [<topic-expr>]
 
 Generic Options
 Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
 ```
 
 Adding Topic
@@ -534,10 +542,11 @@ Adding Topic
 ```
 #./kafka-mesos.sh help topic add
 Add topic
-Usage: topic add <name> [options]
+Usage: topic add <topic-expr> [options]
 
 Option                  Description
 ------                  -----------
+--broker                <broker-expr>. Default - *. See below.
 --options               topic options. Example: flush.ms=60000,retention.ms=6000000
 --partitions <Integer>  partitions count. Default - 1
 --replicas <Integer>    replicas count. Default - 1
@@ -547,6 +556,22 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
+
+broker-expr examples:
+  0      - broker 0
+  0,1    - brokers 0,1
+  0..2   - brokers 0,1,2
+  0,1..2 - brokers 0,1,2
+  *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Updating Topic
@@ -554,7 +579,7 @@ Updating Topic
 ```
 #./kafka-mesos.sh help topic update
 Update topic
-Usage: topic update <name> [options]
+Usage: topic update <topic-expr> [options]
 
 Option     Description
 ------     -----------
@@ -565,6 +590,47 @@ Option  Description
 ------  -----------
 --api   Api url. Example: http://master:7000
 
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
+```
+
+Rebalancing topics
+----------------------------------
+```
+#./kafka-mesos.sh help topic rebalance
+Rebalance topics
+Usage: topic rebalance <topic-expr>|status [options]
+
+Option                Description
+------                -----------
+--broker              <broker-expr>. Default - *. See below.
+--replicas <Integer>  replicas count. Default - 1
+--timeout             timeout (30s, 1m, 1h). 0s - no timeout
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
+
+broker-expr examples:
+  0      - broker 0
+  0,1    - brokers 0,1
+  0..2   - brokers 0,1,2
+  0,1..2 - brokers 0,1,2
+  *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Using the REST API
@@ -572,8 +638,8 @@ Using the REST API
 
 The scheduler REST API fully exposes all of the features of the CLI with the following request format:
 ```
-/api/broker/<cli command>/id={broker.id}&<setting>=<value>
-/api/topic/<cli command>/name={topic.name}&<setting>=<value>
+/api/broker/<cli command>/broker={broker-expr}&<setting>=<value>
+/api/topic/<cli command>/topic={topic-expr}&<setting>=<value>
 ```
 
 Listing brokers
@@ -586,21 +652,21 @@ Listing brokers
 Adding a broker
 
 ```
-# curl "http://localhost:7000/api/broker/add?id=0&cpus=8&mem=43008"
+# curl "http://localhost:7000/api/broker/add?broker=0&cpus=8&mem=43008"
 {"brokers" : [{"id" : "0", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}]}
 ```
 
 Starting a broker
 
 ```
-# curl "http://localhost:7000/api/broker/start?id=0"
+# curl "http://localhost:7000/api/broker/start?broker=0"
 {"success" : true, "ids" : "0"}
 ```
 
 Stopping a broker
 
 ```
-# curl "http://localhost:7000/api/broker/stop?id=0"
+# curl "http://localhost:7000/api/broker/stop?broker=0"
 {"success" : true, "ids" : "0"}
 ```
 
@@ -612,13 +678,13 @@ Listing topics
 
 Adding topic
 ```
-# curl "http://localhost:7000/api/topic/add?name=t"
+# curl "http://localhost:7000/api/topic/add?topic=t"
 {"topic" : {"name" : "t", "partitions" : {"0" : "1"}, "options" : {}}}
 ```
 
 Updating topic
 ```
-# curl "http://localhost:7000/api/topic/update?name=t&options=flush.ms%3D1000"
+# curl "http://localhost:7000/api/topic/update?topic=t&options=flush.ms%3D1000"
 {"topic" : {"name" : "t", "partitions" : {"0" : "0, 1"}, "options" : {"flush.ms" : "1000"}}}
 ```
 

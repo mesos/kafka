@@ -362,7 +362,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private def initLogging() {
-    System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
+    HttpServer.initLogging()
     BasicConfigurator.resetConfiguration()
 
     val root = Logger.getRootLogger
@@ -381,49 +381,5 @@ object Scheduler extends org.apache.mesos.Scheduler {
     else appender = new DailyRollingFileAppender(layout, Config.log.getPath, "'.'yyyy-MM-dd")
     
     root.addAppender(appender)
-  }
-
-  class JettyLog4jLogger extends org.eclipse.jetty.util.log.Logger {
-    private var logger: Logger = Logger.getLogger("Jetty")
-
-    def this(logger: Logger) {
-      this()
-      this.logger = logger
-    }
-
-    def isDebugEnabled: Boolean = logger.isDebugEnabled
-    def setDebugEnabled(enabled: Boolean) = logger.setLevel(if (enabled) Level.DEBUG else Level.INFO)
-
-    def getName: String = logger.getName
-    def getLogger(name: String): org.eclipse.jetty.util.log.Logger = new JettyLog4jLogger(Logger.getLogger(name))
-
-    def info(s: String, args: AnyRef*) = logger.info(format(s, args))
-    def info(s: String, t: Throwable) = logger.info(s, t)
-    def info(t: Throwable) = logger.info("", t)
-
-    def debug(s: String, args: AnyRef*) = logger.debug(format(s, args))
-    def debug(s: String, t: Throwable) = logger.debug(s, t)
-
-    def debug(t: Throwable) = logger.debug("", t)
-    def warn(s: String, args: AnyRef*) = logger.warn(format(s, args))
-
-    def warn(s: String, t: Throwable) = logger.warn(s, t)
-    def warn(s: String) = logger.warn(s)
-    def warn(t: Throwable) = logger.warn("", t)
-
-    def ignore(t: Throwable) = logger.info("Ignored", t)
-  }
-
-  private def format(s: String, args: AnyRef*): String = {
-    var result: String = ""
-    var i: Int = 0
-
-    for (token <- s.split("\\{\\}")) {
-      result += token
-      if (args.length > i) result += args(i)
-      i += 1
-    }
-
-    result
   }
 }

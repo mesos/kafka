@@ -77,7 +77,7 @@ class CliTest extends MesosTestCase {
   @Test
   def broker_add {
     exec("broker add 0 --cpus=0.1 --mem=128")
-    assertOutContains("Broker added")
+    assertOutContains("broker added:")
     assertOutContains("id: 0")
     assertOutContains("cpus:0.10, mem:128")
 
@@ -92,7 +92,7 @@ class CliTest extends MesosTestCase {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
 
     exec("broker update 0 --failover-delay=10s --failover-max-delay=20s --options=log.dirs=/tmp/kafka-logs")
-    assertOutContains("Broker updated")
+    assertOutContains("broker updated:")
     assertOutContains("delay:10s, max-delay:20s")
     assertOutContains("options: log.dirs=/tmp/kafka-logs")
 
@@ -106,7 +106,7 @@ class CliTest extends MesosTestCase {
     Scheduler.cluster.addBroker(new Broker("0"))
     exec("broker remove 0")
 
-    assertOutContains("Broker 0 removed")
+    assertOutContains("broker 0 removed")
     assertNull(Scheduler.cluster.getBroker("0"))
   }
 
@@ -116,17 +116,21 @@ class CliTest extends MesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
 
     exec("broker start * --timeout=0")
-    assertOutContains("Brokers 0,1")
+    assertOutContains("brokers scheduled to start:")
+    assertOutContains("id: 0")
+    assertOutContains("id: 1")
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
     exec("broker stop 0 --timeout=0")
-    assertOutContains("Broker 0")
+    assertOutContains("broker scheduled to stop:")
+    assertOutContains("id: 0")
     assertFalse(broker0.active)
     assertTrue(broker1.active)
 
     exec("broker stop 1 --timeout=0")
-    assertOutContains("Broker 1")
+    assertOutContains("broker scheduled to stop:")
+    assertOutContains("id: 1")
     assertFalse(broker0.active)
     assertFalse(broker1.active)
   }
@@ -135,27 +139,13 @@ class CliTest extends MesosTestCase {
   def broker_start_stop_timeout {
     val broker = Scheduler.cluster.addBroker(new Broker("0"))
     try { exec("broker start 0 --timeout=1ms"); fail() }
-    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker start timeout")) }
     assertTrue(broker.active)
 
     broker.task = new Broker.Task("id", "slave", "executor", "host", _state = Broker.State.RUNNING)
     try { exec("broker stop 0 --timeout=1ms"); fail() }
-    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("Got timeout")) }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker stop timeout")) }
     assertFalse(broker.active)
-  }
-
-  @Test
-  def broker_rebalance {
-    val cluster: Cluster = Scheduler.cluster
-    val rebalancer: Rebalancer = cluster.rebalancer
-
-    cluster.addBroker(new Broker("0"))
-    cluster.addBroker(new Broker("1"))
-    assertFalse(rebalancer.running)
-
-    exec("broker rebalance *")
-    assertTrue(rebalancer.running)
-    assertOutContains("Rebalance started")
   }
 
   @Test
@@ -175,7 +165,7 @@ class CliTest extends MesosTestCase {
     assertOutContains("x")
 
     // name filtering
-    exec("topic list t.*")
+    exec("topic list t*")
     assertOutContains("t0")
     assertOutContains("t1")
     assertOutNotContains("x")
@@ -184,6 +174,9 @@ class CliTest extends MesosTestCase {
   @Test
   def topic_add {
     exec("topic add t0")
+    assertOutContains("topic added:")
+    assertOutContains("name: t0")
+
     exec("topic list")
     assertOutContains("topic:")
     assertOutContains("name: t0")
@@ -200,11 +193,28 @@ class CliTest extends MesosTestCase {
   def topic_update {
     Scheduler.cluster.topics.addTopic("t0")
     exec("topic update t0 --options=flush.ms=5000")
+    assertOutContains("topic updated:")
+    assertOutContains("name: t0")
 
     exec("topic list")
     assertOutContains("topic:")
     assertOutContains("t0")
     assertOutContains("flush.ms=5000")
+  }
+
+  @Test
+  def topic_rebalance {
+    val cluster: Cluster = Scheduler.cluster
+    val rebalancer: Rebalancer = cluster.rebalancer
+
+    cluster.addBroker(new Broker("0"))
+    cluster.addBroker(new Broker("1"))
+    assertFalse(rebalancer.running)
+
+    cluster.topics.addTopic("t")
+    exec("topic rebalance *")
+    assertTrue(rebalancer.running)
+    assertOutContains("Rebalance started")
   }
 
   @Test

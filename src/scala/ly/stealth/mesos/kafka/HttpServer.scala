@@ -18,7 +18,7 @@
 package ly.stealth.mesos.kafka
 
 import java.io._
-import org.apache.log4j.Logger
+import org.apache.log4j.{Level, Logger}
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.eclipse.jetty.servlet.{ServletHolder, ServletContextHandler}
@@ -30,7 +30,6 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
-import ly.stealth.mesos.kafka.Topics.Topic
 
 object HttpServer {
   var jar: File = null
@@ -72,6 +71,12 @@ object HttpServer {
     server = null
 
     logger.info("stopped")
+  }
+
+  def initLogging(): Unit = {
+    System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
+    Logger.getLogger("org.eclipse.jetty").setLevel(Level.WARN)
+    Logger.getLogger("Jetty").setLevel(Level.WARN)
   }
 
   private def resolveDeps: Unit = {
@@ -127,16 +132,30 @@ object HttpServer {
       var uri: String = request.getRequestURI.substring("/api/broker".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "list") handleListBrokers(response)
+      if (uri == "list") handleListBrokers(request, response)
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
-      else if (uri == "rebalance") handleRebalance(request, response)
       else response.sendError(404, "uri not found")
     }
 
-    def handleListBrokers(response: HttpServletResponse): Unit = {
-      response.getWriter.println("" + Scheduler.cluster.toJson)
+    def handleListBrokers(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster = Scheduler.cluster
+
+      var expr = request.getParameter("broker")
+      if (expr == null) expr = "*"
+
+      var ids: util.List[String] = null
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
+
+      val brokerNodes = new ListBuffer[JSONObject]()
+      for (id <- ids) {
+        val broker = cluster.getBroker(id)
+        if (broker != null) brokerNodes.add(cluster.getBroker(id).toJson)
+      }
+
+      response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
     def handleAddUpdateBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -144,8 +163,8 @@ object HttpServer {
       val add: Boolean = request.getRequestURI.endsWith("add")
       val errors = new util.ArrayList[String]()
 
-      val idExpr: String = request.getParameter("id")
-      if (idExpr == null || idExpr.isEmpty) errors.add("id required")
+      val expr: String = request.getParameter("broker")
+      if (expr == null || expr.isEmpty) errors.add("broker required")
 
       var cpus: java.lang.Double = null
       if (request.getParameter("cpus") != null)
@@ -214,8 +233,8 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
 
@@ -264,12 +283,12 @@ object HttpServer {
     def handleRemoveBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster = Scheduler.cluster
 
-      val idExpr = request.getParameter("id")
-      if (idExpr == null) { response.sendError(400, "id required"); return }
+      val expr = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -299,12 +318,12 @@ object HttpServer {
 
       val force: Boolean = request.getParameter("force") != null
 
-      val idExpr: String = request.getParameter("id")
-      if (idExpr == null) { response.sendError(400, "id required"); return }
+      val expr: String = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
 
       var ids: util.List[String] = null
-      try { ids = cluster.expandIds(idExpr) }
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
       for (id <- ids) {
@@ -330,40 +349,127 @@ object HttpServer {
 
         if (start) "started" else "stopped"
       }
+
       val status = waitForBrokers()
+      val brokerNodes = new ListBuffer[JSONObject]()
 
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("status") = status
-      result("ids") = ids.mkString(",")
-
-      response.getWriter.println(JSONObject(result.toMap))
+      for (broker <- brokers) brokerNodes.add(broker.toJson)
+      response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
-    def handleRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+    def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/topic".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "list") handleListTopics(request, response)
+      else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
+      else if (uri == "rebalance") handleTopicRebalance(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleListTopics(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topics: Topics = Scheduler.cluster.topics
+
+      var expr = request.getParameter("topic")
+      if (expr == null) expr = "*"
+      val names: util.List[String] = Expr.expandTopics(expr)
+
+      val topicNodes = new ListBuffer[JSONObject]()
+      for (topic <- topics.getTopics)
+        if (names.contains(topic.name))
+          topicNodes.add(topic.toJson)
+
+      response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
+    }
+
+    def handleAddUpdateTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topics: Topics = Scheduler.cluster.topics
+      val add: Boolean = request.getRequestURI.endsWith("add")
+      val errors = new util.ArrayList[String]()
+
+      val topicExpr: String = request.getParameter("topic")
+      if (topicExpr == null || topicExpr.isEmpty) errors.add("topic required")
+      val topicNames: util.List[String] = Expr.expandTopics(topicExpr)
+      
+      var brokerIds: util.List[Int] = null
+      if (request.getParameter("broker") != null)
+        try { brokerIds = Expr.expandBrokers(Scheduler.cluster, request.getParameter("broker")).map(Integer.parseInt) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid broker-expr") }
+
+      var partitions: Int = 1
+      if (add && request.getParameter("partitions") != null)
+        try { partitions = Integer.parseInt(request.getParameter("partitions")) }
+        catch { case e: NumberFormatException => errors.add("Invalid partitions") }
+
+      var replicas: Int = 1
+      if (add && request.getParameter("replicas") != null)
+        try { replicas = Integer.parseInt(request.getParameter("replicas")) }
+        catch { case e: NumberFormatException => errors.add("Invalid replicas") }
+
+      var options: util.Map[String, String] = null
+      if (request.getParameter("options") != null)
+        try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
+
+      if (!add && options == null)
+        errors.add("options required")
+
+      val optionErr: String = if (options != null) topics.validateOptions(options) else null
+      if (optionErr != null) errors.add(optionErr)
+
+      for (name <- topicNames) {
+        val topic = topics.getTopic(name)
+        if (add && topic != null) errors.add(s"Topic $name already exists")
+        if (!add && topic == null) errors.add(s"Topic $name not found")
+      }
+
+      if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
+
+      val topicNodes= new ListBuffer[JSONObject]
+      for (name <- topicNames) {
+        if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas, brokerIds), options)
+        else topics.updateTopic(topics.getTopic(name), options)
+
+        topicNodes.add(topics.getTopic(name).toJson)
+      }
+
+      response.getWriter.println(JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
+    }
+
+    def handleTopicRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
       val rebalancer: Rebalancer = cluster.rebalancer
 
-      val idExpr: String = request.getParameter("id")
-      var ids: util.List[String] = null
-      if (idExpr != null)
-        try { ids = cluster.expandIds(idExpr) }
-        catch { case e: IllegalArgumentException => response.sendError(400, "invalid id-expr"); return }
+      val topicExpr = request.getParameter("topic")
+      var topics: util.List[String] = null
+      if (topicExpr != null)
+        try { topics = Expr.expandTopics(topicExpr)}
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
 
-      if (ids != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
-
-      val topicExpr = if (request.getParameter("topics") != null) request.getParameter("topics") else "*"
-      var topics: util.Map[String, Integer] = null
-      try { topics = rebalancer.expandTopics(topicExpr)}
-      catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+      if (topics != null && rebalancer.running) { response.sendError(400, "rebalance is already running"); return }
       if (topics != null && topics.isEmpty) { response.sendError(400, "no topics specified"); return }
+
+      val brokerExpr: String = if (request.getParameter("broker") != null) request.getParameter("broker") else "*"
+      var brokers: util.List[String] = null
+      if (brokerExpr != null)
+        try { brokers = Expr.expandBrokers(cluster, brokerExpr) }
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       var timeout: Period = new Period("0")
       if (request.getParameter("timeout") != null)
         try { timeout = new Period(request.getParameter("timeout")) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
 
+      var replicas: Int = -1
+      if (request.getParameter("replicas") != null)
+        try { replicas = Integer.parseInt(request.getParameter("replicas")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid replicas"); return  }
+
+
       def startRebalance: (String, String) = {
-        try { rebalancer.start(ids, topics) }
+        try { rebalancer.start(topics, brokers, replicas) }
         catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)
@@ -376,7 +482,7 @@ object HttpServer {
       var status: String = null
       var error: String = null
 
-      if (ids != null) {
+      if (topics != null) {
         val result: (String, String) = startRebalance
         status = result._1
         error = result._2
@@ -389,67 +495,6 @@ object HttpServer {
       result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
-    }
-
-    def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      request.setAttribute("jsonResponse", true)
-      response.setContentType("application/json; charset=utf-8")
-      var uri: String = request.getRequestURI.substring("/api/topic".length)
-      if (uri.startsWith("/")) uri = uri.substring(1)
-
-      if (uri == "list") handleListTopics(request, response)
-      else if (uri == "add" || uri == "update") handleAddUpdateTopic(request, response)
-      else response.sendError(404, "uri not found")
-    }
-
-    def handleListTopics(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val topics: Topics = Scheduler.cluster.topics
-      val name = request.getParameter("name")
-
-      val topicNodes = new ListBuffer[JSONObject]()
-      for (topic <- topics.getTopics(name = name)) topicNodes.add(topic.toJson)
-      response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
-    }
-
-    def handleAddUpdateTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val topics: Topics = Scheduler.cluster.topics
-      val add: Boolean = request.getRequestURI.endsWith("add")
-      val errors = new util.ArrayList[String]()
-
-      val name: String = request.getParameter("name")
-      if (name == null || name.isEmpty) errors.add("name required")
-
-      var partitions: Int = 1
-      if (add && request.getParameter("partitions") != null)
-        try { partitions = Integer.parseInt(request.getParameter("partitions")) }
-        catch { case e: NumberFormatException => errors.add("Invalid partitions") }
-
-      var replicas: Int = 1
-      if (add && request.getParameter("replicas") != null)
-        try { replicas = Integer.parseInt(request.getParameter("replicas")) }
-        catch { case e: NumberFormatException => errors.add("Invalid replicas") }
-
-      var options: util.Map[String, String] = new util.HashMap[String, String]()
-      if (request.getParameter("options") != null)
-        try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
-        catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
-      else if (!add)
-        errors.add("options required")
-
-      val optionErr: String = topics.validateOptions(options)
-      if (optionErr != null) errors.add(optionErr)
-
-      var topic: Topic = topics.getTopic(name)
-      if (add && topic != null) errors.add("Duplicate topic")
-      if (!add && topic == null) errors.add("Topic not found")
-
-      if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
-
-      if (add) topics.addTopic(name, partitions, replicas, options)
-      else topics.updateTopic(topic, options)
-      topic = topics.getTopic(name)
-
-      response.getWriter.println(JSONObject(Map("topic" -> topic.toJson)))
     }
   }
 
@@ -474,5 +519,49 @@ object HttpServer {
       writer.flush()
       baseRequest.setHandled(true)
     }
+  }
+
+  class JettyLog4jLogger extends org.eclipse.jetty.util.log.Logger {
+    private var logger: Logger = Logger.getLogger("Jetty")
+
+    def this(logger: Logger) {
+      this()
+      this.logger = logger
+    }
+
+    def isDebugEnabled: Boolean = logger.isDebugEnabled
+    def setDebugEnabled(enabled: Boolean) = logger.setLevel(if (enabled) Level.DEBUG else Level.INFO)
+
+    def getName: String = logger.getName
+    def getLogger(name: String): org.eclipse.jetty.util.log.Logger = new JettyLog4jLogger(Logger.getLogger(name))
+
+    def info(s: String, args: AnyRef*) = logger.info(format(s, args))
+    def info(s: String, t: Throwable) = logger.info(s, t)
+    def info(t: Throwable) = logger.info("", t)
+
+    def debug(s: String, args: AnyRef*) = logger.debug(format(s, args))
+    def debug(s: String, t: Throwable) = logger.debug(s, t)
+
+    def debug(t: Throwable) = logger.debug("", t)
+    def warn(s: String, args: AnyRef*) = logger.warn(format(s, args))
+
+    def warn(s: String, t: Throwable) = logger.warn(s, t)
+    def warn(s: String) = logger.warn(s)
+    def warn(t: Throwable) = logger.warn("", t)
+
+    def ignore(t: Throwable) = logger.info("Ignored", t)
+  }
+
+  private def format(s: String, args: AnyRef*): String = {
+    var result: String = ""
+    var i: Int = 0
+
+    for (token <- s.split("\\{\\}")) {
+      result += token
+      if (args.length > i) result += args(i)
+      i += 1
+    }
+
+    result
   }
 }

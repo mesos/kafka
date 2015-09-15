@@ -128,6 +128,7 @@ class MesosTestCase {
   }
 
   def startHttpServer() {
+    HttpServer.initLogging()
     Config.api = "http://localhost:0"
     HttpServer.start(resolveDeps = false)
   }
@@ -418,13 +419,11 @@ class TestRebalancer extends Rebalancer {
 
   override def running: Boolean = _running
 
-  override def start(_ids: util.List[String], _topics: util.Map[String, Integer]): Unit = {
+  override def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1): Unit = {
     if (_failOnStart) throw new Rebalancer.Exception("failOnStart")
     _running = true
   }
 
   override def state: String = if (running) "running" else ""
 
-  override def expandTopics(expr: String): util.Map[String, Integer] = Util.parseMap(expr)
-    .mapValues(v => if (v != null) Integer.valueOf(v) else null).view.force
 }

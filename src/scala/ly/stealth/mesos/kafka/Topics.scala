@@ -36,16 +36,15 @@ class Topics {
 
   def getTopic(name: String): Topics.Topic = {
     if (name == null) return null
-    val topics: util.List[Topic] = getTopics(name)
+    val topics: util.List[Topic] = getTopics.filter(_.name == name)
     if (topics.length > 0) topics(0) else null
   }
 
-  def getTopics(name: String = null): util.List[Topics.Topic] = {
+  def getTopics: util.List[Topics.Topic] = {
     val zkClient = newZkClient
 
     try {
       var names = ZkUtils.getAllTopics(zkClient)
-      if (name != null) names = names.filter(_.matches(name))
 
       val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtils.getPartitionAssignmentForTopics(zkClient, names)
       val configs = AdminUtils.fetchAllTopicConfigs(zkClient)
@@ -64,27 +63,40 @@ class Topics {
     }
   }
 
-  def addTopic(name: String, partitions: Int = 1, replicas: Int = 1, options: util.Map[String, String] = new util.HashMap[String, String]()): Topic = {
-    val zkClient = newZkClient
-    try {
-      val config: Properties = new Properties()
-      for ((k, v) <- options) config.setProperty(k, v)
-      AdminUtils.createTopic(zkClient, name, partitions, replicas, config)
-      getTopic(name)
-    } finally {
-      zkClient.close()
+  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: util.List[Int] = null): util.Map[Int, util.List[Int]] = {
+    var brokers_ = brokers
+
+    if (brokers_ == null) {
+      val zkClient = newZkClient
+      try { brokers_ = ZkUtils.getSortedBrokerList(zkClient)}
+      finally { zkClient.close() }
     }
+
+    AdminUtils.assignReplicasToBrokers(brokers_, partitions, replicas, 0, 0).mapValues(new util.ArrayList[Int](_))
+  }
+
+  def addTopic(name: String, assignment: util.Map[Int, util.List[Int]] = null, options: util.Map[String, String] = null): Topic = {
+    var assignment_ = assignment
+    if (assignment_ == null) assignment_ = fairAssignment(1, 1, null)
+
+    val config: Properties = new Properties()
+    if (options != null)
+      for ((k, v) <- options) config.setProperty(k, v)
+
+    val zkClient = newZkClient
+    try { AdminUtils.createOrUpdateTopicPartitionAssignmentPathInZK(zkClient, name, assignment_.mapValues(_.toList), config) }
+    finally { zkClient.close() }
+
+    getTopic(name)
   }
 
   def updateTopic(topic: Topic, options: util.Map[String, String]): Unit = {
+    val config: Properties = new Properties()
+    for ((k, v) <- options) config.setProperty(k, v)
+
     val zkClient = newZkClient
-    try {
-      val config: Properties = new Properties()
-      for ((k, v) <- options) config.setProperty(k, v)
-      AdminUtils.changeTopicConfig(zkClient, topic.name, config)
-    } finally {
-      zkClient.close()
-    }
+    try { AdminUtils.changeTopicConfig(zkClient, topic.name, config) }
+    finally { zkClient.close() }
   }
 
   def validateOptions(options: util.Map[String, String]): String = {
