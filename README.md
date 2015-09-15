@@ -26,6 +26,9 @@ This is a *beta* version. For issues https://github.com/mesos/kafka/issues
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
 * [Rebalancing brokers in the cluster](#rebalancing-brokers-in-the-cluster)
+* [Listing topics](#listing-topics)
+* [Adding topic](#adding-topic)
+* [Updating topic](#updating-topic)
 
 [Using the REST API](#using-the-rest-api)    
 
@@ -124,7 +127,7 @@ Starting and using 1 broker
 First let's start up and use 1 broker with the default settings. Further in the readme you can see how to change these from the defaults.
 
 ```
-# ./kafka-mesos.sh add 0
+# ./kafka-mesos.sh broker add 0
 Broker added
 
 broker:
@@ -138,42 +141,36 @@ broker:
 You now have a cluster with 1 broker that is not started.
 
 ```
-# ./kafka-mesos.sh status
-Cluster status received
-
-cluster:
-  brokers:
-    id: 0
-    active: false
-    state: stopped
-    resources: cpus:1.00, mem:2048, heap:1024, port:auto
-    failover: delay:10s, max-delay:60s
+# ./kafka-mesos.sh broker list
+brokers:
+  id: 0
+  active: false
+  state: stopped
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:10s, max-delay:60s
 ```
 Now let's start the broker.
 
 ```
-# ./kafka-mesos.sh start 0
+# ./kafka-mesos.sh broker start 0
 Broker 0 started
 ```
 
 We don't know yet where the broker is, and we need that for producers and consumers to connect to the cluster.
 
 ```
-# ./kafka-mesos.sh status
-Cluster status received
-
-cluster:
-  brokers:
-    id: 0
-    active: true
-    state: running
-    resources: cpus:1.00, mem:2048, heap:1024, port:auto
-    failover: delay:10s, max-delay:60s
-    task:
-      id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
-      running: true
-      endpoint: 172.16.25.62:31000
-      attributes: rack=r1
+# ./kafka-mesos.sh broker list
+brokers:
+  id: 0
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:10s, max-delay:60s
+  task:
+    id: broker-0-d2d94520-2f3e-4779-b276-771b4843043c
+    running: true
+    endpoint: 172.16.25.62:31000
+    attributes: rack=r1
 ```
 
 Great! Now let's produce and consume from the cluster. Let's use [kafkacat](https://github.com/edenhill/kafkacat), a nice third party c library command line tool for Kafka.
@@ -198,9 +195,9 @@ Changing the location where data is stored
 ------------------------------------------
 
 ```
-# ./kafka-mesos.sh stop 0
+# ./kafka-mesos.sh broker stop 0
 Broker 0 stopped
-# ./kafka-mesos.sh update 0 --options log.dirs=/mnt/array1/broker0
+# ./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0
 Broker updated
 
 broker:
@@ -212,7 +209,7 @@ broker:
   failover: delay:1m, max-delay:10m
   stickiness: period:10m, hostname:slave0, expires:2015-07-10 15:51:43+03
 
-# ./kafka-mesos.sh start 0
+# ./kafka-mesos.sh broker start 0
 Broker 0 started
 ```
 
@@ -220,7 +217,7 @@ Starting 3 brokers
 -------------------------
 
 ```
-#./kafka-mesos.sh add 0..2 --heap 1024 --mem 2048
+#./kafka-mesos.sh broker add 0..2 --heap 1024 --mem 2048
 Brokers added
 
 brokers:
@@ -245,11 +242,11 @@ brokers:
   failover: delay:1m, max-delay:10m
   stickiness: period:10m, hostname:slave2, expires:2015-07-10 15:51:43+03
 
-#./kafka-mesos.sh start 0
+#./kafka-mesos.sh broker start 0
 Broker 0 started
-#./kafka-mesos.sh start 1
+#./kafka-mesos.sh broker start 1
 Broker 1 started
-#./kafka-mesos.sh start 2
+#./kafka-mesos.sh broker start 2
 Broker 2 started
 ```
 
@@ -291,7 +288,7 @@ Passing multiple options
 A common use case is to supply multiple `log.dirs`, or provide other options. To do this you may use comma escaping like this:
 
 ```
-./kafka-mesos.sh update 0 --options log.dirs=/mnt/array1/broker0\\,/mnt/array2/broker0,num.io.threads=16
+./kafka-mesos.sh broker update 0 --options log.dirs=/mnt/array1/broker0\\,/mnt/array2/broker0,num.io.threads=16
 Broker updated
 
 broker:
@@ -312,7 +309,7 @@ Adding brokers to the cluster
 -------------------------------
 
 ```
-# ./kafka-mesos.sh help add
+# ./kafka-mesos.sh help broker add
 Add broker
 Usage: add <id-expr> [options]
 
@@ -363,7 +360,7 @@ Updating broker configurations
 -----------------------------------
 
 ```
-# ./kafka-mesos.sh help update
+# ./kafka-mesos.sh help broker update
 Update broker
 Usage: update <id-expr> [options]
 
@@ -416,7 +413,7 @@ Starting brokers in the cluster
 -------------------------------
 
 ```
-# ./kafka-mesos.sh help start
+# ./kafka-mesos.sh help broker start
 Start broker
 Usage: start <id-expr> [options]
 
@@ -441,7 +438,7 @@ Stopping brokers in the cluster
 -------------------------------
 
 ```
-# ./kafka-mesos.sh help stop
+# ./kafka-mesos.sh help broker stop
 Stop broker
 Usage: stop <id-expr> [options]
 
@@ -467,7 +464,7 @@ Removing brokers from the cluster
 ----------------------------------
 
 ```
-# ./kafka-mesos.sh help remove
+# ./kafka-mesos.sh help broker remove
 Remove broker
 Usage: remove <id-expr> [options]
 
@@ -487,7 +484,7 @@ id-expr examples:
 Rebalancing brokers in the cluster
 ----------------------------------
 ```
-# ./kafka-mesos.sh help rebalance
+# ./kafka-mesos.sh help broker rebalance
 Rebalance
 Usage: rebalance <id-expr>|status [options]
 
@@ -518,40 +515,111 @@ id-expr examples:
   *      - any broker
 ```
 
+Listing Topics
+--------------
+```
+#./kafka-mesos.sh help topic list
+List topics
+Usage: topic list [name-regex]
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+```
+
+Adding Topic
+------------
+```
+#./kafka-mesos.sh help topic add
+Add topic
+Usage: topic add <name> [options]
+
+Option                  Description
+------                  -----------
+--options               topic options. Example: flush.ms=60000,retention.ms=6000000
+--partitions <Integer>  partitions count. Default - 1
+--replicas <Integer>    replicas count. Default - 1
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+```
+
+Updating Topic
+--------------
+```
+#./kafka-mesos.sh help topic update
+Update topic
+Usage: topic update <name> [options]
+
+Option     Description
+------     -----------
+--options  topic options. Example: flush.ms=60000,retention.ms=6000000
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+```
+
 Using the REST API
 ========================
 
 The scheduler REST API fully exposes all of the features of the CLI with the following request format:
 ```
-/api/brokers/<cli command>/id={broker.id}&<setting>=<value>
+/api/broker/<cli command>/id={broker.id}&<setting>=<value>
+/api/topic/<cli command>/name={topic.name}&<setting>=<value>
+```
+
+Listing brokers
+
+```
+# curl "http://localhost:7000/api/broker/list"
+{"brokers" : [{"id" : "0", "mem" : 128, "cpus" : 0.1, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s", "failures" : 5, "failureTime" : 1426651240585}, "active" : true}, {"id" : "5", "mem" : 128, "cpus" : 0.5, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}, {"id" : "8", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : true}]}
 ```
 
 Adding a broker
 
 ```
-# curl "http://localhost:7000/api/brokers/add?id=0&cpus=8&mem=43008"
+# curl "http://localhost:7000/api/broker/add?id=0&cpus=8&mem=43008"
 {"brokers" : [{"id" : "0", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}]}
 ```
 
 Starting a broker
 
 ```
-# curl "http://localhost:7000/api/brokers/start?id=0"
+# curl "http://localhost:7000/api/broker/start?id=0"
 {"success" : true, "ids" : "0"}
 ```
 
 Stopping a broker
 
 ```
-# curl "http://localhost:7000/api/brokers/stop?id=0"
+# curl "http://localhost:7000/api/broker/stop?id=0"
 {"success" : true, "ids" : "0"}
 ```
 
-Status
-
+Listing topics
 ```
-# curl "http://localhost:7000/api/brokers/status?id=0"
-{"brokers" : [{"id" : "0", "mem" : 128, "cpus" : 0.1, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s", "failures" : 5, "failureTime" : 1426651240585}, "active" : true}, {"id" : "5", "mem" : 128, "cpus" : 0.5, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : false}, {"id" : "8", "mem" : 43008, "cpus" : 8.0, "heap" : 128, "failover" : {"delay" : "10s", "maxDelay" : "60s"}, "active" : true}]}
+# curl "http://localhost:7000/api/topic/list"
+{"topics" : [{"name" : "t", "partitions" : {"0" : "0, 1"}, "options" : {"flush.ms": "1000"}}]}
+```
+
+Adding topic
+```
+# curl "http://localhost:7000/api/topic/add?name=t"
+{"topic" : {"name" : "t", "partitions" : {"0" : "1"}, "options" : {}}}
+```
+
+Updating topic
+```
+# curl "http://localhost:7000/api/topic/update?name=t&options=flush.ms%3D1000"
+{"topic" : {"name" : "t", "partitions" : {"0" : "0, 1"}, "options" : {"flush.ms" : "1000"}}}
 ```
 
 Project Goals

@@ -30,9 +30,13 @@ import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.parsing.json.JSON
 import ly.stealth.mesos.kafka.Cluster.FsStorage
+import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
 
 @Ignore
 class MesosTestCase {
+  var zkDir: File = null
+  var zkServer: ZkServer = null
+
   var schedulerDriver: TestSchedulerDriver = null
   var executorDriver: TestExecutorDriver = null
 
@@ -90,6 +94,46 @@ class MesosTestCase {
     Executor.server.stop()
     Executor.server = new KafkaServer()
     BasicConfigurator.resetConfiguration()
+  }
+
+  def startZkServer() {
+    val port = 56789
+    Config.zk = s"localhost:$port"
+
+    zkDir = File.createTempFile(getClass.getName, null)
+    zkDir.delete()
+
+    val defaultNamespace = new IDefaultNameSpace { def createDefaultNameSpace(zkClient: ZkClient): Unit = {} }
+    zkServer = new ZkServer("" + zkDir, "" + zkDir, defaultNamespace, port)
+    zkServer.start()
+
+    val zkClient: ZkClient = zkServer.getZkClient
+    zkClient.createPersistent("/brokers/ids/0", true)
+    zkClient.createPersistent("/config/changes", true)
+  }
+
+  def stopZkServer() {
+    if (zkDir == null) return
+
+    zkServer.shutdown()
+    def delete(dir: File) {
+      val children: Array[File] = dir.listFiles()
+      if (children != null) children.foreach(delete)
+      dir.delete()
+    }
+    delete(zkDir)
+
+    zkDir = null
+    zkServer = null
+  }
+
+  def startHttpServer() {
+    Config.api = "http://localhost:0"
+    HttpServer.start(resolveDeps = false)
+  }
+
+  def stopHttpServer() {
+     HttpServer.stop()
   }
 
   val LOCALHOST_IP: Int = 2130706433

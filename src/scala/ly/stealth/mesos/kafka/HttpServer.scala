@@ -104,8 +104,8 @@ object HttpServer {
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/health")) handleHealth(response)
-      else if (uri.startsWith("/api/brokers")) handleBrokersApi(request, response)
-      else if (uri.startsWith("/api/topics")) handleTopicsApi(request, response)
+      else if (uri.startsWith("/api/broker")) handleBrokerApi(request, response)
+      else if (uri.startsWith("/api/topic")) handleTopicApi(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -121,13 +121,13 @@ object HttpServer {
       response.getWriter.println("ok")
     }
 
-    def handleBrokersApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+    def handleBrokerApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
-      var uri: String = request.getRequestURI.substring("/api/brokers".length)
+      var uri: String = request.getRequestURI.substring("/api/broker".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
-      if (uri == "status") handleStatus(response)
+      if (uri == "list") handleListBrokers(response)
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
@@ -135,7 +135,7 @@ object HttpServer {
       else response.sendError(404, "uri not found")
     }
 
-    def handleStatus(response: HttpServletResponse): Unit = {
+    def handleListBrokers(response: HttpServletResponse): Unit = {
       response.getWriter.println("" + Scheduler.cluster.toJson)
     }
 
@@ -391,10 +391,10 @@ object HttpServer {
       response.getWriter.println(JSONObject(result.toMap))
     }
 
-    def handleTopicsApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+    def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
-      var uri: String = request.getRequestURI.substring("/api/topics".length)
+      var uri: String = request.getRequestURI.substring("/api/topic".length)
       if (uri.startsWith("/")) uri = uri.substring(1)
 
       if (uri == "list") handleListTopics(request, response)
