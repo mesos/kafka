@@ -95,11 +95,16 @@ object HttpServer {
   private class Servlet extends HttpServlet {
     override def doPost(request: HttpServletRequest, response: HttpServletResponse): Unit = doGet(request, response)
     override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      try { handle(request, response) }
-      catch {
+      val url = request.getRequestURL + (if (request.getQueryString != null) "?" + request.getQueryString else "")
+      logger.info("handling - " + url)
+
+      try {
+        handle(request, response)
+        logger.info("finished handling")
+      } catch {
         case e: Exception =>
+          logger.error("error handling", e)
           response.sendError(500, "" + e)
-          throw e
       }
     }
 
