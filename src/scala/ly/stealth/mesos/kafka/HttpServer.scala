@@ -400,7 +400,7 @@ object HttpServer {
       
       var brokerIds: util.List[Int] = null
       if (request.getParameter("broker") != null)
-        try { brokerIds = Expr.expandBrokers(Scheduler.cluster, request.getParameter("broker")).map(Integer.parseInt) }
+        try { brokerIds = Expr.expandBrokers(Scheduler.cluster, request.getParameter("broker"), sortByAttrs = true).map(Integer.parseInt) }
         catch { case e: IllegalArgumentException => errors.add("Invalid broker-expr") }
 
       var partitions: Int = 1
