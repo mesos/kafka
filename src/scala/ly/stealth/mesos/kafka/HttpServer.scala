@@ -459,7 +459,7 @@ object HttpServer {
       val brokerExpr: String = if (request.getParameter("broker") != null) request.getParameter("broker") else "*"
       var brokers: util.List[String] = null
       if (brokerExpr != null)
-        try { brokers = Expr.expandBrokers(cluster, brokerExpr) }
+        try { brokers = Expr.expandBrokers(cluster, brokerExpr, sortByAttrs = true) }
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       var timeout: Period = new Period("0")
