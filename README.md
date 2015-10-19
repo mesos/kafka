@@ -670,6 +670,13 @@ Stopping a broker
 {"success" : true, "ids" : "0"}
 ```
 
+Removing a broker
+
+```
+# curl "http://localhost:7000/api/broker/remove?broker=0"
+{"ids" : "0"}
+```
+
 Listing topics
 ```
 # curl "http://localhost:7000/api/topic/list"
