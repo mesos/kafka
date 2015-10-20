@@ -114,7 +114,7 @@ class Rebalancer {
       val rf: Int = if (replicas != -1) replicas else entry._2.valuesIterator.next().size
       val partitions: Int = entry._2.size
     
-      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, rf)
+      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, rf, 0, 0)
       reassignment ++= assignedReplicas.map(replicaEntry => TopicAndPartition(topic, replicaEntry._1) -> replicaEntry._2)
     }
 
