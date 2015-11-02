@@ -58,3 +58,7 @@ jar {
     }
     manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.Cli")
 }
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.8'
+}
