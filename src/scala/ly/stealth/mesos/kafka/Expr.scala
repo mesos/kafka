@@ -6,9 +6,10 @@ import java.io.PrintStream
 import kafka.utils.{ZKStringSerializer, ZkUtils}
 import org.I0Itec.zkclient.ZkClient
 import ly.stealth.mesos.kafka.Broker.Task
+import java.lang.Comparable
 
 object Expr {
-  def expandBrokers(cluster: Cluster, _expr: String): util.List[String] = {
+  def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): util.List[String] = {
     var expr: String = _expr
     var attributes: util.Map[String, String] = null
     
@@ -19,8 +20,8 @@ object Expr {
       attributes = Util.parseMap(expr.substring(filterIdx + 1, expr.length - 1))
       expr = expr.substring(0, filterIdx)
     }
-    
-    val ids = new util.TreeSet[String]()
+
+    var ids: util.List[String] = new util.ArrayList[String]()
 
     for (_part <- expr.split(",")) {
       val part = _part.trim()
@@ -47,41 +48,104 @@ object Expr {
         catch { case e: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + expr) }
         ids.add("" + id)
       }
-    }      
-    
-    if (attributes != null) {
+    }
+
+    ids = new util.ArrayList[String](ids.distinct.sorted.toList)
+
+    if (attributes != null) 
+      filterAndSortBrokersByAttrs(cluster, ids, attributes, sortByAttrs)
+
+    ids
+  }
+  
+  private def filterAndSortBrokersByAttrs(cluster: Cluster, ids: util.Collection[String], attributes: util.Map[String, String], sortByAttrs: Boolean): Unit = {
+    def brokerAttr(broker: Broker, name: String): String = {
+      if (broker == null || broker.task == null) return null
+
+      val task: Task = broker.task
+      if (name != "hostname") task.attributes.get(name) else task.hostname
+    }
+
+    def brokerMatches(broker: Broker): Boolean = {
+      if (broker == null) return false
+
+      for (e <- attributes.entrySet()) {
+        val expected = e.getValue
+        val actual = brokerAttr(broker, e.getKey)
+        if (actual == null) return false
+
+        if (expected != null) {
+          if (expected.endsWith("*") && !actual.startsWith(expected.substring(0, expected.length - 1)))
+            return false
+
+          if (!expected.endsWith("*") && actual != expected)
+            return false
+        }
+      }
+
+      true
+    }
+
+     def filterBrokers(): Unit = {
       val iterator = ids.iterator()
       while (iterator.hasNext) {
         val id = iterator.next()
         val broker = cluster.getBroker(id)
-        
-        if (!brokerMatchesAttributes(broker, attributes))
+
+        if (!brokerMatches(broker))
           iterator.remove()
       }
     }
 
-    new util.ArrayList(ids)
-  }
-  
-  private def brokerMatchesAttributes(broker: Broker, attributes: util.Map[String, String]): Boolean = {
-    if (broker == null || broker.task == null) return false
-    val task: Task = broker.task
+    def sortBrokers(): Unit = {
+      class Value(broker: Broker) extends Comparable[Value] {
+        def compareTo(v: Value): Int = toString.compareTo(v.toString)
 
-    for (e <- attributes.entrySet()) {
-      val expected = e.getValue
-      val actual = if (e.getKey != "hostname") task.attributes.get(e.getKey) else task.hostname
-      if (actual == null) return false
+        override def hashCode(): Int = toString.hashCode
 
-      if (expected != null) {
-        if (expected.endsWith("*") && !actual.startsWith(expected.substring(0, expected.length - 1)))
-          return false
+        override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[Value] && toString == obj.toString
 
-        if (!expected.endsWith("*") && actual != expected)
-          return false
+        override def toString: String = {
+          val values = new util.HashMap[String, String]()
+
+          for (k <- attributes.keySet()) {
+            val value: String = brokerAttr(broker, k)
+            values.put(k, value)
+          }
+
+          Util.formatMap(values)
+        }
       }
+
+      val values = new util.HashMap[Value, util.List[String]]()
+      for (id <- ids) {
+        val broker: Broker = cluster.getBroker(id)
+
+        if (broker != null) {
+          val value = new Value(broker)
+          if (!values.containsKey(value)) values.put(value, new util.ArrayList[String]())
+          values.get(value).add(id)
+        }
+      }
+
+      val t = new util.ArrayList[String]()
+      while (!values.isEmpty) {
+        for (value <- new util.ArrayList[Value](values.keySet()).sorted) {
+          val ids = values.get(value)
+
+          val id: String = ids.remove(0)
+          t.add(id)
+
+          if (ids.isEmpty) values.remove(value)
+        }
+      }
+
+      ids.clear()
+      ids.addAll(t)
     }
     
-    true
+    filterBrokers()
+    if (sortByAttrs) sortBrokers()
   }
 
   def printBrokerExprExamples(out: PrintStream): Unit = {
