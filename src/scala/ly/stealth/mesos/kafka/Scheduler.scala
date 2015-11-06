@@ -27,6 +27,7 @@ import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Util.{Period, Str}
 
 object Scheduler extends org.apache.mesos.Scheduler {
+  private var offerNum: Int = 0
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   val cluster: Cluster = new Cluster()
@@ -60,7 +61,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[kafka] def newTask(broker: Broker, offer: Offer, reservation: Broker.Reservation): TaskInfo = {
     def taskData: ByteString = {
-      val defaults: Map[String, String] = Map(
+      var defaults: Map[String, String] = Map(
         "broker.id" -> broker.id,
         "port" -> ("" + reservation.port),
         "log.dirs" -> "kafka-logs",
@@ -70,6 +71,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "host.name" -> offer.getHostname
       )
 
+      if (reservation.persistentVolumeId != null) {
+        defaults += ("log.dirs" -> "data/kafka-logs")
+      }
       val data = new util.HashMap[String, String]()
       data.put("broker", "" + broker.toJson)
       data.put("defaults", Util.formatMap(defaults))
@@ -104,8 +108,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
-    logger.info("[resourceOffers]\n" + Str.offers(offers))
+    logger.info("[resourceOffers:"+offerNum+"]\n" + Str.offers(offers))
     syncBrokers(offers)
+    offerNum = offerNum + 1
   }
 
   def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
@@ -341,7 +346,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setCheckpoint(true)
 
     var credsBuilder: Credential.Builder = null
-    if (Config.principal != null) {
+    if (Config.principal != null && Config.secret != null) {
       frameworkBuilder.setPrincipal(Config.principal)
 
       credsBuilder = Credential.newBuilder()

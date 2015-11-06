@@ -379,7 +379,16 @@ object Util {
         if (!s.isEmpty) s += " "
 
         s += resource.getName
-        if (resource.getRole != "*") s += "(" + resource.getRole + ")"
+        if (resource.getRole != "*") {
+          if (resource.hasReservation && resource.getReservation.hasPrincipal) {
+            s += "(" + resource.getRole + ", " + resource.getReservation().getPrincipal() + ")"
+          } else {
+            s += "(" + resource.getRole +  ")"
+          }
+        }
+        if (resource.hasDisk()) {
+          s += "["+resource.getDisk().getPersistence().getId()+":"+resource.getDisk().getVolume().getContainerPath()+"]"
+        }
         s += ":"
 
         if (resource.hasScalar)

@@ -18,9 +18,13 @@
 package ly.stealth.mesos.kafka
 
 import java.util
+import org.apache.mesos.Protos.Resource.{ReservationInfo, DiskInfo}
+import org.apache.mesos.Protos.Resource.DiskInfo.Persistence
+import org.apache.mesos.Protos.Volume.Mode
+
 import scala.collection.JavaConversions._
 import scala.collection
-import org.apache.mesos.Protos.{Value, Resource, Offer}
+import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
@@ -43,6 +47,7 @@ class Broker(_id: String = "0") {
   var options: util.Map[String, String] = new util.LinkedHashMap()
   var log4jOptions: util.Map[String, String] = new util.LinkedHashMap()
   var jvmOptions: String = null
+  var persistentVolumeId: String = null
 
   var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
@@ -82,6 +87,11 @@ class Broker(_id: String = "0") {
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
+    // Check persistent volume ID
+    if (persistentVolumeId != null && reservation.persistentVolumeId == null) {
+      return s"offer missing persistent volume ID: $persistentVolumeId"
+    }
+
     for ((name, constraint) <- constraints) {
       if (!offerAttributes.containsKey(name)) return s"no $name"
       if (!constraint.matches(offerAttributes.get(name), otherAttributes(name))) return s"$name doesn't match $constraint"
@@ -108,6 +118,10 @@ class Broker(_id: String = "0") {
 
     var role: String = null
 
+    var reservedPersistentPrincipal: String = null
+    var reservedPersistentVolumeId: String = null
+    var reservedVolumeDisk: Double = 0
+
     for (resource <- offer.getResourcesList) {
       if (resource.getRole == "*") {
         if (resource.getName == "cpus") sharedCpus = resource.getScalar.getValue
@@ -116,11 +130,24 @@ class Broker(_id: String = "0") {
       } else {
         if (role != null && role != resource.getRole)
           throw new IllegalArgumentException(s"Offer contains 2 non-default roles: $role, ${resource.getRole}")
-
         role = resource.getRole
-        if (resource.getName == "cpus") roleCpus = resource.getScalar.getValue
-        if (resource.getName == "mem") roleMem = resource.getScalar.getValue.toLong
-        if (resource.getName == "ports") rolePorts.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
+
+        if (resource.hasReservation) {
+          // if hasDisk, then getName == disk should be redundant
+          if (resource.hasDisk && resource.getName == "disk") {
+            if (persistentVolumeId != null && resource.getDisk.getPersistence.getId == persistentVolumeId) {
+              reservedPersistentPrincipal = resource.getReservation.getPrincipal
+              reservedPersistentVolumeId = persistentVolumeId
+              reservedVolumeDisk = resource.getScalar.getValue
+            }
+          }
+        }
+        else {
+          if (resource.getName == "cpus") roleCpus = resource.getScalar.getValue
+          if (resource.getName == "mem") roleMem = resource.getScalar.getValue.toLong
+          if (resource.getName == "ports") rolePorts.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
+        }
+
       }
     }
 
@@ -134,7 +161,7 @@ class Broker(_id: String = "0") {
     if (reservedRolePort == -1)
       reservedSharedPort = getSuitablePort(sharedPorts)
 
-    new Broker.Reservation(role, reservedSharedCpus, reservedRoleCpus, reservedSharedMem, reservedRoleMem, reservedSharedPort, reservedRolePort)
+    new Broker.Reservation(role, reservedPersistentPrincipal, reservedPersistentVolumeId, reservedVolumeDisk, reservedSharedCpus, reservedRoleCpus, reservedSharedMem, reservedRoleMem, reservedSharedPort, reservedRolePort)
   }
 
   private[kafka] def getSuitablePort(ports: util.List[Range]): Int = {
@@ -223,6 +250,8 @@ class Broker(_id: String = "0") {
     if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
     if (node.contains("log4jOptions")) log4jOptions = Util.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
+    if (node.contains("persistentVolumeId")) persistentVolumeId = node("persistentVolumeId").asInstanceOf[String]
+
 
     if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
@@ -238,6 +267,7 @@ class Broker(_id: String = "0") {
     obj("id") = id
     obj("active") = active
 
+
     obj("cpus") = cpus
     obj("mem") = mem
     obj("heap") = heap
@@ -248,6 +278,8 @@ class Broker(_id: String = "0") {
     if (!options.isEmpty) obj("options") = Util.formatMap(options)
     if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
     if (jvmOptions != null) obj("jvmOptions") = jvmOptions
+    if (persistentVolumeId != null) obj("persistentVolumeId") = persistentVolumeId
+
 
     obj("stickiness") = stickiness.toJson
     obj("failover") = failover.toJson
@@ -451,11 +483,18 @@ object Broker {
   
   class Reservation(
      _role: String = null,
+     _persistentVolumePrincipal: String = null,
+     _persistentVolumeId: String = null, _volumeDisk: Double = 0.0,
      _sharedCpus: Double = 0.0, _roleCpus: Double = 0.0,
      _sharedMem: Long = 0, _roleMem: Long = 0,
      _sharedPort: Long = -1, _rolePort: Long = -1
   ) {
     val role: String = _role
+
+    val persistentVolumePrincipal: String = _persistentVolumePrincipal
+    val persistentVolumeId: String = _persistentVolumeId
+    val volumeDisk: Double = _volumeDisk
+
 
     val sharedCpus: Double = _sharedCpus
     val roleCpus: Double = _roleCpus
@@ -470,13 +509,53 @@ object Broker {
     def port: Long = if (rolePort != -1) rolePort else sharedPort
 
     def toResources: util.List[Resource] = {
-      def cpus(value: Double, role: String): Resource = Resource.newBuilder.setName("cpus").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(value)).setRole(role).build()
-      def mem(value: Long, role: String): Resource = Resource.newBuilder.setName("mem").setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(value)).setRole(role).build()
+      def cpus(value: Double, role: String): Resource = {
+        var builder = Resource.newBuilder.
+          setName("cpus").
+          setType(Value.Type.SCALAR)
+          .setScalar(Value.Scalar.newBuilder.setValue(value))
+          .setRole(role)
+        builder.build()
+      }
+      def mem(value: Long, role: String): Resource = {
+        var builder = Resource.newBuilder.
+          setName("mem").
+          setType(Value.Type.SCALAR)
+          .setScalar(Value.Scalar.newBuilder.setValue(value))
+          .setRole(role)
+        builder.build()
+      }
       def port(value: Long, role: String): Resource =
         Resource.newBuilder.setName("ports").setType(Value.Type.RANGES).setRanges(
           Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(value).setEnd(value))
         ).setRole(role).build()
+      def diskWithPersistentVolume(value: Double, volumeID: String, role: String, principal: String): Resource = {
+        val volume = Volume.newBuilder
+          .setMode(Mode.RW)
+          .setContainerPath("data")
+          .build()
+        val persistence = Persistence.newBuilder
+          .setId(volumeID)
+          .build()
+        val disk = DiskInfo.newBuilder
+          .setPersistence(persistence)
+          .setVolume(volume)
+          .build()
 
+        val reservation = ReservationInfo.newBuilder
+          .setPrincipal(principal)
+          .build()
+        val resource = Resource.newBuilder
+          .setName("disk")
+          .setType(Value.Type.SCALAR)
+          .setScalar(Value.Scalar.newBuilder.setValue(value))
+          .setRole(role)
+          .setDisk(disk)
+          .setReservation(reservation)
+          .build()
+
+        resource
+      }
       val resources: util.List[Resource] = new util.ArrayList[Resource]()
 
       if (sharedCpus > 0) resources.add(cpus(sharedCpus, "*"))
@@ -487,6 +566,8 @@ object Broker {
 
       if (sharedPort != -1) resources.add(port(sharedPort, "*"))
       if (rolePort != -1) resources.add(port(rolePort, role))
+
+      if (persistentVolumeId != null) resources.add(diskWithPersistentVolume(volumeDisk, persistentVolumeId, role, persistentVolumePrincipal))
 
       resources
     }

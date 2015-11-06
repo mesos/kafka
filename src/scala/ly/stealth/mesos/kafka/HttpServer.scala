@@ -171,6 +171,11 @@ object HttpServer {
       val expr: String = request.getParameter("broker")
       if (expr == null || expr.isEmpty) errors.add("broker required")
 
+      var persistentVolumeId: java.lang.String = null
+      if (request.getParameter("persistentVolumeId") != null)
+        try { persistentVolumeId = java.lang.String.valueOf(request.getParameter("persistentVolumeId")) }
+        catch { case e: IllegalArgumentException => errors.add("Invalid persistent volume ID") }
+
       var cpus: java.lang.Double = null
       if (request.getParameter("cpus") != null)
         try { cpus = java.lang.Double.valueOf(request.getParameter("cpus")) }
@@ -259,6 +264,7 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       for (broker <- brokers) {
+        if (persistentVolumeId != null) broker.persistentVolumeId = if (persistentVolumeId != "") persistentVolumeId else null
         if (cpus != null) broker.cpus = cpus
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap

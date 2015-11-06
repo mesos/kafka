@@ -453,6 +453,7 @@ object Cli {
 
     private def handleAddUpdate(expr: String, args: Array[String], add: Boolean, help: Boolean = false): Unit = {
       val parser = newParser()
+      parser.accepts("persistent-volume-id").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("cpus", "cpu amount (0.5, 1, 2)").withRequiredArg().ofType(classOf[java.lang.Double])
       parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
       parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
@@ -496,6 +497,7 @@ object Cli {
           throw new Error(e.getMessage)
       }
 
+      val persistentVolumeId = options.valueOf("persistent-volume-id").asInstanceOf[String]
       val cpus = options.valueOf("cpus").asInstanceOf[java.lang.Double]
       val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
       val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
@@ -515,6 +517,7 @@ object Cli {
       val params = new util.LinkedHashMap[String, String]
       params.put("broker", expr)
 
+      if (persistentVolumeId != null) params.put("persistentVolumeId", persistentVolumeId)
       if (cpus != null) params.put("cpus", "" + cpus)
       if (mem != null) params.put("mem", "" + mem)
       if (heap != null) params.put("heap", "" + heap)
@@ -650,6 +653,8 @@ object Cli {
       if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
       if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Util.formatMap(broker.log4jOptions), indent)
       if (broker.jvmOptions != null) printLine("jvm-options: " + broker.jvmOptions, indent)
+      if (broker.persistentVolumeId != null) printLine("persistent-volume-id: " + broker.persistentVolumeId, indent)
+
 
       var failover = "failover:"
       failover += " delay:" + broker.failover.delay

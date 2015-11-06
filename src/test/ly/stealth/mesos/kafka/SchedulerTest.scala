@@ -56,7 +56,7 @@ class SchedulerTest extends MesosTestCase {
     assertNotNull(task.getExecutor)
 
     // resources
-    assertEquals(resources(s"cpus:${broker.cpus}, mem:${broker.mem}, ports:1000"), task.getResourcesList)
+    assertEquals(resources(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000"), task.getResourcesList)
 
     // data
     val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
