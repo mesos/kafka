@@ -48,7 +48,7 @@ class SchedulerTest extends MesosTestCase {
     broker.cpus = 0.5
     broker.mem = 256
 
-    val offer = this.offer(slaveId = "slave", hostname = "host", resources = s"cpus:${broker.cpus},mem:${broker.mem},ports:1000")
+    val offer = this.offer(slaveId = "slave", hostname = "host", resources = s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
     val reservation = broker.getReservation(offer)
 
     val task = Scheduler.newTask(broker, offer, reservation)
@@ -77,7 +77,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def syncBrokers {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    val offer = this.offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}, ports:1000")
+    val offer = this.offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
@@ -106,13 +106,13 @@ class SchedulerTest extends MesosTestCase {
     assertEquals("reconciling", Scheduler.acceptOffer(null))
 
     broker.task = null
-    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(resources = s"cpus:0.4, mem:${broker.mem}")))
-    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}, mem:99")))
+    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(resources = s"cpus:0.4; mem:${broker.mem}")))
+    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}; mem:99")))
 
-    assertNull(Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}, ports:1000")))
+    assertNull(Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
-    assertEquals("", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}")))
+    assertEquals("", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}")))
   }
 
   @Test
@@ -177,7 +177,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
-    val offer = this.offer(resources = s"cpus:${broker.cpus}, mem:${broker.mem}", attributes = "a=1,b=2")
+    val offer = this.offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}", attributes = "a=1,b=2")
 
     Scheduler.launchTask(broker, offer)
     assertEquals(1, schedulerDriver.launchedTasks.size())

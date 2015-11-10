@@ -87,10 +87,8 @@ class Broker(_id: String = "0") {
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
-    // Check persistent volume ID
-    if (persistentVolumeId != null && reservation.persistentVolumeId == null) {
+    if (persistentVolumeId != null && reservation.persistentVolumeId == null)
       return s"offer missing persistent volume ID: $persistentVolumeId"
-    }
 
     for ((name, constraint) <- constraints) {
       if (!offerAttributes.containsKey(name)) return s"no $name"

@@ -407,7 +407,6 @@ class MesosTestCase {
 
     def start(): Status = throw new UnsupportedOperationException
 
-    // TODO: Write test stubs
     def acceptOffers(offerIds: util.Collection[OfferID], operations: util.Collection[Offer.Operation], filters: Filters): Status = throw new UnsupportedOperationException
 
     def acknowledgeStatusUpdate(status: TaskStatus): Status = throw new UnsupportedOperationException

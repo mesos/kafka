@@ -58,14 +58,14 @@ class BrokerTest extends MesosTestCase {
   def matches {
     // cpus
     broker.cpus = 0.5
-    assertNull(broker.matches(offer(resources = "cpus:0.2;cpus(role):0.3;ports:1000")))
-    assertEquals("cpus < 0.5", broker.matches(offer(resources = "cpus:0.2;cpus(role):0.2")))
+    assertNull(broker.matches(offer(resources = "cpus:0.2; cpus(role):0.3; ports:1000")))
+    assertEquals("cpus < 0.5", broker.matches(offer(resources = "cpus:0.2; cpus(role):0.2")))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
-    assertNull(broker.matches(offer(resources = "mem:70;mem(role):30;ports:1000")))
-    assertEquals("mem < 100", broker.matches(offer(resources = "mem:70;mem(role):29")))
+    assertNull(broker.matches(offer(resources = "mem:70; mem(role):30; ports:1000")))
+    assertEquals("mem < 100", broker.matches(offer(resources = "mem:70; mem(role):29")))
     broker.mem = 0
 
     // port
@@ -214,7 +214,7 @@ class BrokerTest extends MesosTestCase {
 
     // two non-default roles
     try {
-      broker.getReservation(offer(resources = "cpus(r1):0.5;mem(r2):100"))
+      broker.getReservation(offer(resources = "cpus(r1):0.5; mem(r2):100"))
       fail()
     } catch {
       case e: IllegalArgumentException =>
