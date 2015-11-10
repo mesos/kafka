@@ -508,42 +508,44 @@ object Broker {
 
     def toResources: util.List[Resource] = {
       def cpus(value: Double, role: String): Resource = {
-        var builder = Resource.newBuilder.
-          setName("cpus").
-          setType(Value.Type.SCALAR)
+        Resource.newBuilder
+          .setName("cpus")
+          .setType(Value.Type.SCALAR)
           .setScalar(Value.Scalar.newBuilder.setValue(value))
           .setRole(role)
-        builder.build()
+          .build()
       }
+      
       def mem(value: Long, role: String): Resource = {
-        var builder = Resource.newBuilder.
-          setName("mem").
-          setType(Value.Type.SCALAR)
+        Resource.newBuilder
+          .setName("mem")
+          .setType(Value.Type.SCALAR)
           .setScalar(Value.Scalar.newBuilder.setValue(value))
           .setRole(role)
-        builder.build()
+          .build()
       }
-      def port(value: Long, role: String): Resource =
-        Resource.newBuilder.setName("ports").setType(Value.Type.RANGES).setRanges(
-          Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(value).setEnd(value))
-        ).setRole(role).build()
-      def diskWithPersistentVolume(value: Double, volumeID: String, role: String, principal: String): Resource = {
-        val volume = Volume.newBuilder
-          .setMode(Mode.RW)
-          .setContainerPath("data")
-          .build()
-        val persistence = Persistence.newBuilder
-          .setId(volumeID)
-          .build()
+      
+      def port(value: Long, role: String): Resource = {
+        Resource.newBuilder
+            .setName("ports")
+            .setType(Value.Type.RANGES)
+            .setRanges(Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(value).setEnd(value)))
+            .setRole(role)
+            .build()
+      }
+      
+      def volume(id: String, value: Double, role: String, principal: String): Resource = {
+        val volume = Volume.newBuilder.setMode(Mode.RW).setContainerPath("data").build()
+        val persistence = Persistence.newBuilder.setId(id).build()
+        
         val disk = DiskInfo.newBuilder
           .setPersistence(persistence)
           .setVolume(volume)
           .build()
 
-        val reservation = ReservationInfo.newBuilder
-          .setPrincipal(principal)
-          .build()
-        val resource = Resource.newBuilder
+        val reservation = ReservationInfo.newBuilder.setPrincipal(principal).build()
+        
+        Resource.newBuilder
           .setName("disk")
           .setType(Value.Type.SCALAR)
           .setScalar(Value.Scalar.newBuilder.setValue(value))
@@ -551,9 +553,8 @@ object Broker {
           .setDisk(disk)
           .setReservation(reservation)
           .build()
-
-        resource
       }
+      
       val resources: util.List[Resource] = new util.ArrayList[Resource]()
 
       if (sharedCpus > 0) resources.add(cpus(sharedCpus, "*"))
@@ -565,8 +566,7 @@ object Broker {
       if (sharedPort != -1) resources.add(port(sharedPort, "*"))
       if (rolePort != -1) resources.add(port(rolePort, role))
 
-      if (persistentVolumeId != null) resources.add(diskWithPersistentVolume(volumeDisk, persistentVolumeId, role, persistentVolumePrincipal))
-
+      if (persistentVolumeId != null) resources.add(volume(persistentVolumeId, volumeDisk, role, persistentVolumePrincipal))
       resources
     }
   }

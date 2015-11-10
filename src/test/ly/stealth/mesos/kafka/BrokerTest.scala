@@ -140,33 +140,20 @@ class BrokerTest extends MesosTestCase {
     broker.cpus = 2
     broker.mem = 200
     // ignore non-dynamically reserved disk
-    var reservation = broker.getReservation(offer(rawResources = resources(
-      TestResource("cpus", "2"), TestResource("mem", "100"), TestResource("ports", "1000"), TestResource("disk", "1000"))))
-    assertEquals(resources(TestResource("cpus", "2"), TestResource("mem", "100"), TestResource("ports", "1000")), reservation.toResources)
-
+    var reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk:1000"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
     // Ignore resources with a principal
-    reservation = broker.getReservation(offer(rawResources = resources(
-      TestResource("cpus", "2"),
-      TestResource("mem", "100"),
-      TestResource("ports", "1000"),
-      TestResource("mem", "100", principal = "principal"))))
-    assertEquals(resources(TestResource("cpus", "2"), TestResource("mem", "100"), TestResource("ports", "1000")), reservation.toResources)
-    // Ignore resources with a principal + role
-    reservation = broker.getReservation(offer(rawResources = resources(
-      TestResource("cpus", "2"),
-      TestResource("mem", "100"),
-      TestResource("ports", "1000"),
-      TestResource("mem", "100", principal = "principal", role = "role"))))
-    assertEquals(resources(TestResource("cpus", "2"), TestResource("mem", "100"), TestResource("ports", "1000")), reservation.toResources)
+    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(*,principal):100"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
-    // Pay attention resources with a role
-    reservation = broker.getReservation(offer(rawResources = resources(
-      TestResource("cpus", "2"),
-      TestResource("mem", "100"),
-      TestResource("ports", "1000"),
-      TestResource("mem", "100", role = "role"))))
-    assertEquals(resources(TestResource("cpus", "2"), TestResource("mem", "100"), TestResource("mem", "100", role = "role"), TestResource("ports", "1000")), reservation.toResources)
+    // Ignore resources with a principal + role
+    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(role,principal):100"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
+
+    // pay attention resources with a role
+    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(role):100"))
+    assertEquals(resources("cpus:2; mem:100; mem(role):100; ports:1000"), reservation.toResources)
   }
 
   @Test
@@ -174,17 +161,9 @@ class BrokerTest extends MesosTestCase {
     broker.cpus = 2
     broker.mem = 200
     broker.persistentVolumeId = "test"
-    // Pay attention to my disk with the specific persistent volume ID
 
-    var reservation = broker.getReservation(offer(rawResources = resources(
-      TestResource("cpus", "2"),
-      TestResource("mem", "100"),
-      TestResource("ports", "1000"),
-      TestResource("disk", "100", principal = "principal", role = "role", disk = Disk("test", "mount_point")))))
-    // Ensure the mount point is turned into data
-    assertEquals(resources(TestResource("cpus", "2"), TestResource("mem", "100"), TestResource("ports", "1000"),
-      TestResource("disk", "100", principal = "principal", role = "role", disk = Disk("test", "data"))),
-      reservation.toResources)
+    val reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk(role,principal)[test:mount_point]:100"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000; disk(role,principal)[test:data]:100"), reservation.toResources)
 
   }
   @Test

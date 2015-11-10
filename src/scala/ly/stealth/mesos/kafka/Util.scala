@@ -376,19 +376,21 @@ object Util {
 
       val order: util.List[String] = "cpus mem disk ports".split(" ").toList
       for (resource <- resources.sortBy(r => order.indexOf(r.getName))) {
-        if (!s.isEmpty) s += " "
+        if (!s.isEmpty) s += "; "
 
         s += resource.getName
         if (resource.getRole != "*") {
-          if (resource.hasReservation && resource.getReservation.hasPrincipal) {
-            s += "(" + resource.getRole + ", " + resource.getReservation().getPrincipal() + ")"
-          } else {
-            s += "(" + resource.getRole +  ")"
-          }
+          s += "(" + resource.getRole
+
+          if (resource.hasReservation && resource.getReservation.hasPrincipal)
+            s += ", " + resource.getReservation.getPrincipal
+
+          s += ")"
         }
-        if (resource.hasDisk()) {
-          s += "["+resource.getDisk().getPersistence().getId()+":"+resource.getDisk().getVolume().getContainerPath()+"]"
-        }
+
+        if (resource.hasDisk)
+          s += "[" + resource.getDisk.getPersistence.getId + ":" + resource.getDisk.getVolume.getContainerPath + "]"
+
         s += ":"
 
         if (resource.hasScalar)
