@@ -35,6 +35,7 @@ import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.json.JSON
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
+import java.net.ServerSocket
 
 @Ignore
 class MesosTestCase {
@@ -101,7 +102,7 @@ class MesosTestCase {
   }
 
   def startZkServer() {
-    val port = 56789
+    val port = findFreePort
     Config.zk = s"localhost:$port"
 
     zkDir = File.createTempFile(getClass.getName, null)
@@ -139,6 +140,18 @@ class MesosTestCase {
 
   def stopHttpServer() {
      HttpServer.stop()
+  }
+
+  def findFreePort: Int = {
+    var s: ServerSocket = null
+    var port: Int = -1
+
+    try {
+      s = new ServerSocket(0)
+      port = s.getLocalPort
+    } finally { if (s != null) s.close(); }
+
+    port
   }
 
   val LOCALHOST_IP: Int = 2130706433
