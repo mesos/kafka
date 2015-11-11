@@ -70,7 +70,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "host.name" -> offer.getHostname
       )
 
-      if (reservation.volumeId != null)
+      if (reservation.volume != null)
         defaults += ("log.dirs" -> "data/kafka-logs")
 
       val data = new util.HashMap[String, String]()

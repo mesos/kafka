@@ -41,13 +41,13 @@ class Broker(_id: String = "0") {
   var mem: Long = 2048
   var heap: Long = 1024
   var port: Range = null
+  var volume: String = null
   var bindAddress: BindAddress = null
 
   var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
   var log4jOptions: util.Map[String, String] = new util.LinkedHashMap()
   var jvmOptions: String = null
-  var persistentVolumeId: String = null
 
   var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
@@ -87,9 +87,9 @@ class Broker(_id: String = "0") {
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
-    // check volume id
-    if (persistentVolumeId != null && reservation.volumeId == null)
-      return s"offer missing persistent volume ID: $persistentVolumeId"
+    // check volume
+    if (volume != null && reservation.volume == null)
+      return s"offer missing volume: $volume"
 
     // check constraints
     for ((name, constraint) <- constraints) {
@@ -118,8 +118,8 @@ class Broker(_id: String = "0") {
 
     var role: String = null
 
-    var reservedVolumeId: String = null
-    var reservedVolumeDisk: Double = 0
+    var reservedVolume: String = null
+    var reservedVolumeSize: Double = 0
     var reservedVolumePrincipal: String = null
 
     for (resource <- offer.getResourcesList) {
@@ -141,9 +141,9 @@ class Broker(_id: String = "0") {
         }
 
         // dynamic role/principal-reserved volume
-        if (persistentVolumeId != null && resource.hasDisk && resource.getDisk.hasPersistence && resource.getDisk.getPersistence.getId == persistentVolumeId) {
-          reservedVolumeId = persistentVolumeId
-          reservedVolumeDisk = resource.getScalar.getValue
+        if (volume != null && resource.hasDisk && resource.getDisk.hasPersistence && resource.getDisk.getPersistence.getId == volume) {
+          reservedVolume = volume
+          reservedVolumeSize = resource.getScalar.getValue
           reservedVolumePrincipal = resource.getReservation.getPrincipal
         }
       }
@@ -163,7 +163,7 @@ class Broker(_id: String = "0") {
       reservedSharedCpus, reservedRoleCpus,
       reservedSharedMem, reservedRoleMem,
       reservedSharedPort, reservedRolePort,
-      reservedVolumeId, reservedVolumeDisk, reservedVolumePrincipal
+      reservedVolume, reservedVolumeSize, reservedVolumePrincipal
     )
   }
 
@@ -246,6 +246,7 @@ class Broker(_id: String = "0") {
     mem = node("mem").asInstanceOf[Number].longValue()
     heap = node("heap").asInstanceOf[Number].longValue()
     if (node.contains("port")) port = new Range(node("port").asInstanceOf[String])
+    if (node.contains("volume")) volume = node("volume").asInstanceOf[String]
     if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
 
     if (node.contains("constraints")) constraints = Util.parseMap(node("constraints").asInstanceOf[String])
@@ -253,7 +254,6 @@ class Broker(_id: String = "0") {
     if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
     if (node.contains("log4jOptions")) log4jOptions = Util.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
-    if (node.contains("persistentVolumeId")) persistentVolumeId = node("persistentVolumeId").asInstanceOf[String]
 
     if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
@@ -273,13 +273,13 @@ class Broker(_id: String = "0") {
     obj("mem") = mem
     obj("heap") = heap
     if (port != null) obj("port") = "" + port
+    if (volume != null) obj("volume") = volume
     if (bindAddress != null) obj("bindAddress") = "" + bindAddress
 
     if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
     if (!options.isEmpty) obj("options") = Util.formatMap(options)
     if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
     if (jvmOptions != null) obj("jvmOptions") = jvmOptions
-    if (persistentVolumeId != null) obj("persistentVolumeId") = persistentVolumeId
 
     obj("stickiness") = stickiness.toJson
     obj("failover") = failover.toJson
@@ -486,7 +486,7 @@ object Broker {
      _sharedCpus: Double = 0.0, _roleCpus: Double = 0.0,
      _sharedMem: Long = 0, _roleMem: Long = 0,
      _sharedPort: Long = -1, _rolePort: Long = -1,
-     _volumeId: String = null, _volumeDisk: Double = 0.0, _volumePrincipal: String = null
+     _volume: String = null, _volumeSize: Double = 0.0, _volumePrincipal: String = null
   ) {
     val role: String = _role
 
@@ -502,8 +502,8 @@ object Broker {
     val rolePort: Long = _rolePort
     def port: Long = if (rolePort != -1) rolePort else sharedPort
 
-    val volumeId: String = _volumeId
-    val volumeDisk: Double = _volumeDisk
+    val volume: String = _volume
+    val volumeSize: Double = _volumeSize
     val volumePrincipal: String = _volumePrincipal
 
     def toResources: util.List[Resource] = {
@@ -534,7 +534,7 @@ object Broker {
             .build()
       }
 
-      def volume(id: String, value: Double, role: String, principal: String): Resource = {
+      def volumeDisk(id: String, value: Double, role: String, principal: String): Resource = {
         val volume = Volume.newBuilder.setMode(Mode.RW).setContainerPath("data").build()
         val persistence = Persistence.newBuilder.setId(id).build()
         
@@ -566,7 +566,7 @@ object Broker {
       if (sharedPort != -1) resources.add(port(sharedPort, "*"))
       if (rolePort != -1) resources.add(port(rolePort, role))
 
-      if (volumeId != null) resources.add(volume(volumeId, volumeDisk, role, volumePrincipal))
+      if (volume != null) resources.add(volumeDisk(volume, volumeSize, role, volumePrincipal))
       resources
     }
   }

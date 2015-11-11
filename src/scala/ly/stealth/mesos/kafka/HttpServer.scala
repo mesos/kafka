@@ -171,11 +171,6 @@ object HttpServer {
       val expr: String = request.getParameter("broker")
       if (expr == null || expr.isEmpty) errors.add("broker required")
 
-      var persistentVolumeId: java.lang.String = null
-      if (request.getParameter("persistentVolumeId") != null)
-        try { persistentVolumeId = java.lang.String.valueOf(request.getParameter("persistentVolumeId")) }
-        catch { case e: IllegalArgumentException => errors.add("Invalid persistent volume ID") }
-
       var cpus: java.lang.Double = null
       if (request.getParameter("cpus") != null)
         try { cpus = java.lang.Double.valueOf(request.getParameter("cpus")) }
@@ -195,6 +190,8 @@ object HttpServer {
       if (port != null && port != "")
         try { new Range(request.getParameter("port")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid port") }
+
+      val volume: java.lang.String = request.getParameter("volume")
 
       val bindAddress: String = request.getParameter("bindAddress")
       if (bindAddress != null)
@@ -264,11 +261,11 @@ object HttpServer {
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
       for (broker <- brokers) {
-        if (persistentVolumeId != null) broker.persistentVolumeId = if (persistentVolumeId != "") persistentVolumeId else null
         if (cpus != null) broker.cpus = cpus
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
         if (port != null) broker.port = if (port != "") new Range(port) else null
+        if (volume != null) broker.volume = if (volume != "") volume else null
         if (bindAddress != null) broker.bindAddress = if (bindAddress != "") new BindAddress(bindAddress) else null
         if (stickinessPeriod != null) broker.stickiness.period = stickinessPeriod
 

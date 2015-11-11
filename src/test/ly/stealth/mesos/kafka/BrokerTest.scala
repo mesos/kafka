@@ -157,10 +157,10 @@ class BrokerTest extends MesosTestCase {
   }
 
   @Test
-  def getReservations_persistent_volume = {
+  def getReservations_volume = {
     broker.cpus = 2
     broker.mem = 200
-    broker.persistentVolumeId = "test"
+    broker.volume = "test"
 
     val reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk(role,principal)[test:mount_point]:100"))
     assertEquals(resources("cpus:2; mem:100; ports:1000; disk(role,principal)[test:data]:100"), reservation.toResources)
@@ -333,6 +333,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
     broker.port = new Util.Range("0..100")
+    broker.volume = "volume"
     broker.bindAddress = new Util.BindAddress("192.168.0.1")
 
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
@@ -537,6 +538,7 @@ object BrokerTest {
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
     assertEquals(expected.port, actual.port)
+    assertEquals(expected.volume, actual.volume)
     assertEquals(expected.bindAddress, actual.bindAddress)
 
     assertEquals(expected.constraints, actual.constraints)
