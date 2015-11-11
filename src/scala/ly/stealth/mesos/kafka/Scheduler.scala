@@ -60,7 +60,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[kafka] def newTask(broker: Broker, offer: Offer, reservation: Broker.Reservation): TaskInfo = {
     def taskData: ByteString = {
-      val defaults: Map[String, String] = Map(
+      var defaults: Map[String, String] = Map(
         "broker.id" -> broker.id,
         "port" -> ("" + reservation.port),
         "log.dirs" -> "kafka-logs",
@@ -69,6 +69,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "zookeeper.connect" -> Config.zk,
         "host.name" -> offer.getHostname
       )
+
+      if (reservation.volume != null)
+        defaults += ("log.dirs" -> "data/kafka-logs")
 
       val data = new util.HashMap[String, String]()
       data.put("broker", "" + broker.toJson)
@@ -341,12 +344,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setCheckpoint(true)
 
     var credsBuilder: Credential.Builder = null
-    if (Config.principal != null) {
+    if (Config.principal != null && Config.secret != null) {
       frameworkBuilder.setPrincipal(Config.principal)
 
       credsBuilder = Credential.newBuilder()
       credsBuilder.setPrincipal(Config.principal)
-      if (Config.secret != null) credsBuilder.setSecret(ByteString.copyFromUtf8(Config.secret))
+      credsBuilder.setSecret(ByteString.copyFromUtf8(Config.secret))
     }
 
     val driver =

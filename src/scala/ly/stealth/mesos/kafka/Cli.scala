@@ -457,6 +457,7 @@ object Cli {
       parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
       parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
       parser.accepts("port", "port or range (31092, 31090..31100). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
+      parser.accepts("volume").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("bind-address", "broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("stickiness-period", "stickiness period to preserve same node for broker (5m, 10m, 1h)").withRequiredArg().ofType(classOf[String])
 
@@ -500,6 +501,7 @@ object Cli {
       val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
       val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
       val port = options.valueOf("port").asInstanceOf[String]
+      val volume = options.valueOf("volume").asInstanceOf[String]
       val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
       val stickinessPeriod = options.valueOf("stickiness-period").asInstanceOf[String]
 
@@ -519,6 +521,7 @@ object Cli {
       if (mem != null) params.put("mem", "" + mem)
       if (heap != null) params.put("heap", "" + heap)
       if (port != null) params.put("port", port)
+      if (volume != null) params.put("volume", volume)
       if (bindAddress != null) params.put("bindAddress", bindAddress)
       if (stickinessPeriod != null) params.put("stickinessPeriod", stickinessPeriod)
 
@@ -643,7 +646,7 @@ object Cli {
       printLine("id: " + broker.id, indent)
       printLine("active: " + broker.active, indent)
       printLine("state: " + broker.state(), indent)
-      printLine("resources: " + "cpus:" + "%.2f".format(broker.cpus) + ", mem:" + broker.mem + ", heap:" + broker.heap + ", port:" + (if (broker.port != null) broker.port else "auto"), indent)
+      printLine("resources: " + brokerResources(broker), indent)
 
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
       if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
@@ -671,6 +674,18 @@ object Cli {
         if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
         if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
       }
+    }
+    
+    private def brokerResources(broker: Broker): String = {
+      var s: String = ""
+
+      s += "cpus:" + "%.2f".format(broker.cpus)
+      s += ", mem:" + broker.mem
+      s += ", heap:" + broker.heap
+      s += ", port:" + (if (broker.port != null) broker.port else "auto")
+      if (broker.volume != null) s += ", volume:" + broker.volume
+
+      s
     }
 
     private def printConstraintExamples(): Unit = {

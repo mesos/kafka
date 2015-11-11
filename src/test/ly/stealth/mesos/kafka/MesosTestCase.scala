@@ -17,6 +17,9 @@
 
 package ly.stealth.mesos.kafka
 
+import org.apache.mesos.Protos.Resource.DiskInfo.Persistence
+import org.apache.mesos.Protos.Resource.{DiskInfo, ReservationInfo}
+import org.apache.mesos.Protos.Volume.Mode
 import org.apache.mesos.Protos._
 import java.util.{Collections, UUID}
 import org.apache.mesos.Protos.Value.Text
@@ -200,45 +203,89 @@ class MesosTestCase {
     builder.build()
   }
 
-  // parses resources definition like: cpus:0.5, cpus(kafka):0.3, mem:128, ports(kafka):1000..2000
-  def resources(s: String): util.List[Resource] = {
-    // parses range definition: 1000..1100,1102,2000..3000
-    def ranges(s: String): util.List[Value.Range] = {
-      if (s.isEmpty) return Collections.emptyList()
-      s.split(",").toList
-        .map(s => new Util.Range(s.trim))
-        .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
-    }
+  // parses range definition: 1000..1100,1102,2000..3000
+  def ranges(s: String): util.List[Value.Range] = {
+    if (s.isEmpty) return Collections.emptyList()
+    s.split(",").toList
+      .map(s => new Util.Range(s.trim))
+      .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
+  }
 
+  // parses resources definition like: cpus:0.5, cpus(kafka):0.3, mem:128, ports(kafka):1000..2000
+  // Must parse the following
+  // disk:73390
+  // disk(*):73390
+  // disk(kafka):73390
+  // cpu(kafka, principal):0.01
+  // disk(kafka, principal)[test_volume:fake_path]:100)
+  def resources(s: String): util.List[Resource] = {
     val resources = new util.ArrayList[Resource]()
     if (s == null) return resources
 
-    for (r <- s.split(",").map(_.trim).filter(!_.isEmpty)) {
-      val colonIdx = r.indexOf(":")
+    for (r <- s.split(";").map(_.trim).filter(!_.isEmpty)) {
+      val colonIdx = r.lastIndexOf(":")
       if (colonIdx == -1) throw new IllegalArgumentException("invalid resource: " + r)
+      var key = r.substring(0, colonIdx)
 
-      var name = r.substring(0, colonIdx)
       var role = "*"
+      var principal: String = null
+      var volumeId: String = null
+      var volumePath: String = null
 
-      val bracketIdx = name.indexOf("(")
-      if (bracketIdx != -1) {
-        role = name.substring(bracketIdx + 1, name.length - 1)
-        name = name.substring(0, bracketIdx)
+      // role & principal
+      val roleStart = key.indexOf("(")
+      if (roleStart != -1) {
+        val roleEnd = key.indexOf(")")
+        if (roleEnd == -1) throw new IllegalArgumentException(s)
+
+        role = key.substring(roleStart + 1, roleEnd)
+        
+        val principalIdx = role.indexOf(",")
+        if (principalIdx != -1) {
+          principal = role.substring(principalIdx + 1)
+          role = role.substring(0, principalIdx)
+        }
+
+        key = key.substring(0, roleStart) + key.substring(roleEnd + 1)
       }
 
+      // volume
+      val volumeStart = key.indexOf("[")
+      if (volumeStart != -1) {
+        val volumeEnd = key.indexOf("]")
+        if (volumeEnd == -1) throw new IllegalArgumentException(s)
+
+        val volume = key.substring(volumeStart + 1, volumeEnd)
+        val colonIdx = volume.indexOf(":")
+
+        volumeId = volume.substring(0, colonIdx)
+        volumePath = volume.substring(colonIdx + 1)
+
+        key = key.substring(0, volumeStart) + key.substring(volumeEnd + 1)
+      }
+
+      // name & value
+      val name = key
       val value = r.substring(colonIdx + 1)
 
       val builder = Resource.newBuilder()
         .setName(name)
         .setRole(role)
+      
+      if (principal != null)
+        builder.setReservation(ReservationInfo.newBuilder.setPrincipal(principal))
 
-      if (name == "cpus" || name == "mem")
-        builder.setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(java.lang.Double.parseDouble(value)))
-      else if (name == "ports")
-        builder.setType(Value.Type.RANGES).setRanges(
-          Value.Ranges.newBuilder.addAllRange(ranges(value))
+      if (volumeId != null)
+        builder.setDisk(DiskInfo.newBuilder
+          .setPersistence(Persistence.newBuilder.setId(volumeId))
+          .setVolume(Volume.newBuilder.setContainerPath(volumePath).setMode(Mode.RW))
         )
-      else throw new IllegalArgumentException("Unsupported resource type: " + name)
+
+      if (key == "cpus" || key == "mem" || key == "disk")
+        builder.setType(Value.Type.SCALAR).setScalar(Value.Scalar.newBuilder.setValue(java.lang.Double.parseDouble(value)))
+      else if (key == "ports")
+        builder.setType(Value.Type.RANGES).setRanges(Value.Ranges.newBuilder.addAllRange(ranges(value)))
+      else throw new IllegalArgumentException("Unsupported resource type: " + key)
 
       resources.add(builder.build())
     }
@@ -351,6 +398,12 @@ class MesosTestCase {
     def abort(): Status = throw new UnsupportedOperationException
 
     def start(): Status = throw new UnsupportedOperationException
+
+    def acceptOffers(offerIds: util.Collection[OfferID], operations: util.Collection[Offer.Operation], filters: Filters): Status = throw new UnsupportedOperationException
+
+    def acknowledgeStatusUpdate(status: TaskStatus): Status = throw new UnsupportedOperationException
+
+    def suppressOffers(): Status = throw new UnsupportedOperationException
   }
 
   class TestExecutorDriver extends ExecutorDriver {

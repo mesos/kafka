@@ -191,6 +191,8 @@ object HttpServer {
         try { new Range(request.getParameter("port")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid port") }
 
+      val volume: java.lang.String = request.getParameter("volume")
+
       val bindAddress: String = request.getParameter("bindAddress")
       if (bindAddress != null)
         try { new BindAddress(request.getParameter("bindAddress")) }
@@ -263,6 +265,7 @@ object HttpServer {
         if (mem != null) broker.mem = mem
         if (heap != null) broker.heap = heap
         if (port != null) broker.port = if (port != "") new Range(port) else null
+        if (volume != null) broker.volume = if (volume != "") volume else null
         if (bindAddress != null) broker.bindAddress = if (bindAddress != "") new BindAddress(bindAddress) else null
         if (stickinessPeriod != null) broker.stickiness.period = stickinessPeriod
 

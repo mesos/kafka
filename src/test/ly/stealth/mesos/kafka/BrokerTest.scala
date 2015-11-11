@@ -58,14 +58,14 @@ class BrokerTest extends MesosTestCase {
   def matches {
     // cpus
     broker.cpus = 0.5
-    assertNull(broker.matches(offer(resources = "cpus:0.2,cpus(role):0.3,ports:1000")))
-    assertEquals("cpus < 0.5", broker.matches(offer(resources = "cpus:0.2,cpus(role):0.2")))
+    assertNull(broker.matches(offer(resources = "cpus:0.2; cpus(role):0.3; ports:1000")))
+    assertEquals("cpus < 0.5", broker.matches(offer(resources = "cpus:0.2; cpus(role):0.2")))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
-    assertNull(broker.matches(offer(resources = "mem:70,mem(role):30,ports:1000")))
-    assertEquals("mem < 100", broker.matches(offer(resources = "mem:70,mem(role):29")))
+    assertNull(broker.matches(offer(resources = "mem:70; mem(role):30; ports:1000")))
+    assertEquals("mem < 100", broker.matches(offer(resources = "mem:70; mem(role):29")))
     broker.mem = 0
 
     // port
@@ -136,25 +136,56 @@ class BrokerTest extends MesosTestCase {
   }
 
   @Test
+  def getReservations_dynamic = {
+    broker.cpus = 2
+    broker.mem = 200
+    // ignore non-dynamically reserved disk
+    var reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk:1000"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
+
+    // Ignore resources with a principal
+    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(*,principal):100"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
+
+    // Ignore resources with a principal + role
+    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(role,principal):100"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
+
+    // pay attention resources with a role
+    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(role):100"))
+    assertEquals(resources("cpus:2; mem:100; mem(role):100; ports:1000"), reservation.toResources)
+  }
+
+  @Test
+  def getReservations_volume = {
+    broker.cpus = 2
+    broker.mem = 200
+    broker.volume = "test"
+
+    val reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk(role,principal)[test:mount_point]:100"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000; disk(role,principal)[test:data]:100"), reservation.toResources)
+
+  }
+  @Test
   def getReservations {
     broker.cpus = 2
     broker.mem = 100
 
     // shared resources
-    var reservation = broker.getReservation(offer(resources = "cpus:3, mem:200, ports:1000..2000"))
-    assertEquals(resources("cpus:2, mem:100, ports:1000"), reservation.toResources)
+    var reservation = broker.getReservation(offer(resources = "cpus:3; mem:200; ports:1000..2000"))
+    assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
     // role resources
-    reservation = broker.getReservation(offer(resources = "cpus(role):3, mem(role):200, ports(role):1000..2000"))
-    assertEquals(resources("cpus(role):2, mem(role):100, ports(role):1000"), reservation.toResources)
+    reservation = broker.getReservation(offer(resources = "cpus(role):3; mem(role):200; ports(role):1000..2000"))
+    assertEquals(resources("cpus(role):2; mem(role):100; ports(role):1000"), reservation.toResources)
 
     // mixed resources
-    reservation = broker.getReservation(offer(resources = "cpus:2, cpus(role):1, mem:100, mem(role):99, ports:1000..2000, ports(role):3000"))
-    assertEquals(resources("cpus:1, cpus(role):1, mem:1, mem(role):99, ports(role):3000"), reservation.toResources)
+    reservation = broker.getReservation(offer(resources = "cpus:2; cpus(role):1; mem:100; mem(role):99; ports:1000..2000; ports(role):3000"))
+    assertEquals(resources("cpus:1; cpus(role):1; mem:1; mem(role):99; ports(role):3000"), reservation.toResources)
 
     // not enough resources
-    reservation = broker.getReservation(offer(resources = "cpus:0.5, cpus(role):0.5, mem:1, mem(role):1, ports:1000"))
-    assertEquals(resources("cpus:0.5, cpus(role):0.5, mem:1, mem(role):1, ports:1000"), reservation.toResources)
+    reservation = broker.getReservation(offer(resources = "cpus:0.5; cpus(role):0.5; mem:1; mem(role):1; ports:1000"))
+    assertEquals(resources("cpus:0.5; cpus(role):0.5; mem:1; mem(role):1; ports:1000"), reservation.toResources)
 
     // no port
     reservation = broker.getReservation(offer(resources = ""))
@@ -162,7 +193,7 @@ class BrokerTest extends MesosTestCase {
 
     // two non-default roles
     try {
-      broker.getReservation(offer(resources = "cpus(r1):0.5,mem(r2):100"))
+      broker.getReservation(offer(resources = "cpus(r1):0.5; mem(r2):100"))
       fail()
     } catch {
       case e: IllegalArgumentException =>
@@ -302,6 +333,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 128
     broker.heap = 128
     broker.port = new Util.Range("0..100")
+    broker.volume = "volume"
     broker.bindAddress = new Util.BindAddress("192.168.0.1")
 
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
@@ -330,15 +362,15 @@ class BrokerTest extends MesosTestCase {
   def Reservation_toResources {
     // shared
     var reservation = new Broker.Reservation(null, _sharedCpus =  0.5, _sharedMem = 100, _sharedPort = 1000)
-    assertEquals(resources("cpus:0.5, mem:100, ports:1000"), reservation.toResources)
+    assertEquals(resources("cpus:0.5; mem:100; ports:1000"), reservation.toResources)
 
     // role
     reservation = new Broker.Reservation("role", _roleCpus =  0.5, _roleMem = 100, _rolePort = 1000)
-    assertEquals(resources("cpus(role):0.5, mem(role):100, ports(role):1000"), reservation.toResources)
+    assertEquals(resources("cpus(role):0.5; mem(role):100; ports(role):1000"), reservation.toResources)
 
     // shared + role
     reservation = new Broker.Reservation("role", _sharedCpus = 0.3, _roleCpus =  0.7, _sharedMem = 50, _roleMem = 100, _sharedPort = 1000, _rolePort = 2000)
-    assertEquals(resources("cpus:0.3, cpus(role):0.7, mem:50, mem(role):100, ports:1000, ports(role):2000"), reservation.toResources)
+    assertEquals(resources("cpus:0.3; cpus(role):0.7; mem:50; mem(role):100; ports:1000; ports(role):2000"), reservation.toResources)
   }
   
   // Stickiness
@@ -506,6 +538,7 @@ object BrokerTest {
     assertEquals(expected.mem, actual.mem)
     assertEquals(expected.heap, actual.heap)
     assertEquals(expected.port, actual.port)
+    assertEquals(expected.volume, actual.volume)
     assertEquals(expected.bindAddress, actual.bindAddress)
 
     assertEquals(expected.constraints, actual.constraints)
