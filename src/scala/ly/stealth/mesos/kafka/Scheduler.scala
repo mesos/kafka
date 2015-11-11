@@ -27,7 +27,6 @@ import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Util.{Period, Str}
 
 object Scheduler extends org.apache.mesos.Scheduler {
-  private var offerNum: Int = 0
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   val cluster: Cluster = new Cluster()
@@ -71,9 +70,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "host.name" -> offer.getHostname
       )
 
-      if (reservation.persistentVolumeId != null) {
+      if (reservation.volumeId != null)
         defaults += ("log.dirs" -> "data/kafka-logs")
-      }
+
       val data = new util.HashMap[String, String]()
       data.put("broker", "" + broker.toJson)
       data.put("defaults", Util.formatMap(defaults))
@@ -108,9 +107,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
-    logger.info("[resourceOffers:"+offerNum+"]\n" + Str.offers(offers))
+    logger.info("[resourceOffers]\n" + Str.offers(offers))
     syncBrokers(offers)
-    offerNum = offerNum + 1
   }
 
   def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
@@ -351,7 +349,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       credsBuilder = Credential.newBuilder()
       credsBuilder.setPrincipal(Config.principal)
-      if (Config.secret != null) credsBuilder.setSecret(ByteString.copyFromUtf8(Config.secret))
+      credsBuilder.setSecret(ByteString.copyFromUtf8(Config.secret))
     }
 
     val driver =

@@ -87,9 +87,11 @@ class Broker(_id: String = "0") {
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
-    if (persistentVolumeId != null && reservation.persistentVolumeId == null)
+    // check volume id
+    if (persistentVolumeId != null && reservation.volumeId == null)
       return s"offer missing persistent volume ID: $persistentVolumeId"
 
+    // check constraints
     for ((name, constraint) <- constraints) {
       if (!offerAttributes.containsKey(name)) return s"no $name"
       if (!constraint.matches(offerAttributes.get(name), otherAttributes(name))) return s"$name doesn't match $constraint"
@@ -116,12 +118,13 @@ class Broker(_id: String = "0") {
 
     var role: String = null
 
-    var reservedPersistentPrincipal: String = null
-    var reservedPersistentVolumeId: String = null
+    var reservedVolumeId: String = null
     var reservedVolumeDisk: Double = 0
+    var reservedVolumePrincipal: String = null
 
     for (resource <- offer.getResourcesList) {
       if (resource.getRole == "*") {
+        // shared resources
         if (resource.getName == "cpus") sharedCpus = resource.getScalar.getValue
         if (resource.getName == "mem") sharedMem = resource.getScalar.getValue.toLong
         if (resource.getName == "ports") sharedPorts.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
@@ -130,22 +133,19 @@ class Broker(_id: String = "0") {
           throw new IllegalArgumentException(s"Offer contains 2 non-default roles: $role, ${resource.getRole}")
         role = resource.getRole
 
-        if (resource.hasReservation) {
-          // if hasDisk, then getName == disk should be redundant
-          if (resource.hasDisk && resource.getName == "disk") {
-            if (persistentVolumeId != null && resource.getDisk.getPersistence.getId == persistentVolumeId) {
-              reservedPersistentPrincipal = resource.getReservation.getPrincipal
-              reservedPersistentVolumeId = persistentVolumeId
-              reservedVolumeDisk = resource.getScalar.getValue
-            }
-          }
-        }
-        else {
+        // static role-reserved resources
+        if (!resource.hasReservation) {
           if (resource.getName == "cpus") roleCpus = resource.getScalar.getValue
           if (resource.getName == "mem") roleMem = resource.getScalar.getValue.toLong
           if (resource.getName == "ports") rolePorts.addAll(resource.getRanges.getRangeList.map(r => new Range(r.getBegin.toInt, r.getEnd.toInt)))
         }
 
+        // dynamic role/principal-reserved volume
+        if (persistentVolumeId != null && resource.hasDisk && resource.getDisk.hasPersistence && resource.getDisk.getPersistence.getId == persistentVolumeId) {
+          reservedVolumeId = persistentVolumeId
+          reservedVolumeDisk = resource.getScalar.getValue
+          reservedVolumePrincipal = resource.getReservation.getPrincipal
+        }
       }
     }
 
@@ -159,7 +159,12 @@ class Broker(_id: String = "0") {
     if (reservedRolePort == -1)
       reservedSharedPort = getSuitablePort(sharedPorts)
 
-    new Broker.Reservation(role, reservedPersistentPrincipal, reservedPersistentVolumeId, reservedVolumeDisk, reservedSharedCpus, reservedRoleCpus, reservedSharedMem, reservedRoleMem, reservedSharedPort, reservedRolePort)
+    new Broker.Reservation(role,
+      reservedSharedCpus, reservedRoleCpus,
+      reservedSharedMem, reservedRoleMem,
+      reservedSharedPort, reservedRolePort,
+      reservedVolumeId, reservedVolumeDisk, reservedVolumePrincipal
+    )
   }
 
   private[kafka] def getSuitablePort(ports: util.List[Range]): Int = {
@@ -481,18 +486,12 @@ object Broker {
   
   class Reservation(
      _role: String = null,
-     _persistentVolumePrincipal: String = null,
-     _persistentVolumeId: String = null, _volumeDisk: Double = 0.0,
      _sharedCpus: Double = 0.0, _roleCpus: Double = 0.0,
      _sharedMem: Long = 0, _roleMem: Long = 0,
-     _sharedPort: Long = -1, _rolePort: Long = -1
+     _sharedPort: Long = -1, _rolePort: Long = -1,
+     _volumeId: String = null, _volumeDisk: Double = 0.0, _volumePrincipal: String = null
   ) {
     val role: String = _role
-
-    val persistentVolumePrincipal: String = _persistentVolumePrincipal
-    val persistentVolumeId: String = _persistentVolumeId
-    val volumeDisk: Double = _volumeDisk
-
 
     val sharedCpus: Double = _sharedCpus
     val roleCpus: Double = _roleCpus
@@ -505,6 +504,10 @@ object Broker {
     val sharedPort: Long = _sharedPort
     val rolePort: Long = _rolePort
     def port: Long = if (rolePort != -1) rolePort else sharedPort
+
+    val volumeId: String = _volumeId
+    val volumeDisk: Double = _volumeDisk
+    val volumePrincipal: String = _volumePrincipal
 
     def toResources: util.List[Resource] = {
       def cpus(value: Double, role: String): Resource = {
@@ -533,7 +536,7 @@ object Broker {
             .setRole(role)
             .build()
       }
-      
+
       def volume(id: String, value: Double, role: String, principal: String): Resource = {
         val volume = Volume.newBuilder.setMode(Mode.RW).setContainerPath("data").build()
         val persistence = Persistence.newBuilder.setId(id).build()
@@ -566,7 +569,7 @@ object Broker {
       if (sharedPort != -1) resources.add(port(sharedPort, "*"))
       if (rolePort != -1) resources.add(port(rolePort, role))
 
-      if (persistentVolumeId != null) resources.add(volume(persistentVolumeId, volumeDisk, role, persistentVolumePrincipal))
+      if (volumeId != null) resources.add(volume(volumeId, volumeDisk, role, volumePrincipal))
       resources
     }
   }
