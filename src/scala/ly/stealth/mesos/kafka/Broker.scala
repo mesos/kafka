@@ -255,7 +255,6 @@ class Broker(_id: String = "0") {
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
     if (node.contains("persistentVolumeId")) persistentVolumeId = node("persistentVolumeId").asInstanceOf[String]
 
-
     if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
@@ -270,7 +269,6 @@ class Broker(_id: String = "0") {
     obj("id") = id
     obj("active") = active
 
-
     obj("cpus") = cpus
     obj("mem") = mem
     obj("heap") = heap
@@ -282,7 +280,6 @@ class Broker(_id: String = "0") {
     if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
     if (jvmOptions != null) obj("jvmOptions") = jvmOptions
     if (persistentVolumeId != null) obj("persistentVolumeId") = persistentVolumeId
-
 
     obj("stickiness") = stickiness.toJson
     obj("failover") = failover.toJson

@@ -178,7 +178,6 @@ class MesosTestCase {
     slaveId: String = "" + UUID.randomUUID(),
     hostname: String = "host",
     resources: String = "ports:9092",
-    rawResources: util.List[Resource] = null,
     attributes: String = null
   ): Offer = {
     val builder = Offer.newBuilder()
@@ -187,11 +186,7 @@ class MesosTestCase {
       .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
 
     builder.setHostname(hostname)
-    if (rawResources == null) {
-      builder.addAllResources(this.resources(resources))
-    } else {
-      builder.addAllResources(rawResources)
-    }
+    builder.addAllResources(this.resources(resources))
 
     if (attributes != null) {
       val map = Util.parseMap(attributes)
