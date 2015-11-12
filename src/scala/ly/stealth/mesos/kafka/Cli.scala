@@ -457,7 +457,7 @@ object Cli {
       parser.accepts("mem", "mem amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
       parser.accepts("heap", "heap amount in Mb").withRequiredArg().ofType(classOf[java.lang.Long])
       parser.accepts("port", "port or range (31092, 31090..31100). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
-      parser.accepts("volume").withRequiredArg().ofType(classOf[java.lang.String])
+      parser.accepts("volume", "pre-reserved persistent volume id").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("bind-address", "broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("stickiness-period", "stickiness period to preserve same node for broker (5m, 10m, 1h)").withRequiredArg().ofType(classOf[String])
 

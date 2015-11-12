@@ -349,6 +349,7 @@ Option                Description
                        file:server.properties
 --port                port or range (31092, 31090..31100). Default - auto
 --stickiness-period   stickiness period to preserve same node for broker (5m, 10m, 1h)
+--volume              pre-reserved persistent volume id
 
 Generic Options
 Option  Description
@@ -404,6 +405,7 @@ Option                Description
                        file:server.properties
 --port                port or range (31092, 31090..31100). Default - auto
 --stickiness-period   stickiness period to preserve same node for broker (5m, 10m, 1h)
+--volume              pre-reserved persistent volume id
 
 Generic Options
 Option  Description
