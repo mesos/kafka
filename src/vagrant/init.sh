@@ -17,9 +17,10 @@
 
 install_mesos() {
     mode=$1 # master | slave
-    apt-get -qy install mesos
+    apt-get -qy install mesos=0.25.0*
 
     echo "zk://master:2181/mesos" > /etc/mesos/zk
+    echo '5mins' > /etc/mesos-slave/executor_registration_timeout
 
     ip=$(cat /etc/hosts | grep `hostname` | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}")
     echo $ip > "/etc/mesos-$mode/ip"
@@ -36,14 +37,13 @@ install_mesos() {
 }
 
 install_marathon() {
-    apt-get install -qy marathon
+    apt-get install -qy marathon=0.10.0*
     service marathon start
 }
 
 install_docker() {
     apt-get install -qy lxc-docker
     echo 'docker,mesos' > /etc/mesos-slave/containerizers
-    echo '5mins' > /etc/mesos-slave/executor_registration_timeout
     service mesos-slave restart
 }
 
@@ -92,5 +92,5 @@ apt-get install -qy vim zip mc curl wget openjdk-7-jre scala git
 
 install_mesos $mode
 if [ $mode == "master" ]; then install_marathon; fi
-install_docker
+#install_docker
 
