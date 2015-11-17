@@ -106,7 +106,7 @@ object Expr {
         override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[Value] && toString == obj.toString
 
         override def toString: String = {
-          val values = new util.HashMap[String, String]()
+          val values = new util.LinkedHashMap[String, String]()
 
           for (k <- attributes.keySet()) {
             val value: String = brokerAttr(broker, k)
