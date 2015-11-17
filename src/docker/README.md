@@ -67,10 +67,7 @@ Example:
 Then the cli should be able to connect to url http://master:7000 from your api client machine
 (typically different than the mesos slaves). Example:
 ```
-# ./kafka-mesos.sh status --api=http://master:7000
-Cluster status received
-
-cluster:
-  brokers:
+# ./kafka-mesos.sh broker list --api=http://master:7000
+no brokers
 ```
 Now you can configure and start brokers.
