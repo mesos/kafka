@@ -95,6 +95,7 @@ object Executor extends org.apache.mesos.Executor {
     new Thread {
       override def run() {
         setName("BrokerServer")
+        Thread.currentThread().setContextClassLoader(server.getClassLoader)
         runBroker0
       }
     }.start()

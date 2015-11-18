@@ -477,6 +477,8 @@ class TestBrokerServer extends BrokerServer {
         started.wait()
     }
   }
+
+  def getClassLoader: ClassLoader = getClass.getClassLoader
 }
 
 class TestRebalancer extends Rebalancer {

@@ -23,12 +23,14 @@ import java.net.{URL, URLClassLoader}
 import java.util.Properties
 import java.util
 import scala.collection.JavaConversions._
+import ly.stealth.mesos.kafka.BrokerServer.Distro
 
 abstract class BrokerServer {
   def isStarted: Boolean
   def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint
   def stop(): Unit
   def waitFor(): Unit
+  def getClassLoader: ClassLoader
 }
 
 class KafkaServer extends BrokerServer {
@@ -65,6 +67,8 @@ class KafkaServer extends BrokerServer {
     if (server != null)
       server.getClass.getMethod("awaitShutdown").invoke(server)
   }
+
+  def getClassLoader: ClassLoader = Distro.loader
 }
 
 object BrokerServer {
@@ -133,15 +137,29 @@ object BrokerServer {
     }
   }
 
+  // Loader that loads classes in reverse order: 1. from self, 2. from parent.
+  // This is required, because current jar have classes incompatible with classes from kafka distro.
   class Loader(urls: Array[URL]) extends URLClassLoader(urls) {
+    val snappyHackedClasses = Array[String]("org.xerial.snappy.SnappyNativeAPI", "org.xerial.snappy.SnappyNative", "org.xerial.snappy.SnappyErrorCode")
+
     override protected def loadClass(name: String, resolve: Boolean): Class[_] = {
       getClassLoadingLock(name) synchronized {
+        // Handle Snappy class loading hack:
+        // Snappy injects 3 classes and native lib to root ClassLoader
+        // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
+        if (snappyHackedClasses.contains(name))
+          return super.loadClass(name, true)
+
+        // Check class is loaded
         var c: Class[_] = findLoadedClass(name)
 
+        // Load from self
         try { if (c == null) c = findClass(name) }
         catch { case e: ClassNotFoundException => }
 
+        // Load from parent
         if (c == null) c = super.loadClass(name, true)
+
         if (resolve) resolveClass(c)
         c
       }
