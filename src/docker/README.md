@@ -20,6 +20,7 @@ Example:
 ```
 # ./build-image.sh
 ```
+Note: this would not push the image. Push should be done manually after testing.
 
 ## Using docker-machine
 If you have docker-machine installed, with virtualbox, you can run the following commands:
@@ -28,8 +29,6 @@ $ docker-machine create --driver virtualbox dev
 $ eval "$(docker-machine env dev)"
 $ ./build-image.sh
 ```
-
-Note: this would not push the image. Push should be done manually after testing.
 
 # Running image
 Running image using docker. Required networking params should be provided. Image has no entry point,
