@@ -22,10 +22,10 @@ sourceSets {
 }
 
 dependencies {
-    compile "org.scala-lang:scala-library:2.10.3"
+    compile "org.scala-lang:scala-library:2.10.6"
     compile "org.apache.mesos:mesos:0.25.0"
     compile "com.google.protobuf:protobuf-java:2.5.0"
-    compile "log4j:log4j:1.2.16"
+    compile "log4j:log4j:1.2.17"
     compile "net.sf.jopt-simple:jopt-simple:4.8"
     compile "org.eclipse.jetty:jetty-http:9.0.4.v20130625"
     compile "org.eclipse.jetty:jetty-io:9.0.4.v20130625"
