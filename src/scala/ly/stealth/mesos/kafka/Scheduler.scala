@@ -218,8 +218,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[kafka] def onBrokerStopped(broker: Broker, status: TaskStatus, now: Date = new Date()): Unit = {
-    broker.task = null
+    if (broker == null) {
+      logger.info(s"Got ${status.getState} for unknown broker, ignoring it")
+      return
+    }
 
+    broker.task = null
     val failed = broker.active && status.getState != TaskState.TASK_FINISHED && status.getState != TaskState.TASK_KILLED
     broker.registerStop(now, failed)
 
