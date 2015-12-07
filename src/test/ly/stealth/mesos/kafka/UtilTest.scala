@@ -232,7 +232,7 @@ class UtilTest {
   }
 
   @Test
-  def overlap {
+  def Range_overlap {
     // no overlap
     assertNull(new Range(0, 10).overlap(new Range(20, 30)))
     assertNull(new Range(20, 30).overlap(new Range(0, 10)))

@@ -493,5 +493,4 @@ class TestRebalancer extends Rebalancer {
   }
 
   override def state: String = if (running) "running" else ""
-
 }
