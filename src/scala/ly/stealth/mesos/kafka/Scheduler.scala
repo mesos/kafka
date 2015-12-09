@@ -47,7 +47,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     commandBuilder
-      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName).setExtract(false))
       .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/kafka/" + HttpServer.kafkaDist.getName))
       .setValue(cmd)
 
