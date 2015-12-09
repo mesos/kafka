@@ -211,7 +211,7 @@ class MesosTestCase {
       .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
   }
 
-  // parses resources definition like: cpus:0.5, cpus(kafka):0.3, mem:128, ports(kafka):1000..2000
+  // parses resources definition like: cpus:0.5; cpus(kafka):0.3; mem:128; ports(kafka):1000..2000
   // Must parse the following
   // disk:73390
   // disk(*):73390
