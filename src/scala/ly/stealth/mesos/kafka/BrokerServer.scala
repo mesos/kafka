@@ -100,8 +100,8 @@ object BrokerServer {
 
     private def newKafkaConfig(props: Properties): Object = {
       val configClass = loader.loadClass("kafka.server.KafkaConfig")
-
       var config: Object = null
+    
       // in kafka <= 0.8.x constructor is KafkaConfig(java.util.Properties)
       try { config = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object] }
       catch { case e: NoSuchMethodException => }
