@@ -160,13 +160,31 @@ object BrokerServer {
   // This is required, because current jar have classes incompatible with classes from kafka distro.
   class Loader(urls: Array[URL]) extends URLClassLoader(urls) {
     val snappyHackedClasses = Array[String]("org.xerial.snappy.SnappyNativeAPI", "org.xerial.snappy.SnappyNative", "org.xerial.snappy.SnappyErrorCode")
+    var snappyHackEnabled = false
+    checkSnappyVersion
+
+    def checkSnappyVersion {
+      var jarName: String = null
+      for (url <- urls) {
+        val fileName = new File(url.getFile).getName
+        if (fileName.matches("snappy.*jar")) jarName = fileName
+      }
+
+      if (jarName == null) return
+      val hIdx = jarName.lastIndexOf("-")
+      val extIdx = jarName.lastIndexOf(".jar")
+      if (hIdx == -1 || extIdx == -1) return
+
+      val version = new Util.Version(jarName.substring(hIdx + 1, extIdx))
+      snappyHackEnabled = version.compareTo(new Util.Version(1,1,0)) <= 0
+    }
 
     override protected def loadClass(name: String, resolve: Boolean): Class[_] = {
       getClassLoadingLock(name) synchronized {
         // Handle Snappy class loading hack:
         // Snappy injects 3 classes and native lib to root ClassLoader
         // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
-        if (snappyHackedClasses.contains(name))
+        if (snappyHackEnabled && snappyHackedClasses.contains(name))
           return super.loadClass(name, true)
 
         // Check class is loaded
