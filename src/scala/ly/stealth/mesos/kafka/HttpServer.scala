@@ -34,6 +34,7 @@ import scala.util.parsing.json.JSONObject
 object HttpServer {
   var jar: File = null
   var kafkaDist: File = null
+  var kafkaVersion: Util.Version = null
 
   val logger = Logger.getLogger(HttpServer.getClass)
   var server: Server = null
@@ -90,6 +91,13 @@ object HttpServer {
 
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
     if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
+
+    // extract version
+    val distName: String = kafkaDist.getName
+    val tgzIdx = distName.lastIndexOf(".tgz")
+    val hIdx = distName.lastIndexOf("-")
+    if (tgzIdx == -1 || hIdx == -1) throw new IllegalStateException("Can't extract version number from " + distName)
+    kafkaVersion = new Util.Version(distName.substring(hIdx + 1, tgzIdx))
   }
 
   private class Servlet extends HttpServlet {

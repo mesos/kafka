@@ -2,6 +2,7 @@ out/*
 project/*
 .gradle
 *.iml
+*.ipr
 todo.txt
 
 src/docker/.docker

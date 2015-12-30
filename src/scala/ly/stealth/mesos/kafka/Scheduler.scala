@@ -24,7 +24,7 @@ import java.util
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Util.{Period, Str}
+import ly.stealth.mesos.kafka.Util.{Version, Period, Str}
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -69,6 +69,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
         "zookeeper.connect" -> Config.zk,
         "host.name" -> offer.getHostname
       )
+
+      if (HttpServer.kafkaVersion.compareTo(new Version("0.9")) >= 0)
+        defaults += ("listeners" -> s"PLAINTEXT://:${reservation.port}")
 
       if (reservation.volume != null)
         defaults += ("log.dirs" -> "data/kafka-logs")

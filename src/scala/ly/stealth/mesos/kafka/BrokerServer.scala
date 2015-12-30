@@ -81,27 +81,46 @@ object BrokerServer {
       val serverClass = loader.loadClass("kafka.server.KafkaServerStartable")
       val configClass = loader.loadClass("kafka.server.KafkaConfig")
 
-      val props: Properties = this.props(options, "server.properties")
-      val config: Object = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object]
+      val config: Object = newKafkaConfig(this.props(options, "server.properties"))
       val server: Object = serverClass.getConstructor(configClass).newInstance(config).asInstanceOf[Object]
 
       server
     }
 
     def startReporters(options: util.Map[String, String]): Object = {
-      val configClass = loader.loadClass("kafka.server.KafkaConfig")
-
-      val props: Properties = this.props(options, "server.properties")
-      val config: Object = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object]
-
       val metricsReporter = loader.loadClass("kafka.metrics.KafkaMetricsReporter$").getField("MODULE$").get(null)
       val metricsReporterClass = metricsReporter.getClass
-      val verifiableProps = config.getClass.getMethod("props").invoke(config)
+
+      val props = this.props(options, "server.properties")
+      val verifiablePropsClass: Class[_] = loader.loadClass("kafka.utils.VerifiableProperties")
+      val verifiableProps: Object = verifiablePropsClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object]
+
       metricsReporterClass.getMethod("startReporters", verifiableProps.getClass).invoke(metricsReporter, verifiableProps)
     }
+
+    private def newKafkaConfig(props: Properties): Object = {
+      val configClass = loader.loadClass("kafka.server.KafkaConfig")
+      var config: Object = null
     
+      // in kafka <= 0.8.x constructor is KafkaConfig(java.util.Properties)
+      try { config = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object] }
+      catch { case e: NoSuchMethodException => }
+
+      if (config == null) {
+        // in kafka 0.9.0.0 constructor is KafkaConfig(java.util.Map[_,_])
+        val map: util.Map[_,_] = props.toMap.asInstanceOf[Map[_,_]]
+        try { config = configClass.getConstructor(classOf[util.Map[String, String]]).newInstance(map).asInstanceOf[Object] }
+        catch { case e: NoSuchMethodError => }
+      }
+
+      if (config == null) throw new IllegalStateException("Can't create KafkaConfig. Unsupported kafka distro?")
+      config
+    }
+
     def configureLog4j(options: util.Map[String, String]): Unit = {
+      System.setProperty("kafka.logs.dir", "" + new File(Distro.dir, "log"))
       val props: Properties = this.props(options, "log4j.properties")
+
       val configurator: Class[_] = loader.loadClass("org.apache.log4j.PropertyConfigurator")
       configurator.getMethod("configure", classOf[Properties]).invoke(null, props)
     }
@@ -141,13 +160,31 @@ object BrokerServer {
   // This is required, because current jar have classes incompatible with classes from kafka distro.
   class Loader(urls: Array[URL]) extends URLClassLoader(urls) {
     val snappyHackedClasses = Array[String]("org.xerial.snappy.SnappyNativeAPI", "org.xerial.snappy.SnappyNative", "org.xerial.snappy.SnappyErrorCode")
+    var snappyHackEnabled = false
+    checkSnappyVersion
+
+    def checkSnappyVersion {
+      var jarName: String = null
+      for (url <- urls) {
+        val fileName = new File(url.getFile).getName
+        if (fileName.matches("snappy.*jar")) jarName = fileName
+      }
+
+      if (jarName == null) return
+      val hIdx = jarName.lastIndexOf("-")
+      val extIdx = jarName.lastIndexOf(".jar")
+      if (hIdx == -1 || extIdx == -1) return
+
+      val version = new Util.Version(jarName.substring(hIdx + 1, extIdx))
+      snappyHackEnabled = version.compareTo(new Util.Version(1,1,0)) <= 0
+    }
 
     override protected def loadClass(name: String, resolve: Boolean): Class[_] = {
       getClassLoadingLock(name) synchronized {
         // Handle Snappy class loading hack:
         // Snappy injects 3 classes and native lib to root ClassLoader
         // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
-        if (snappyHackedClasses.contains(name))
+        if (snappyHackEnabled && snappyHackedClasses.contains(name))
           return super.loadClass(name, true)
 
         // Check class is loaded

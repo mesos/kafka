@@ -19,7 +19,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Version}
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
 import java.util
 
@@ -258,6 +258,33 @@ class UtilTest {
     assertEquals("0", "" + new Range("0"))
     assertEquals("0..10", "" + new Range("0..10"))
     assertEquals("0", "" + new Range("0..0"))
+  }
+
+  @Test
+  def Version_init {
+    assertEquals(List(), new Version().asList)
+    assertEquals(List(1,0), new Version(1,0).asList)
+    assertEquals(List(1,2,3,4), new Version("1.2.3.4").asList)
+
+    try { new Version(" "); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    try { new Version("."); fail() }
+    catch { case e: IllegalArgumentException => }
+
+    try { new Version("a"); fail() }
+    catch { case e: IllegalArgumentException => }
+  }
+
+  @Test
+  def Version_compareTo {
+    assertEquals(0, new Version().compareTo(new Version()))
+    assertEquals(0, new Version(0).compareTo(new Version(0)))
+
+    assertTrue(new Version(0).compareTo(new Version(1)) < 0)
+    assertTrue(new Version(0).compareTo(new Version(0, 0)) < 0)
+
+    assertTrue(new Version(0, 9, 0, 0).compareTo(new Version(0, 8, 2, 0)) > 0)
   }
 
   // BindAddress
