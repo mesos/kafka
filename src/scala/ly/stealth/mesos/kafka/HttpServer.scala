@@ -92,7 +92,7 @@ object HttpServer {
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
     if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
 
-    // extract version
+    // extract version: "kafka-dist-1.2.3.tgz" => "1.2.3"
     val distName: String = kafkaDist.getName
     val tgzIdx = distName.lastIndexOf(".tgz")
     val hIdx = distName.lastIndexOf("-")
