@@ -83,6 +83,7 @@ class MesosTestCase {
 
     HttpServer.jar = createTempFile("executor.jar", "executor")
     HttpServer.kafkaDist = createTempFile("kafka-0.9.3.0.tgz", "kafka")
+    HttpServer.kafkaVersion = new Util.Version("0.9.3.0")
   }
 
   @After
