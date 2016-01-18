@@ -31,7 +31,6 @@ import org.apache.log4j.BasicConfigurator
 import java.io.{FileWriter, File}
 import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.util.parsing.json.JSON
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
 import java.net.ServerSocket
@@ -46,9 +45,6 @@ class MesosTestCase {
 
   @Before
   def before {
-    def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
-    JSON.globalNumberParser = parseNumber
-    JSON.perThreadNumberParser = parseNumber
 
     BasicConfigurator.configure()
 
