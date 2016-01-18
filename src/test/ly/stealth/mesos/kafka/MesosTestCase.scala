@@ -153,6 +153,8 @@ class MesosTestCase {
   val LOCALHOST_IP: Int = 2130706433
   
   def frameworkId(id: String = "" + UUID.randomUUID()): FrameworkID = FrameworkID.newBuilder().setValue(id).build()
+  def executorId(id: String = "" + UUID.randomUUID()): ExecutorID = ExecutorID.newBuilder().setValue(id).build()
+  def slaveId(id: String = "" + UUID.randomUUID()): SlaveID = SlaveID.newBuilder().setValue(id).build()
   def taskId(id: String = "" + UUID.randomUUID()): TaskID = TaskID.newBuilder().setValue(id).build()
 
   def master(
