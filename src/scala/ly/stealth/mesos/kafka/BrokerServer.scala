@@ -202,4 +202,36 @@ object BrokerServer {
       }
     }
   }
+
+  object Metrics {
+    import scala.collection.JavaConverters._
+    import javax.management.{MBeanServer, MBeanServerFactory, ObjectName}
+
+    val activeControllerCountObj = new ObjectName("kafka.controller:type=KafkaController,name=ActiveControllerCount")
+    val offlinePartitionsCountObj = new ObjectName("kafka.controller:type=KafkaController,name=OfflinePartitionsCount")
+    val underReplicatedPartitionsObj = new ObjectName("kafka.server:type=ReplicaManager,name=UnderReplicatedPartitions")
+
+    def attribute[T](server: MBeanServer, objName: ObjectName, attribute: String): T = {
+      server.getAttribute(objName, attribute).asInstanceOf[T]
+    }
+
+    def value[T](server: MBeanServer, objName: ObjectName): T = {
+      attribute[T](server, objName, "Value")
+    }
+
+    def collect: Option[Broker.Metrics] = {
+      val servers = MBeanServerFactory.findMBeanServer(null).asScala.toList
+      servers.find(s => s.getDomains.exists(_.equals("kafka.server"))).map { server: MBeanServer =>
+        val metrics: Broker.Metrics = new Broker.Metrics()
+
+        metrics.activeControllerCount = value(server, activeControllerCountObj)
+        metrics.offlinePartitionsCount = value(server, offlinePartitionsCountObj)
+        metrics.underReplicatedPartitions = value(server, underReplicatedPartitionsObj)
+
+        metrics.timestamp = System.currentTimeMillis()
+
+        metrics
+      }
+    }
+  }
 }

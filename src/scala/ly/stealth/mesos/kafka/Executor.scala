@@ -24,6 +24,7 @@ import org.apache.log4j._
 import Util.Str
 import java.util
 import com.google.protobuf.ByteString
+import scala.util.parsing.json.JSONObject
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
@@ -80,6 +81,8 @@ object Executor extends org.apache.mesos.Executor {
           .setData(ByteString.copyFromUtf8("" + endpoint))
         driver.sendStatusUpdate(status.build)
 
+        startCollectingMetrics()
+
         server.waitFor()
         status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED)
         driver.sendStatusUpdate(status.build)
@@ -90,6 +93,25 @@ object Executor extends org.apache.mesos.Executor {
       } finally {
         stopExecutor(driver)
       }
+    }
+
+    def startCollectingMetrics(): Unit = {
+      new Thread {
+        setName("BrokerMetrics")
+        def send(driver: ExecutorDriver, metrics: Broker.Metrics): Unit = {
+          driver.sendFrameworkMessage(JSONObject(Map("metrics" -> metrics.toJson)).toString().getBytes)
+        }
+        override def run(): Unit = {
+          while (true) {
+            try {
+              BrokerServer.Metrics.collect.foreach(metrics => send(driver, metrics))
+              Thread.sleep(5000L)
+            } catch {
+              case e: Throwable => logger.warn("", e)
+            }
+          }
+        }
+      }.start()
     }
 
     new Thread {

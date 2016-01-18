@@ -29,7 +29,13 @@ import java.net.{Inet4Address, InetAddress, NetworkInterface}
 
 object Util {
   Class.forName(kafka.utils.Json.getClass.getName) // init class
-  private def parseNumber(s: String): Number = if (s.contains(".")) s.toDouble else s.toInt
+  private def parseNumber(s: String): Number =
+    if (s.contains(".")) {
+      s.toDouble
+    } else {
+      try { java.lang.Integer.parseInt(s) }
+      catch { case e: java.lang.NumberFormatException => s.toLong }
+    }
 
   JSON.globalNumberParser = parseNumber
   JSON.perThreadNumberParser = parseNumber

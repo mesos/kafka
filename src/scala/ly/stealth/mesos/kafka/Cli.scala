@@ -23,7 +23,7 @@ import scala.io.Source
 import java.io._
 import java.util
 import scala.collection.JavaConversions._
-import java.util.{Properties, Collections}
+import java.util.{Date, Properties, Collections}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Str, Period}
 import ly.stealth.mesos.kafka.Topics.Topic
 
@@ -673,6 +673,15 @@ object Cli {
         printLine("state: " + task.state, indent + 1)
         if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
         if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
+      }
+
+      val metrics = broker.metrics
+      if (metrics != null) {
+        printLine("metrics: ", indent)
+        printLine("collected: " + Str.dateTime(new Date(metrics.timestamp)), indent + 1)
+        printLine("under-replicated-partitions: " + metrics.underReplicatedPartitions, indent + 1)
+        printLine("offline-partitions-count: " + metrics.offlinePartitionsCount, indent + 1)
+        printLine("active-controller-count: " + metrics.activeControllerCount, indent + 1)
       }
     }
     

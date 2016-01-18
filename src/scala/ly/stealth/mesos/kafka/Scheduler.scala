@@ -125,6 +125,24 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
     logger.info("[frameworkMessage] executor:" + Str.id(executorId.getValue) + " slave:" + Str.id(slaveId.getValue) + " data: " + new String(data))
+
+    val broker = cluster.getBroker(Broker.idFromExecutorId(executorId.getValue))
+
+    try {
+      val node: Map[String, Object] = Util.parseJson(new String(data))
+      if (node.contains("metrics")) {
+        if (broker != null && broker.active) {
+          val metricsNode = node("metrics").asInstanceOf[Map[String, Object]]
+          val metrics = new Broker.Metrics()
+          metrics.fromJson(metricsNode)
+
+          broker.metrics = metrics
+        }
+      }
+    } catch {
+      case e: IllegalArgumentException =>
+        logger.warn("Unable to parse framework message as JSON", e)
+    }
   }
 
   def disconnected(driver: SchedulerDriver): Unit = {
@@ -245,6 +263,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       logger.info(msg)
     }
+
+    broker.metrics = null
   }
 
   private def isReconciling: Boolean = cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
