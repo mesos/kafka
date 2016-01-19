@@ -324,7 +324,7 @@ Broker metrics
 Executor sends broker metrics to scheduler every 30 seconds, such as:
 - under-replicated-partitions is number of under replicated partitions (| ISR | < | all replicas |)
 - offline-partitions-count is number of partitions that don't have an active leader and are hence not writable or readable
-- active-controller-count is number of active controllers in the cluster, only one broker in cluster should have value "1"
+- is-active-controller is controller active on broker, only one broker in cluster should have value "1"
 
 ```
 ./kafka-mesos.sh broker list
@@ -343,7 +343,7 @@ brokers:
     collected: 2016-01-18 11:53:36Z
     under-replicated-partitions: 0
     offline-partitions-count: 0
-    active-controller-count: 1
+    is-active-controller: 1
 
   id: 1
   active: true
@@ -359,7 +359,7 @@ brokers:
     collected: 2016-01-18 11:53:36Z
     under-replicated-partitions: 0
     offline-partitions-count: 0
-    active-controller-count: 0
+    is-active-controller: 0
 ```
 
 

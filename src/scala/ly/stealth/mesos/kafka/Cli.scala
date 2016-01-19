@@ -681,7 +681,7 @@ object Cli {
         printLine("collected: " + Str.dateTime(new Date(metrics.timestamp)), indent + 1)
         printLine("under-replicated-partitions: " + metrics.underReplicatedPartitions, indent + 1)
         printLine("offline-partitions-count: " + metrics.offlinePartitionsCount, indent + 1)
-        printLine("active-controller-count: " + metrics.activeControllerCount, indent + 1)
+        printLine("is-active-controller: " + metrics.activeControllerCount, indent + 1)
       }
     }
     
