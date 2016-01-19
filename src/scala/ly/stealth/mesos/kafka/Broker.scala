@@ -26,7 +26,7 @@ import scala.collection.JavaConversions._
 import scala.collection
 import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
-import ly.stealth.mesos.kafka.Broker.{Stickiness, Failover}
+import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
 import java.text.SimpleDateFormat
 import scala.List
@@ -51,6 +51,8 @@ class Broker(_id: String = "0") {
 
   var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
+
+  var metrics: Metrics = null
 
   def options(defaults: util.Map[String, String] = null): util.Map[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
@@ -262,6 +264,11 @@ class Broker(_id: String = "0") {
       task = new Broker.Task()
       task.fromJson(node("task").asInstanceOf[Map[String, Object]])
     }
+
+    if (node.contains("metrics")) {
+      metrics = new Broker.Metrics()
+      metrics.fromJson(node("metrics").asInstanceOf[Map[String, Object]])
+    }
   }
 
   def toJson: JSONObject = {
@@ -284,6 +291,7 @@ class Broker(_id: String = "0") {
     obj("stickiness") = stickiness.toJson
     obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson
+    if (metrics != null) obj("metrics") = metrics.toJson
 
     new JSONObject(obj.toMap)
   }
@@ -298,6 +306,8 @@ object Broker {
     if (parts.length < 2) throw new IllegalArgumentException(taskId)
     parts(1)
   }
+
+  def idFromExecutorId(executorId: String): String = idFromTaskId(executorId)
 
   def isOptionOverridable(name: String): Boolean = !List("broker.id", "port", "zookeeper.connect").contains(name)
 
@@ -568,6 +578,34 @@ object Broker {
 
       if (volume != null) resources.add(volumeDisk(volume, volumeSize, role, volumePrincipal))
       resources
+    }
+  }
+
+  class Metrics {
+    var underReplicatedPartitions: Int = 0
+    var offlinePartitionsCount: Int = 0
+    var activeControllerCount: Int = 0
+
+    var timestamp: Long = 0
+
+    def fromJson(node: Map[String, Object]): Unit = {
+      underReplicatedPartitions = node("underReplicatedPartitions").asInstanceOf[Number].intValue()
+      offlinePartitionsCount = node("offlinePartitionsCount").asInstanceOf[Number].intValue()
+      activeControllerCount = node("activeControllerCount").asInstanceOf[Number].intValue()
+
+      timestamp = node("timestamp").asInstanceOf[Number].longValue()
+    }
+
+    def toJson: JSONObject = {
+      val obj = new collection.mutable.LinkedHashMap[String, Any]()
+
+      obj("underReplicatedPartitions") = underReplicatedPartitions
+      obj("offlinePartitionsCount") = offlinePartitionsCount
+      obj("activeControllerCount") = activeControllerCount
+
+      obj("timestamp") = timestamp
+
+      new JSONObject(obj.toMap)
     }
   }
 

@@ -234,4 +234,51 @@ class SchedulerTest extends MesosTestCase {
     assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("2", "3"), Scheduler.otherTasksAttributes("b").asInstanceOf[Array[AnyRef]])
   }
+
+  @Test
+  def onFrameworkMessage = {
+    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
+    broker0.active = true
+    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
+    broker1.active = true
+
+    assertNull(broker0.metrics)
+    assertNull(broker1.metrics)
+
+    val metrics0 = new Broker.Metrics()
+    metrics0.underReplicatedPartitions = 2
+    metrics0.offlinePartitionsCount = 3
+    metrics0.activeControllerCount = 1
+    metrics0.timestamp = System.currentTimeMillis()
+
+    val data = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics0.toJson)).toString().getBytes
+
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker0)), slaveId(), data)
+
+    // metrics updated for corresponding broker
+    assertNotNull(broker0.metrics)
+    assertNull(broker1.metrics)
+
+    def assertMetricsEquals(expected: Broker.Metrics, actual: Broker.Metrics): Unit = {
+      assertEquals(expected.underReplicatedPartitions, actual.underReplicatedPartitions)
+      assertEquals(expected.offlinePartitionsCount, actual.offlinePartitionsCount)
+      assertEquals(expected.activeControllerCount, actual.activeControllerCount)
+      assertEquals(expected.timestamp, actual.timestamp)
+    }
+
+    assertMetricsEquals(metrics0, broker0.metrics)
+
+    // metrics updated only for active brokers
+    broker1.active = false
+
+    val metrics1 = new Broker.Metrics()
+    metrics1.offlinePartitionsCount = 1
+    metrics1.timestamp = System.currentTimeMillis()
+
+    val data1 = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics1.toJson)).toString().getBytes
+
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker1)), slaveId(), data1)
+
+    assertNull(broker1.metrics)
+  }
 }

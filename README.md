@@ -17,6 +17,7 @@ For issues https://github.com/mesos/kafka/issues
 * [High Availability Scheduler State](#high-availability-scheduler-state)
 * [Failed Broker Recovery](#failed-broker-recovery)
 * [Passing multiple options](#passing-multiple-options)
+* [Broker metrics](#broker-metrics)
 
 
 [Navigating the CLI](#navigating-the-cli)
@@ -316,6 +317,49 @@ broker updated:
   options: log.dirs=/mnt/array1/broker0\,/mnt/array2/broker0,num.io.threads=16
   failover: delay:1m, max-delay:10m
   stickiness: period:10m, hostname:slave0, expires:2015-07-29 11:54:39Z
+```
+
+Broker metrics
+--------------
+Executor sends broker metrics to scheduler every 30 seconds, such as:
+- under-replicated-partitions is number of under replicated partitions (| ISR | < | all replicas |)
+- offline-partitions-count is number of partitions that don't have an active leader and are hence not writable or readable
+- is-active-controller is controller active on broker, only one broker in cluster should have value "1"
+
+```
+./kafka-mesos.sh broker list
+brokers:
+  id: 0
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave0
+  task:
+    id: broker-0-826e8075-5dd3-49ab-b86e-6432fa03ef66
+    state: running
+    endpoint: slave0:9092 (slave0)
+  metrics:
+    collected: 2016-01-18 11:53:36Z
+    under-replicated-partitions: 0
+    offline-partitions-count: 0
+    is-active-controller: 1
+
+  id: 1
+  active: true
+  state: running
+  resources: cpus:1.00, mem:2048, heap:1024, port:auto
+  failover: delay:1m, max-delay:10m
+  stickiness: period:10m, hostname:slave1
+  task:
+    id: broker-1-4648130a-9aa0-4c7e-b8af-761c03aa111c
+    state: running
+    endpoint: slave1:9092 (slave1)
+  metrics:
+    collected: 2016-01-18 11:53:36Z
+    under-replicated-partitions: 0
+    offline-partitions-count: 0
+    is-active-controller: 0
 ```
 
 
