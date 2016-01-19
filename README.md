@@ -321,7 +321,7 @@ broker updated:
 
 Broker metrics
 --------------
-Executor sends broker metrics to scheduler every 5 seconds, such as:
+Executor sends broker metrics to scheduler every 30 seconds, such as:
 - under-replicated-partitions is number of under replicated partitions (| ISR | < | all replicas |)
 - offline-partitions-count is number of partitions that don't have an active leader and are hence not writable or readable
 - active-controller-count is number of active controllers in the cluster, only one broker in cluster should have value "1"

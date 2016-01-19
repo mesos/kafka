@@ -97,16 +97,19 @@ object Executor extends org.apache.mesos.Executor {
 
     def startCollectingMetrics(): Unit = {
       new Thread {
-        setName("BrokerMetrics")
         def send(driver: ExecutorDriver, metrics: Broker.Metrics): Unit = {
           driver.sendFrameworkMessage(JSONObject(Map("metrics" -> metrics.toJson)).toString().getBytes)
         }
+
         override def run(): Unit = {
+          setName("BrokerMetrics")
           while (true) {
             try {
-              BrokerServer.Metrics.collect.foreach(metrics => send(driver, metrics))
-              Thread.sleep(5000L)
+              val metrics = BrokerServer.Metrics.collect
+              if (metrics != null) send(driver, metrics)
+              Thread.sleep(30000L)
             } catch {
+              case e: InterruptedException => return
               case e: Throwable => logger.warn("", e)
             }
           }

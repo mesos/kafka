@@ -219,7 +219,7 @@ object BrokerServer {
       attribute[T](server, objName, "Value")
     }
 
-    def collect: Option[Broker.Metrics] = {
+    def collect: Broker.Metrics = {
       val servers = MBeanServerFactory.findMBeanServer(null).asScala.toList
       servers.find(s => s.getDomains.exists(_.equals("kafka.server"))).map { server: MBeanServer =>
         val metrics: Broker.Metrics = new Broker.Metrics()
@@ -231,7 +231,7 @@ object BrokerServer {
         metrics.timestamp = System.currentTimeMillis()
 
         metrics
-      }
+      }.getOrElse(null)
     }
   }
 }
