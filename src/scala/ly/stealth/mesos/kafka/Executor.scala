@@ -145,6 +145,34 @@ object Executor extends org.apache.mesos.Executor {
 
   private[kafka] def handleMessage(driver: ExecutorDriver, message: String): Unit = {
     if (message == "stop") driver.stop()
+    if (message.startsWith("log,")) handleLogRequest(driver, message)
+  }
+
+  private[kafka] def handleLogRequest(driver: ExecutorDriver, message: String) {
+    val logRequest = LogRequest.parse(message)
+    val name = logRequest.name
+
+    val cwd = new File(".")
+    val path = if (name == "stdout" || name == "stderr") {
+      cwd.toPath.resolve(name).toFile
+    } else if (name.endsWith(".log")) {
+      new File(BrokerServer.Distro.dir, "log/" + name)
+    } else {
+      null
+    }
+
+    val content = if (path == null) {
+      s"$name doesn't ends with .log"
+    } else if (path.exists()) {
+      if (path.canRead) Util.readLastLines(path, logRequest.lines)
+      else s"$name not readable"
+    } else {
+      s"$name doesn't exist"
+    }
+
+    val json = LogResponse(logRequest.requestId, content).toJson
+
+    driver.sendFrameworkMessage(json.toString().getBytes())
   }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {

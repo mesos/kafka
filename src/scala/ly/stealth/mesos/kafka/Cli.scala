@@ -395,6 +395,7 @@ object Cli {
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
+        case "log" => handleLog(arg, args)
         case _ => throw new Error("unsupported broker command " + cmd)
       }
     }
@@ -415,6 +416,8 @@ object Cli {
           handleRemove(null, help = true)
         case "start" | "stop" =>
           handleStartStop(null, null, cmd == "start", help = true)
+        case "log" =>
+          handleLog(null, null, help = true)
         case _ =>
           throw new Error(s"unsupported broker command $cmd")
       }
@@ -632,6 +635,55 @@ object Cli {
       }
     }
 
+    private def handleLog(brokerId: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("timeout", "timeout (30s, 1m, 1h). Default - 30s").withRequiredArg().ofType(classOf[String])
+      parser.accepts("name", "name of log file (stdout, stderr, server.log). Default - stdout").withRequiredArg().ofType(classOf[String])
+      parser.accepts("lines", "maximum number of lines to read from the end of file. Default - 100").withRequiredArg().ofType(classOf[Integer])
+
+      if (help) {
+        printLine(s"Retrieve broker log\nUsage: broker log <broker-id> [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          printLine()
+          throw new Error(e.getMessage)
+      }
+
+      val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+      val name: String = options.valueOf("name").asInstanceOf[String]
+      val lines: Integer = options.valueOf("lines").asInstanceOf[java.lang.Integer]
+
+      val params = new util.LinkedHashMap[String, String]()
+      params.put("broker", brokerId)
+      if (timeout != null) params.put("timeout", timeout)
+      if (name != null) params.put("name", name)
+      if (lines != null) params.put("lines", "" + lines)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/broker/log", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val status = json("status").asInstanceOf[String]
+      val content = json("content").asInstanceOf[String]
+
+      if (status == "timeout") throw new Error(s"broker $brokerId log retrieve timeout")
+      else printLine(content)
+
+      if (!content.isEmpty && content.last != '\n') printLine()
+    }
+
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list brokers", 1)
@@ -640,6 +692,7 @@ object Cli {
       printLine("remove     - remove broker", 1)
       printLine("start      - start broker", 1)
       printLine("stop       - stop broker", 1)
+      printLine("log        - retrieve broker log", 1)
     }
 
     private def printBroker(broker: Broker, indent: Int): Unit = {

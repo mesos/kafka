@@ -149,6 +149,7 @@ object HttpServer {
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
+      else if (uri == "log") handleBrokerLog(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -371,6 +372,56 @@ object HttpServer {
 
       for (broker <- brokers) brokerNodes.add(broker.toJson)
       response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
+    }
+
+    def handleBrokerLog(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+
+      var timeout: Period = new Period("30s")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+      val id: String = request.getParameter("broker")
+      if (id == null) { response.sendError(400, "broker required"); return }
+
+      var name: String = request.getParameter("name")
+      if (name == null) name = "stdout"
+
+      var lines: Int = 100
+      if (request.getParameter("lines") != null)
+        try { lines = Integer.parseInt(request.getParameter("lines")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid lines"); return  }
+      if (lines <= 0) { response.sendError(400, "lines has to be greater than 0"); return }
+
+      val broker = cluster.getBroker(id)
+      if (broker == null) { response.sendError(400, "broker " + id + " not found"); return }
+      if (!broker.active) { response.sendError(400, "broker " + id + " is not active"); return }
+      if (broker.task == null || !broker.task.running) { response.sendError(400, "broker " + id + " is not running"); return }
+
+      val requestId = Scheduler.requestBrokerLog(broker, name, lines)
+
+      if (requestId == -1) { response.sendError(500, "disconnected from the master"); return }
+
+      def receivedLog: Boolean = Scheduler.receivedLog(requestId)
+
+      def waitForLog(): String = {
+        var t = timeout.ms
+        while (t > 0 && !receivedLog) {
+          val delay = Math.min(100, t)
+          Thread.sleep(delay)
+          t -= delay
+        }
+
+        if (receivedLog) "ok" else "timeout"
+      }
+
+      val status = waitForLog()
+      val content = if (status == "ok") Scheduler.logContent(requestId) else ""
+
+      Scheduler.removeLog(requestId)
+
+      response.getWriter.println(JSONObject(Map("status" -> status, "content" -> content)))
     }
 
     def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {

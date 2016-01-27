@@ -23,6 +23,8 @@ import org.junit.Assert._
 import org.apache.mesos.Protos.TaskState
 import java.util.Date
 
+import scala.util.parsing.json.JSONObject
+
 class SchedulerTest extends MesosTestCase {
   @Test
   def newExecutor {
@@ -280,5 +282,51 @@ class SchedulerTest extends MesosTestCase {
     Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker1)), slaveId(), data1)
 
     assertNull(broker1.metrics)
+  }
+
+  @Test
+  def sendReceiveBrokerLog = {
+    val broker = Scheduler.cluster.addBroker(new Broker("0"))
+    broker.task = new Broker.Task("task-id", "slave-id", "executor-id")
+
+    // driver connected
+    val requestId = Scheduler.requestBrokerLog(broker, "stdout", 111)
+    assertEquals(1, schedulerDriver.sentFrameworkMessages.size())
+    val message = schedulerDriver.sentFrameworkMessages.get(0)
+    assertEquals(broker.task.executorId, message._1.getValue)
+    assertEquals(broker.task.slaveId, message._2.getValue)
+    assertEquals(LogRequest(requestId, 111, "stdout").toString, message._3)
+
+    val content = "1\n2\n3\n"
+    val data = LogResponse(requestId, content).toJson.toString().getBytes
+
+    // skip log response when broker is null
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(new Broker("100"))), slaveId(), data)
+    assertEquals(None, Scheduler.logs.get(requestId))
+
+    // skip log response when not active
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker)), slaveId(), data)
+    assertEquals(None, Scheduler.logs.get(requestId))
+
+    // skip log response when no task
+    broker.active = true
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker)), slaveId(), data)
+    assertEquals(None, Scheduler.logs.get(requestId))
+
+    // skip log response when has task but no running
+    broker.task = new Broker.Task()
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker)), slaveId(), data)
+    assertEquals(None, Scheduler.logs.get(requestId))
+
+    // broker has to be and task has to be running
+    broker.task = new Broker.Task(_state = Broker.State.RUNNING)
+    Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker)), slaveId(), data)
+    assertEquals(Some(content), Scheduler.logs.get(requestId))
+
+    // driver disconnected
+    Scheduler.disconnected(schedulerDriver)
+    val sizeBeforeRequest = Scheduler.logs.size()
+    assertEquals(-1L, Scheduler.requestBrokerLog(broker, "stdout", 1))
+    assertEquals(sizeBeforeRequest, Scheduler.logs.size())
   }
 }

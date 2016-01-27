@@ -482,4 +482,53 @@ object Util {
       s.substring(s.length - maxLen)
     }
   }
+
+  def readLastLines(file: File, n: Int, maxBytes: Int = 102400): String = {
+    require(n > 0)
+
+    val raf = new java.io.RandomAccessFile(file, "r")
+    val fileLength: Long = raf.length()
+    var line = 0
+    var pos: Long = fileLength - 1
+    var found = false
+    var nlPos = pos
+
+    try {
+      while (pos != -1 && !found) {
+        raf.seek(pos)
+
+        if (raf.readByte() == 10) {
+          if (pos != fileLength - 1) {
+            line += 1
+          }
+          nlPos = pos
+        }
+
+        if (line == n) found = true
+        if (fileLength - pos > maxBytes) found = true
+
+        if (!found) pos -= 1
+      }
+
+      if (pos == -1) pos = 0
+
+      if (line == n) {
+        pos = pos + 1
+      } else if (fileLength - pos > maxBytes) {
+        pos = nlPos + 1
+      }
+
+      raf.seek(pos)
+
+      val buffer = new Array[Byte]((fileLength - pos).toInt)
+
+      raf.read(buffer, 0, buffer.length)
+
+      val str = new String(buffer, "UTF-8")
+
+      str
+    } finally {
+      raf.close()
+    }
+  }
 }

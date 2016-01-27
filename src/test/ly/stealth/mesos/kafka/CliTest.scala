@@ -148,6 +148,72 @@ class CliTest extends MesosTestCase {
     assertFalse(broker.active)
   }
 
+  @Test(timeout = 60000)
+  def broker_log: Unit = {
+    def assertCliErrorContains(cmd: String, str: String) =
+      try { exec(cmd); fail() }
+      catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains(str)) }
+
+    // no broker
+    assertCliErrorContains("broker log 0", "broker 0 not found")
+
+    // broker isn't active or running
+    val broker = Scheduler.cluster.addBroker(new Broker("0"))
+    assertCliErrorContains("broker log 0", "broker 0 is not active")
+
+    broker.active = true
+    assertCliErrorContains("broker log 0", "broker 0 is not running")
+
+    // not running when task is null
+    assertCliErrorContains("broker log 0", "broker 0 is not running")
+
+    import Broker.State._
+
+    broker.task = new Broker.Task("id", "slave", "executor", "host")
+    for(state <- Seq(STOPPED, STARTING, RUNNING, RECONCILING, STOPPING) if state != RUNNING) {
+      broker.task.state = state
+      assertCliErrorContains("broker log 0", "broker 0 is not running")
+    }
+
+    def setLogContent(content: String, delay: Period = new Period("100ms")) =
+      new Thread {
+        override def run(): Unit = {
+          Thread.sleep(delay.ms)
+          Scheduler.logs.keys().take(1).foreach { rid => Scheduler.logs.put(rid, Some(content)) }
+        }
+      }.start()
+
+    setLogContent("something")
+    // retrieve log only for active and running broker
+    broker.task.state = RUNNING
+    try { exec("broker log 0 --timeout 1s") }
+    catch { case e: Cli.Error => fail("") }
+
+    assertOutContains("something")
+
+    // with name
+    setLogContent("something with name")
+    exec("broker log 0 --name server.log --timeout 1s")
+    assertOutContains("something with name")
+
+    // with lines
+    setLogContent("something with lines")
+    exec("broker log 0 --lines 200 --timeout 1s")
+    assertOutContains("something with lines")
+
+    // with name, lines
+    setLogContent("something with name with lines with timeout")
+    exec("broker log 0 --name controller.log --lines 300 --timeout 1s")
+    assertOutContains("something with name with lines with timeout")
+
+    // timed out
+    assertCliErrorContains("broker log 0 --timeout 1s", "broker 0 log retrieve timeout")
+
+    // disconnected
+    Scheduler.disconnected(schedulerDriver)
+    assertCliErrorContains("broker log 0 --timeout 1s", "disconnected from the master")
+  }
+
   @Test
   def topic_list {
     exec("topic list")

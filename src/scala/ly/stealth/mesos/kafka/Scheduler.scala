@@ -17,6 +17,7 @@
 
 package ly.stealth.mesos.kafka
 
+import java.util.concurrent.ConcurrentHashMap
 import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
@@ -31,6 +32,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   val cluster: Cluster = new Cluster()
   private var driver: SchedulerDriver = null
+
+  val logs = new ConcurrentHashMap[Long, Option[String]]()
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jar.getName
@@ -137,6 +140,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
           metrics.fromJson(metricsNode)
 
           broker.metrics = metrics
+        }
+      }
+
+      if (node.contains("log")) {
+        if (broker != null && broker.active && broker.task != null && broker.task.running) {
+          val logResponse = LogResponse.fromJson(node)
+          if (logs.containsKey(logResponse.requestId)) {
+            logs.put(logResponse.requestId, Some(logResponse.content))
+          }
         }
       }
     } catch {
@@ -412,4 +424,23 @@ object Scheduler extends org.apache.mesos.Scheduler {
     
     root.addAppender(appender)
   }
+
+  def requestBrokerLog(broker: Broker, name: String, lines: Int): Long = {
+    var requestId: Long = -1
+    if (driver != null) {
+      requestId = System.currentTimeMillis()
+      logs.put(requestId, None)
+      val executorId = ExecutorID.newBuilder().setValue(broker.task.executorId).build()
+      val slaveId = SlaveID.newBuilder().setValue(broker.task.slaveId).build()
+
+      driver.sendFrameworkMessage(executorId, slaveId, LogRequest(requestId, lines, name).toString.getBytes())
+    }
+    requestId
+  }
+
+  def receivedLog(requestId: Long): Boolean = logs.get(requestId).isDefined
+
+  def logContent(requestId: Long): String = logs.get(requestId).get
+
+  def removeLog(requestId: Long): Option[String] = logs.remove(requestId)
 }
