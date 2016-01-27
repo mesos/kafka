@@ -14,6 +14,7 @@ For issues https://github.com/mesos/kafka/issues
 * [Run the scheduler on Marathon](https://github.com/mesos/kafka/tree/master/src/docker#running-image-in-marathon)  
 * [Changing the location where data is stored](#changing-the-location-where-data-is-stored)
 * [Starting 3 brokers](#starting-3-brokers)
+* [View broker log](#view-broker-log)
 * [High Availability Scheduler State](#high-availability-scheduler-state)
 * [Failed Broker Recovery](#failed-broker-recovery)
 * [Passing multiple options](#passing-multiple-options)
@@ -26,6 +27,7 @@ For issues https://github.com/mesos/kafka/issues
 * [Starting brokers](#starting-brokers-in-the-cluster)
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
+* [Retrieving broker log](#retrieving-broker-log)
 * [Rebalancing brokers in the cluster](#rebalancing-topics)
 * [Listing topics](#listing-topics)
 * [Adding topic](#adding-topic)
@@ -269,6 +271,35 @@ brokers started:
   state: running
   ...
 ```
+
+View broker log
+---------------
+
+Strings are always being read from the end of a file.
+Get last 100 lines from `stdout` file of broker 0,
+```
+./kafka-mesos.sh broker log 0
+```
+
+or from `stderr`
+
+```
+./kafka-mesos.sh broker log 0 --name stderr
+```
+
+or any file in kafka-*/log/, for example: `server.log`
+
+```
+./kafka-mesos.sh broker log 0 --name server.log
+```
+
+or maybe more lines
+
+```
+./kafka-mesos.sh broker log 0 --name server.log --lines 200
+```
+
+current limit is 100Kb no matter how many lines being requested.
 
 High Availability Scheduler State
 -------------------------
@@ -562,6 +593,27 @@ attribute filtering:
   *[rack=r1]           - any broker having rack=r1
   *[hostname=slave*]   - any broker on host with name starting with 'slave'
   0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
+```
+
+Retrieving broker log
+---------------------
+
+```
+Retrieve broker log
+Usage: broker log <broker-id> [options]
+
+Option             Description
+------             -----------
+--lines <Integer>  maximum number of lines to read from the end of file.
+                     Default - 100
+--name             name of log file (stdout, stderr, server.log). Default
+                     - stdout
+--timeout          timeout (30s, 1m, 1h). Default - 30s
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
 ```
 
 Listing Topics
