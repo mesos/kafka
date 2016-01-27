@@ -336,6 +336,8 @@ class MesosTestCase {
     val killedTasks: util.List[String] = new util.ArrayList[String]()
     val reconciledTasks: util.List[String] = new util.ArrayList[String]()
 
+    val sentFrameworkMessages = new util.ArrayList[(ExecutorID, SlaveID, String)]()
+
     def declineOffer(id: OfferID): Status = {
       declinedOffers.add(id.getValue)
       status
@@ -381,7 +383,10 @@ class MesosTestCase {
 
     def requestResources(requests: util.Collection[Request]): Status = throw new UnsupportedOperationException
 
-    def sendFrameworkMessage(executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Status = throw new UnsupportedOperationException
+    def sendFrameworkMessage(executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Status = {
+      sentFrameworkMessages.add((executorId, slaveId, new String(data)))
+      status
+    }
 
     def join(): Status = throw new UnsupportedOperationException
 
