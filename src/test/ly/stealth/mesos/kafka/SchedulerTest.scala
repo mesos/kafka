@@ -152,17 +152,21 @@ class SchedulerTest extends MesosTestCase {
 
     // finished
     broker.task = task
+    broker.needsRestart = true
     Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FINISHED))
     assertNull(broker.task)
     assertEquals(0, broker.failover.failures)
+    assertFalse(broker.needsRestart)
 
     // failed
     broker.active = true
     broker.task = task
+    broker.needsRestart = true
     Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FAILED), new Date(0))
     assertNull(broker.task)
     assertEquals(1, broker.failover.failures)
     assertEquals(new Date(0), broker.failover.failureTime)
+    assertFalse(broker.needsRestart)
 
     // failed maxRetries exceeded
     broker.failover.maxTries = 2
@@ -180,9 +184,11 @@ class SchedulerTest extends MesosTestCase {
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
     val offer = this.offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}", attributes = "a=1,b=2")
+    broker.needsRestart = true
 
     Scheduler.launchTask(broker, offer)
     assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertFalse(broker.needsRestart)
 
     assertNotNull(broker.task)
     assertEquals(Broker.State.STARTING, broker.task.state)

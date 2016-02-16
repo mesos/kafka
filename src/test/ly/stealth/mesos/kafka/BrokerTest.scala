@@ -548,6 +548,8 @@ object BrokerTest {
 
     assertFailoverEquals(expected.failover, actual.failover)
     assertTaskEquals(expected.task, actual.task)
+
+    assertEquals(expected.needsRestart, actual.needsRestart)
   }
 
   def assertFailoverEquals(expected: Failover, actual: Failover) {

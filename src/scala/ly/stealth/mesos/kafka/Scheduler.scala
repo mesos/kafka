@@ -277,11 +277,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     broker.metrics = null
+    broker.needsRestart = false
   }
 
   private def isReconciling: Boolean = cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
 
   private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
+    broker.needsRestart = false
+
     val reservation = broker.getReservation(offer)
     val task_ = newTask(broker, offer, reservation)
     val id = task_.getTaskId.getValue

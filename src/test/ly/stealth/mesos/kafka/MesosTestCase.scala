@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
 import java.net.ServerSocket
+import scala.concurrent.duration.Duration
 
 @Ignore
 class MesosTestCase {
@@ -456,6 +457,13 @@ class MesosTestCase {
 
     def sendFrameworkMessage(message: Array[Byte]): Status = throw new UnsupportedOperationException
   }
+
+  def delay(duration: String = "100ms")(f: => Unit) = new Thread {
+    override def run(): Unit = {
+      Thread.sleep(Duration(duration).toMillis)
+      f
+    }
+  }.start()
 }
 
 class TestBrokerServer extends BrokerServer {

@@ -395,6 +395,7 @@ object Cli {
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
+        case "restart" => handleRestart(arg, args)
         case "log" => handleLog(arg, args)
         case _ => throw new Error("unsupported broker command " + cmd)
       }
@@ -416,6 +417,8 @@ object Cli {
           handleRemove(null, help = true)
         case "start" | "stop" =>
           handleStartStop(null, null, cmd == "start", help = true)
+        case "restart" =>
+          handleRestart(null, null, help = true)
         case "log" =>
           handleLog(null, null, help = true)
         case _ =>
@@ -635,6 +638,59 @@ object Cli {
       }
     }
 
+    private def handleRestart(expr: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("timeout", "time to wait until broker restarts (30s, 1m, 1h). Default - 2m").withRequiredArg().ofType(classOf[String])
+
+      if (help) {
+        printLine(s"Restart broker\nUsage: broker restart <broker-expr> [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printBrokerExprExamples(out)
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          printLine()
+          throw new Error(e.getMessage)
+      }
+
+      val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+
+      val params = new util.LinkedHashMap[String, String]()
+      params.put("broker", expr)
+      if (timeout != null) params.put("timeout", timeout)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/broker/restart", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val status = json("status").asInstanceOf[String]
+
+      // restarted|timeout
+      if (status == "timeout") throw new Error(json("message").asInstanceOf[String])
+
+      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      val brokers = "broker" + (if (brokerNodes.size > 1) "s" else "")
+      printLine(s"$brokers $status:")
+
+      for (brokerNode <- brokerNodes) {
+        val broker: Broker = new Broker()
+        broker.fromJson(brokerNode)
+
+        printBroker(broker, 1)
+        printLine()
+      }
+    }
+
     private def handleLog(brokerId: String, args: Array[String], help: Boolean = false): Unit = {
       val parser = newParser()
       parser.accepts("timeout", "timeout (30s, 1m, 1h). Default - 30s").withRequiredArg().ofType(classOf[String])
@@ -692,13 +748,14 @@ object Cli {
       printLine("remove     - remove broker", 1)
       printLine("start      - start broker", 1)
       printLine("stop       - stop broker", 1)
+      printLine("restart    - restart broker", 1)
       printLine("log        - retrieve broker log", 1)
     }
 
     private def printBroker(broker: Broker, indent: Int): Unit = {
       printLine("id: " + broker.id, indent)
       printLine("active: " + broker.active, indent)
-      printLine("state: " + broker.state(), indent)
+      printLine("state: " + broker.state() + (if (broker.needsRestart) " (modified, needs restart)" else ""), indent)
       printLine("resources: " + brokerResources(broker), indent)
 
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
