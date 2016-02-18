@@ -54,6 +54,9 @@ class Broker(_id: String = "0") {
 
   var metrics: Metrics = null
 
+  // broker has been modified while being in non stopped state, once stopped or before task launch becomes false
+  var needsRestart: Boolean = false
+
   def options(defaults: util.Map[String, String] = null): util.Map[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
     if (defaults != null) result.putAll(defaults)
@@ -269,6 +272,8 @@ class Broker(_id: String = "0") {
       metrics = new Broker.Metrics()
       metrics.fromJson(node("metrics").asInstanceOf[Map[String, Object]])
     }
+
+    if (node.contains("needsRestart")) needsRestart = node("needsRestart").asInstanceOf[Boolean]
   }
 
   def toJson: JSONObject = {
@@ -292,6 +297,7 @@ class Broker(_id: String = "0") {
     obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson
     if (metrics != null) obj("metrics") = metrics.toJson
+    if (needsRestart) obj("needsRestart") = needsRestart
 
     new JSONObject(obj.toMap)
   }

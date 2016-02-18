@@ -149,6 +149,7 @@ object HttpServer {
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
+      else if (uri == "restart") handleRestartBroker(request, response)
       else if (uri == "log") handleBrokerLog(request, response)
       else response.sendError(404, "uri not found")
     }
@@ -262,7 +263,6 @@ object HttpServer {
           else broker = new Broker(id)
         else
           if (broker == null) errors.add(s"Broker $id not found")
-          else if (broker.active) errors.add(s"Broker $id is active")
 
         brokers.add(broker)
       }
@@ -288,6 +288,7 @@ object HttpServer {
         if (failoverMaxTries != null) broker.failover.maxTries = if (failoverMaxTries != "") Integer.valueOf(failoverMaxTries) else null
 
         if (add) cluster.addBroker(broker)
+        else if (broker.active || broker.task != null) broker.needsRestart = true
       }
       cluster.save()
 
@@ -372,6 +373,55 @@ object HttpServer {
 
       for (broker <- brokers) brokerNodes.add(broker.toJson)
       response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
+    }
+
+    def handleRestartBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+
+      var timeout: Period = new Period("2m")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+      val expr: String = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
+
+      var ids: util.List[String] = null
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
+
+      val brokers = new util.ArrayList[Broker]()
+      for (id <- ids) {
+        val broker = cluster.getBroker(id)
+        if (broker == null) { response.sendError(400, s"broker $id not found"); return }
+        if (!broker.active || broker.task == null || !broker.task.running) { response.sendError(400, s"broker $id is not running"); return }
+        brokers.add(broker)
+      }
+
+      def timeoutJson(broker: Broker, stage: String): JSONObject =
+        new JSONObject(Map("status" -> "timeout", "message" -> s"broker ${broker.id} timeout on $stage"))
+
+      for (broker <- brokers) {
+        if (!broker.active || broker.task == null || !broker.task.running) { response.sendError(400, s"broker ${broker.id} is not running"); return }
+
+        // stop
+        broker.active = false
+        broker.failover.resetFailures()
+        val begin = System.currentTimeMillis()
+        cluster.save()
+
+        if (!broker.waitFor(null, timeout)) { response.getWriter.println("" + timeoutJson(broker, "stop")); return }
+
+        val startTimeout = new Period(Math.max(timeout.ms - (System.currentTimeMillis() - begin), 0L) + "ms")
+
+        // start
+        broker.active = true
+        cluster.save()
+
+        if (!broker.waitFor(State.RUNNING, startTimeout)) { response.getWriter.println("" + timeoutJson(broker, "start")); return }
+      }
+
+      response.getWriter.println(JSONObject(Map("status" -> "restarted", "brokers" -> new JSONArray(brokers.map(_.toJson).toList))))
     }
 
     def handleBrokerLog(request: HttpServletRequest, response: HttpServletResponse): Unit = {
