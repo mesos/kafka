@@ -436,7 +436,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       val executorId = ExecutorID.newBuilder().setValue(broker.task.executorId).build()
       val slaveId = SlaveID.newBuilder().setValue(broker.task.slaveId).build()
 
-      driver.sendFrameworkMessage(executorId, slaveId, LogRequest(requestId, lines, name).toString.getBytes())
+      driver.sendFrameworkMessage(executorId, slaveId, LogRequest(requestId, lines, name).toString.getBytes)
     }
     requestId
   }
