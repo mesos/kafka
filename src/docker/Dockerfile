@@ -40,4 +40,4 @@ COPY .docker/kafka* /opt/kafka-mesos/
 WORKDIR /opt/kafka-mesos
 EXPOSE 7000
 
-ENTRYPOINT ["/usr/bin/java", "-jar", "/opt/kafka-mesos/kafka-mesos-0.9.4.0.jar", "scheduler"]
+ENTRYPOINT ["/usr/bin/java", "-jar", "/opt/kafka-mesos/kafka-mesos-0.9.5.0.jar", "scheduler"]
