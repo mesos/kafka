@@ -17,6 +17,7 @@
 
 package ly.stealth.mesos.kafka
 
+import net.elodina.mesos.util.Strings
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 import org.apache.mesos.Protos._
 import java.io._
@@ -69,11 +70,11 @@ object Executor extends org.apache.mesos.Executor {
   private[kafka] def startBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
     def runBroker0 {
       try {
-        val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
+        val data: util.Map[String, String] = Strings.parseMap(task.getData.toStringUtf8)
         val broker = new Broker()
         broker.fromJson(Util.parseJson(data.get("broker")))
 
-        val defaults = Util.parseMap(data.get("defaults"))
+        val defaults = Strings.parseMap(data.get("defaults"))
         val endpoint = server.start(broker, defaults)
 
         var status = TaskStatus.newBuilder

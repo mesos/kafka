@@ -35,7 +35,7 @@ import ly.stealth.mesos.kafka.Cluster.FsStorage
 import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
 import java.net.ServerSocket
 import scala.concurrent.duration.Duration
-import net.elodina.mesos.util.{Range, Version}
+import net.elodina.mesos.util.{Strings, Range, Version}
 
 @Ignore
 class MesosTestCase {
@@ -190,7 +190,7 @@ class MesosTestCase {
     builder.addAllResources(this.resources(resources))
 
     if (attributes != null) {
-      val map = Util.parseMap(attributes)
+      val map = Strings.parseMap(attributes)
       for ((k, v) <- map) {
         val attribute = Attribute.newBuilder()
           .setType(Value.Type.TEXT)

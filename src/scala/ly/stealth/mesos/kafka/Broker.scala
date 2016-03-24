@@ -28,7 +28,7 @@ import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Str}
-import net.elodina.mesos.util.{Period, Range}
+import net.elodina.mesos.util.{Strings, Period, Range}
 import java.text.SimpleDateFormat
 import scala.List
 import scala.collection.Map
@@ -255,10 +255,10 @@ class Broker(_id: String = "0") {
     if (node.contains("volume")) volume = node("volume").asInstanceOf[String]
     if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
 
-    if (node.contains("constraints")) constraints = Util.parseMap(node("constraints").asInstanceOf[String])
+    if (node.contains("constraints")) constraints = Strings.parseMap(node("constraints").asInstanceOf[String])
                                                     .mapValues(new Constraint(_)).view.force
-    if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
-    if (node.contains("log4jOptions")) log4jOptions = Util.parseMap(node("log4jOptions").asInstanceOf[String])
+    if (node.contains("options")) options = Strings.parseMap(node("options").asInstanceOf[String])
+    if (node.contains("log4jOptions")) log4jOptions = Strings.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
 
     if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])

@@ -26,8 +26,8 @@ import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 import java.util
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
-import ly.stealth.mesos.kafka.Util.{BindAddress}
-import net.elodina.mesos.util.{Version, Period, Range, IO}
+import ly.stealth.mesos.kafka.Util.BindAddress
+import net.elodina.mesos.util._
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
@@ -216,19 +216,19 @@ object HttpServer {
 
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
-        try { options = Util.parseMap(request.getParameter("options"), nullValues = false).filterKeys(Broker.isOptionOverridable).view.force }
+        try { options = Strings.parseMap(request.getParameter("options")).filterKeys(Broker.isOptionOverridable).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
       var log4jOptions: util.Map[String, String] = null
       if (request.getParameter("log4jOptions") != null)
-        try { log4jOptions = Util.parseMap(request.getParameter("log4jOptions")) }
+        try { log4jOptions = Strings.parseMap(request.getParameter("log4jOptions")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid log4jOptions: " + e.getMessage) }
 
       val jvmOptions: String = request.getParameter("jvmOptions")
 
       var constraints: util.Map[String, Constraint] = null
       if (request.getParameter("constraints") != null)
-        try { constraints = Util.parseMap(request.getParameter("constraints"), nullValues = false).mapValues(new Constraint(_)).view.force }
+        try { constraints = Strings.parseMap(request.getParameter("constraints")).mapValues(new Constraint(_)).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
 
 
@@ -528,7 +528,7 @@ object HttpServer {
 
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
-        try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
+        try { options = Strings.parseMap(request.getParameter("options")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
       if (!add && options == null)

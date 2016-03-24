@@ -19,8 +19,9 @@ package ly.stealth.mesos.kafka
 
 import org.junit.{Before, Test}
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.{BindAddress, parseMap}
+import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Period, Range}
+import net.elodina.mesos.util.Strings.parseMap
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Stickiness, State, Task, Failover}

@@ -23,7 +23,7 @@ import org.junit.Assert._
 import java.util
 import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
-import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.{Strings, Period}
 
 class CliTest extends MesosTestCase {
   val out: ByteArrayOutputStream = new ByteArrayOutputStream()
@@ -105,7 +105,7 @@ class CliTest extends MesosTestCase {
 
     assertEquals(new Period("10s"), broker.failover.delay)
     assertEquals(new Period("20s"), broker.failover.maxDelay)
-    assertEquals(Util.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
+    assertEquals(Strings.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
   }
 
   @Test

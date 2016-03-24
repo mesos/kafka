@@ -41,47 +41,6 @@ object Util {
   JSON.perThreadNumberParser = parseNumber
   private val jsonLock = new Object
 
-  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): util.Map[String, String] = {
-    def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
-      val parts = new util.ArrayList[String]()
-
-      var escaped = false
-      var part = ""
-      for (c <- s.toCharArray) {
-        if (c == '\\' && !escaped) escaped = true
-        else if (c == sep && !escaped) {
-          parts.add(part)
-          part = ""
-        } else {
-          if (escaped && !unescape) part += "\\"
-          part += c
-          escaped = false
-        }
-      }
-
-      if (escaped) throw new IllegalArgumentException("open escaping")
-      if (part != "") parts.add(part)
-
-      parts.toArray(Array[String]())
-    }
-
-    val result = new util.LinkedHashMap[String, String]()
-    if (s == null) return result
-
-    for (entry <- splitEscaped(s, entrySep)) {
-      if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
-
-      val pair = splitEscaped(entry, valueSep, unescape = true)
-      val key: String = pair(0).trim
-      val value: String = if (pair.length > 1) pair(1).trim else null
-
-      if (value == null && !nullValues) throw new IllegalArgumentException(s)
-      result.put(key, value)
-    }
-
-    result
-  }
-
   def formatMap(map: util.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = {
     def escape(s: String): String = {
       var result = ""

@@ -22,8 +22,7 @@ import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.TaskState
 import java.util.Date
-
-import scala.util.parsing.json.JSONObject
+import net.elodina.mesos.util.Strings.parseMap
 
 class SchedulerTest extends MesosTestCase {
   @Test
@@ -45,8 +44,8 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def newTask {
     val broker = new Broker("1")
-    broker.options = Util.parseMap("a=1")
-    broker.log4jOptions = Util.parseMap("b=2")
+    broker.options = parseMap("a=1")
+    broker.log4jOptions = parseMap("b=2")
     broker.cpus = 0.5
     broker.mem = 256
 
@@ -61,13 +60,13 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(resources(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000"), task.getResourcesList)
 
     // data
-    val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
+    val data: util.Map[String, String] = parseMap(task.getData.toStringUtf8)
     
     val readBroker: Broker = new Broker()
     readBroker.fromJson(Util.parseJson(data.get("broker")))
     BrokerTest.assertBrokerEquals(broker, readBroker)
 
-    val defaults = Util.parseMap(data.get("defaults"))
+    val defaults = parseMap(data.get("defaults"))
     assertEquals(broker.id, defaults.get("broker.id"))
     assertEquals("" + 1000, defaults.get("port"))
     assertEquals(Config.zk, defaults.get("zookeeper.connect"))
@@ -192,7 +191,7 @@ class SchedulerTest extends MesosTestCase {
 
     assertNotNull(broker.task)
     assertEquals(Broker.State.STARTING, broker.task.state)
-    assertEquals(Util.parseMap("a=1,b=2"), broker.task.attributes)
+    assertEquals(parseMap("a=1,b=2"), broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
@@ -233,10 +232,10 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def otherTasksAttributes {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
-    broker0.task = new Broker.Task(_hostname = "host0", _attributes = Util.parseMap("a=1,b=2"))
+    broker0.task = new Broker.Task(_hostname = "host0", _attributes = parseMap("a=1,b=2"))
 
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
-    broker1.task = new Broker.Task(_hostname = "host1", _attributes = Util.parseMap("b=3"))
+    broker1.task = new Broker.Task(_hostname = "host1", _attributes = parseMap("b=3"))
 
     assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("hostname").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])

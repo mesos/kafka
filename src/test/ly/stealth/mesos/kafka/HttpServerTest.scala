@@ -22,8 +22,8 @@ import org.junit.{Test, After, Before}
 import org.junit.Assert._
 import java.io.{IOException, FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
-import Util.parseMap
 import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.Strings.parseMap
 import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
@@ -109,7 +109,7 @@ class HttpServerTest extends MesosTestCase {
     // when running
     Scheduler.statusUpdate(schedulerDriver, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, data = "slave0:9042"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
-    sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka=DEBUG\\, kafkaAppender"))
+    sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka\\=DEBUG\\\\\\, kafkaAppender"))
     assertTrue(broker.needsRestart)
 
     // once stopped needsRestart flag reset to false
