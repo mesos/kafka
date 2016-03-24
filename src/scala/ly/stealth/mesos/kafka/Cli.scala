@@ -24,7 +24,8 @@ import java.io._
 import java.util
 import scala.collection.JavaConversions._
 import java.util.{Date, Properties, Collections}
-import ly.stealth.mesos.kafka.Util.{BindAddress, Str, Period}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Str}
+import net.elodina.mesos.util.Period
 import ly.stealth.mesos.kafka.Topics.Topic
 
 object Cli {

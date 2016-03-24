@@ -23,7 +23,7 @@ import org.junit.Assert._
 import java.util
 import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
-import Util.Period
+import net.elodina.mesos.util.Period
 
 class CliTest extends MesosTestCase {
   val out: ByteArrayOutputStream = new ByteArrayOutputStream()

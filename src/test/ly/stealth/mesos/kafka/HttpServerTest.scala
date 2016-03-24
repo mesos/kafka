@@ -22,7 +22,8 @@ import org.junit.{Test, After, Before}
 import org.junit.Assert._
 import java.io.{IOException, FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
-import Util.{Period, parseMap}
+import Util.parseMap
+import net.elodina.mesos.util.Period
 import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util

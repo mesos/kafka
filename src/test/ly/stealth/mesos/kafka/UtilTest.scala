@@ -19,8 +19,7 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Version}
-import java.io.{ByteArrayOutputStream, ByteArrayInputStream}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Range, Version}
 import java.util
 
 class UtilTest {
@@ -82,96 +81,6 @@ class UtilTest {
     assertEquals(2, node.size)
     assertEquals("1", node("a").asInstanceOf[String])
     assertEquals("2", node("b").asInstanceOf[String])
-  }
-
-  // Period
-  @Test
-  def Period_init() {
-    new Period("1m")
-
-    // empty
-    try {
-      new Period("")
-      fail()
-    } catch { case e: IllegalArgumentException => }
-
-    // zero without units
-    new Period("0")
-
-    // no units
-    try {
-      new Period("1")
-      fail()
-    } catch { case e: IllegalArgumentException => }
-
-    // no value
-    try {
-      new Period("ms")
-      fail()
-    } catch { case e: IllegalArgumentException => }
-
-    // wrong unit
-    try {
-      new Period("1k")
-      fail()
-    } catch { case e: IllegalArgumentException => }
-
-    // non-integer value
-    try {
-      new Period("0.5m")
-      fail()
-    } catch { case e: IllegalArgumentException => }
-
-    // invalid value
-    try {
-      new Period("Xh")
-      fail()
-    } catch { case e: IllegalArgumentException => }
-  }
-
-  @Test
-  def Period_ms {
-    assertEquals(0, new Period("0").ms)
-    assertEquals(1, new Period("1ms").ms)
-    assertEquals(10, new Period("10ms").ms)
-
-    val s: Int = 1000
-    assertEquals(s, new Period("1s").ms)
-    assertEquals(10 * s, new Period("10s").ms)
-
-    val m: Int = 60 * s
-    assertEquals(m, new Period("1m").ms)
-    assertEquals(10 * m, new Period("10m").ms)
-
-    val h: Int = 60 * m
-    assertEquals(h, new Period("1h").ms)
-    assertEquals(10 * h, new Period("10h").ms)
-
-    val d: Int = 24 * h
-    assertEquals(d, new Period("1d").ms)
-    assertEquals(10 * d, new Period("10d").ms)
-  }
-
-  @Test
-  def Period_value {
-    assertEquals(0, new Period("0").value)
-    assertEquals(10, new Period("10ms").value)
-    assertEquals(50, new Period("50h").value)
-    assertEquals(20, new Period("20d").value)
-  }
-
-  @Test
-  def Period_unit {
-    assertEquals("ms", new Period("0").unit)
-    assertEquals("ms", new Period("10ms").unit)
-    assertEquals("h", new Period("50h").unit)
-    assertEquals("d", new Period("20d").unit)
-  }
-
-  @Test
-  def Period_toString {
-    assertEquals("10ms", "" + new Period("10ms"))
-    assertEquals("5h", "" + new Period("5h"))
   }
 
   // Range

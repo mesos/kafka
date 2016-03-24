@@ -27,7 +27,8 @@ import scala.collection
 import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
-import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
+import ly.stealth.mesos.kafka.Util.{BindAddress, Range, Str}
+import net.elodina.mesos.util.Period
 import java.text.SimpleDateFormat
 import scala.List
 import scala.collection.Map

@@ -17,15 +17,18 @@
 
 package ly.stealth.mesos.kafka
 
+import net.elodina.mesos.util.Period
 import java.util.concurrent.ConcurrentHashMap
-import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Util.{Version, Period, Str}
+import ly.stealth.mesos.kafka.Util.{Version, Str}
+import org.apache.log4j._
+import scala.Some
+
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
