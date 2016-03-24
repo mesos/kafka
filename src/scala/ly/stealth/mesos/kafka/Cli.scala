@@ -24,8 +24,8 @@ import java.io._
 import java.util
 import scala.collection.JavaConversions._
 import java.util.{Date, Properties, Collections}
-import ly.stealth.mesos.kafka.Util.{BindAddress, Str}
-import net.elodina.mesos.util.{Strings, Period}
+import ly.stealth.mesos.kafka.Util.{BindAddress}
+import net.elodina.mesos.util.{Strings, Period, Repr}
 import ly.stealth.mesos.kafka.Topics.Topic
 
 object Cli {
@@ -774,7 +774,7 @@ object Cli {
       var stickiness = "stickiness:"
       stickiness += " period:" + broker.stickiness.period
       if (broker.stickiness.hostname != null) stickiness += ", hostname:" + broker.stickiness.hostname
-      if (broker.stickiness.stopTime != null) stickiness += ", expires:" + Str.dateTime(broker.stickiness.expires)
+      if (broker.stickiness.stopTime != null) stickiness += ", expires:" + Repr.dateTime(broker.stickiness.expires)
       printLine(stickiness, indent)
 
       val task = broker.task
@@ -789,7 +789,7 @@ object Cli {
       val metrics = broker.metrics
       if (metrics != null) {
         printLine("metrics: ", indent)
-        printLine("collected: " + Str.dateTime(new Date(metrics.timestamp)), indent + 1)
+        printLine("collected: " + Repr.dateTime(new Date(metrics.timestamp)), indent + 1)
         printLine("under-replicated-partitions: " + metrics.underReplicatedPartitions, indent + 1)
         printLine("offline-partitions-count: " + metrics.offlinePartitionsCount, indent + 1)
         printLine("is-active-controller: " + metrics.activeControllerCount, indent + 1)

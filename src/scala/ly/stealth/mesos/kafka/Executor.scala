@@ -17,12 +17,11 @@
 
 package ly.stealth.mesos.kafka
 
-import net.elodina.mesos.util.Strings
+import net.elodina.mesos.util.{Strings, Repr}
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 import org.apache.mesos.Protos._
 import java.io._
 import org.apache.log4j._
-import Util.Str
 import java.util
 import com.google.protobuf.ByteString
 import scala.util.parsing.json.JSONObject
@@ -32,11 +31,11 @@ object Executor extends org.apache.mesos.Executor {
   var server: BrokerServer = new KafkaServer()
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo): Unit = {
-    logger.info("[registered] framework:" + Str.framework(framework) + " slave:" + Str.slave(slave))
+    logger.info("[registered] framework:" + Repr.framework(framework) + " slave:" + Repr.slave(slave))
   }
 
   def reregistered(driver: ExecutorDriver, slave: SlaveInfo): Unit = {
-    logger.info("[reregistered] " + Str.slave(slave))
+    logger.info("[reregistered] " + Repr.slave(slave))
   }
 
   def disconnected(driver: ExecutorDriver): Unit = {
@@ -44,7 +43,7 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   def launchTask(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    logger.info("[launchTask] " + Str.task(task))
+    logger.info("[launchTask] " + Repr.task(task))
     startBroker(driver, task)
   }
 
@@ -173,7 +172,7 @@ object Executor extends org.apache.mesos.Executor {
 
     val json = LogResponse(logRequest.requestId, content).toJson
 
-    driver.sendFrameworkMessage(json.toString().getBytes())
+    driver.sendFrameworkMessage(json.toString().getBytes)
   }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {

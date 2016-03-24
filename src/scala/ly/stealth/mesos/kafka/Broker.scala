@@ -27,8 +27,8 @@ import scala.collection
 import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
-import ly.stealth.mesos.kafka.Util.{BindAddress, Str}
-import net.elodina.mesos.util.{Strings, Period, Range}
+import ly.stealth.mesos.kafka.Util.BindAddress
+import net.elodina.mesos.util.{Strings, Period, Range, Repr}
 import java.text.SimpleDateFormat
 import scala.List
 import scala.collection.Map
@@ -213,15 +213,15 @@ class Broker(_id: String = "0") {
       if (failover.isWaitingDelay(now)) {
         var s = "failed " + failover.failures
         if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += " " + Str.dateTime(failover.failureTime)
-        s += ", next start " + Str.dateTime(failover.delayExpires)
+        s += " " + Repr.dateTime(failover.failureTime)
+        s += ", next start " + Repr.dateTime(failover.delayExpires)
         return s
       }
 
       if (failover.failures > 0) {
         var s = "starting " + (failover.failures + 1)
         if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += ", failed " + Str.dateTime(failover.failureTime)
+        s += ", failed " + Repr.dateTime(failover.failureTime)
         return s
       }
 
