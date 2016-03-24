@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.{BindAddress, parseMap}
-import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.{Period, Range}
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Stickiness, State, Task, Failover}
@@ -206,9 +206,9 @@ class BrokerTest extends MesosTestCase {
 
   @Test
   def getSuitablePort {
-    def ranges(s: String): util.List[Util.Range] = {
+    def ranges(s: String): util.List[Range] = {
       if (s.isEmpty) return Collections.emptyList()
-      s.split(",").toList.map(s => new Util.Range(s.trim))
+      s.split(",").toList.map(s => new Range(s.trim))
     }
 
     // no port restrictions
@@ -221,13 +221,13 @@ class BrokerTest extends MesosTestCase {
     assertEquals(50, broker.getSuitablePort(ranges("100..200, 50..60")))
 
     // single port restriction
-    broker.port = new Util.Range(92)
+    broker.port = new Range(92)
     assertEquals(-1, broker.getSuitablePort(ranges("0..91")))
     assertEquals(-1, broker.getSuitablePort(ranges("93..100")))
     assertEquals(92, broker.getSuitablePort(ranges("90..100")))
 
     // port range restriction
-    broker.port = new Util.Range("92..100")
+    broker.port = new Range("92..100")
     assertEquals(-1, broker.getSuitablePort(ranges("0..91")))
     assertEquals(-1, broker.getSuitablePort(ranges("101..200")))
     assertEquals(92, broker.getSuitablePort(ranges("0..100")))
@@ -333,7 +333,7 @@ class BrokerTest extends MesosTestCase {
     broker.cpus = 0.5
     broker.mem = 128
     broker.heap = 128
-    broker.port = new Util.Range("0..100")
+    broker.port = new Range("0..100")
     broker.volume = "volume"
     broker.bindAddress = new Util.BindAddress("192.168.0.1")
 

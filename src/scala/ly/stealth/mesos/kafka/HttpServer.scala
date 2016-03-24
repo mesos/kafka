@@ -26,8 +26,8 @@ import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 import java.util
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
-import ly.stealth.mesos.kafka.Util.{BindAddress, Range}
-import net.elodina.mesos.util.{Version, Period, IO}
+import ly.stealth.mesos.kafka.Util.{BindAddress}
+import net.elodina.mesos.util.{Version, Period, Range, IO}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject

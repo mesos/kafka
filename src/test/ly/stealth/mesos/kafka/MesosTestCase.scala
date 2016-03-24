@@ -35,7 +35,7 @@ import ly.stealth.mesos.kafka.Cluster.FsStorage
 import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
 import java.net.ServerSocket
 import scala.concurrent.duration.Duration
-import net.elodina.mesos.util.Version
+import net.elodina.mesos.util.{Range, Version}
 
 @Ignore
 class MesosTestCase {
@@ -208,7 +208,7 @@ class MesosTestCase {
   def ranges(s: String): util.List[Value.Range] = {
     if (s.isEmpty) return Collections.emptyList()
     s.split(",").toList
-      .map(s => new Util.Range(s.trim))
+      .map(s => new Range(s.trim))
       .map(r => Value.Range.newBuilder().setBegin(r.start).setEnd(r.end).build())
   }
 
