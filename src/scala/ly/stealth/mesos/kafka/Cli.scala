@@ -25,7 +25,7 @@ import java.util
 import scala.collection.JavaConversions._
 import java.util.{Date, Properties, Collections}
 import ly.stealth.mesos.kafka.Util.{BindAddress, Str}
-import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.{Strings, Period}
 import ly.stealth.mesos.kafka.Topics.Topic
 
 object Cli {
@@ -130,7 +130,7 @@ object Cli {
     finally { reader.close() }
 
     val map = new util.HashMap[String, String](props.toMap)
-    Util.formatMap(map)
+    Strings.formatMap(map)
   }
 
   private def newParser(): OptionParser = {
@@ -760,9 +760,9 @@ object Cli {
       printLine("resources: " + brokerResources(broker), indent)
 
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
-      if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
-      if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
-      if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Util.formatMap(broker.log4jOptions), indent)
+      if (!broker.constraints.isEmpty) printLine("constraints: " + Strings.formatMap(broker.constraints), indent)
+      if (!broker.options.isEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
+      if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)
       if (broker.jvmOptions != null) printLine("jvm-options: " + broker.jvmOptions, indent)
 
       var failover = "failover:"
@@ -783,7 +783,7 @@ object Cli {
         printLine("id: " + broker.task.id, indent + 1)
         printLine("state: " + task.state, indent + 1)
         if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
-        if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
+        if (!task.attributes.isEmpty) printLine("attributes: " + Strings.formatMap(task.attributes), indent + 1)
       }
 
       val metrics = broker.metrics
@@ -1036,7 +1036,7 @@ object Cli {
     private def printTopic(topic: Topic, indent: Int): Unit = {
       printLine("name: " + topic.name, indent)
       printLine("partitions: " + topic.partitionsState, indent)
-      if (!topic.options.isEmpty) printLine("options: " + Util.formatMap(topic.options), indent)
+      if (!topic.options.isEmpty) printLine("options: " + Strings.formatMap(topic.options), indent)
     }
   }
 }

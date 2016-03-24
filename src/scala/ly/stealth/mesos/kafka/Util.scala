@@ -41,28 +41,6 @@ object Util {
   JSON.perThreadNumberParser = parseNumber
   private val jsonLock = new Object
 
-  def formatMap(map: util.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = {
-    def escape(s: String): String = {
-      var result = ""
-
-      for (c <- s.toCharArray) {
-        if (c == entrySep || c == valueSep || c == '\\') result += "\\"
-        result += c
-      }
-
-      result
-    }
-
-    var s = ""
-    for ((k, v) <- map) {
-      if (!s.isEmpty) s += entrySep
-      s += escape(k)
-      if (v != null) s += valueSep + escape("" + v)
-    }
-
-    s
-  }
-
   def parseJson(json: String): Map[String, Object] = {
     jsonLock synchronized {
       val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]

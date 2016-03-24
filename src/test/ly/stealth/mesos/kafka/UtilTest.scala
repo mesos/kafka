@@ -24,24 +24,6 @@ import java.util
 
 class UtilTest {
   @Test
-  def formatMap {
-    val map = new util.LinkedHashMap[String, String]()
-    map.put("a", "1")
-    map.put("b", "2")
-    assertEquals("a=1,b=2", Util.formatMap(map))
-
-    // null value
-    map.put("b", null)
-    assertEquals("a=1,b", Util.formatMap(map))
-
-    // escaping
-    map.put("a", ",")
-    map.put("b", "=")
-    map.put("c", "\\")
-    assertEquals("a=\\,,b=\\=,c=\\\\", Util.formatMap(map))
-  }
-
-  @Test
   def parseJson {
     val node: Map[String, Object] = Util.parseJson("{\"a\":\"1\", \"b\":\"2\"}")
     assertEquals(2, node.size)

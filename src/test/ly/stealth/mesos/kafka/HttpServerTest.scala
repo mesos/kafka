@@ -22,13 +22,12 @@ import org.junit.{Test, After, Before}
 import org.junit.Assert._
 import java.io.{IOException, FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
-import net.elodina.mesos.util.Period
-import net.elodina.mesos.util.Strings.parseMap
+import net.elodina.mesos.util.{Period, IO}
+import net.elodina.mesos.util.Strings.{parseMap, formatMap}
 import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import scala.collection.JavaConversions._
-import net.elodina.mesos.util.IO
 
 class HttpServerTest extends MesosTestCase {
   @Before
@@ -297,7 +296,7 @@ class HttpServerTest extends MesosTestCase {
     val t1: Topic = topics.getTopic("t1")
     assertNotNull(t1)
     assertEquals("t1", t1.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t1.options))
+    assertEquals("flush.ms=1000", formatMap(t1.options))
 
     assertEquals(2, t1.partitions.size())
     assertEquals(util.Arrays.asList(0), t1.partitions.get(0))
@@ -316,7 +315,7 @@ class HttpServerTest extends MesosTestCase {
 
     val t = topics.getTopic("t")
     assertEquals("t", t.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t.options))
+    assertEquals("flush.ms=1000", formatMap(t.options))
   }
 
   @Test

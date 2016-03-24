@@ -114,7 +114,7 @@ object Expr {
             values.put(k, value)
           }
 
-          Util.formatMap(values)
+          Strings.formatMap(values)
         }
       }
 

@@ -289,9 +289,9 @@ class Broker(_id: String = "0") {
     if (volume != null) obj("volume") = volume
     if (bindAddress != null) obj("bindAddress") = "" + bindAddress
 
-    if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
-    if (!options.isEmpty) obj("options") = Util.formatMap(options)
-    if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
+    if (!constraints.isEmpty) obj("constraints") = Strings.formatMap(constraints)
+    if (!options.isEmpty) obj("options") = Strings.formatMap(options)
+    if (!log4jOptions.isEmpty) obj("log4jOptions") = Strings.formatMap(log4jOptions)
     if (jvmOptions != null) obj("jvmOptions") = jvmOptions
 
     obj("stickiness") = stickiness.toJson

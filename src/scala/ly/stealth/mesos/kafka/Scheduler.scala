@@ -17,7 +17,7 @@
 
 package ly.stealth.mesos.kafka
 
-import net.elodina.mesos.util.{Period, Version}
+import net.elodina.mesos.util.{Strings, Period, Version}
 import java.util.concurrent.ConcurrentHashMap
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
@@ -84,8 +84,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       val data = new util.HashMap[String, String]()
       data.put("broker", "" + broker.toJson)
-      data.put("defaults", Util.formatMap(defaults))
-      ByteString.copyFromUtf8(Util.formatMap(data))
+      data.put("defaults", Strings.formatMap(defaults))
+      ByteString.copyFromUtf8(Strings.formatMap(data))
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder

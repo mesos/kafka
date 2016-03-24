@@ -4,7 +4,7 @@ import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
-import net.elodina.mesos.util.Strings.parseMap
+import net.elodina.mesos.util.Strings.{parseMap, formatMap}
 
 class TopicsTest extends MesosTestCase {
   var topics: Topics = null
@@ -58,7 +58,7 @@ class TopicsTest extends MesosTestCase {
 
     val t0: Topic = _topics.get(0)
     assertEquals("t0", t0.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t0.options))
+    assertEquals("flush.ms=1000", formatMap(t0.options))
 
     assertEquals(2, t0.partitions.size())
     assertEquals(util.Arrays.asList(0), t0.partitions.get(0))
@@ -71,7 +71,7 @@ class TopicsTest extends MesosTestCase {
     topics.updateTopic(t, parseMap("flush.ms=1000"))
 
     t = topics.getTopic(t.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t.options))
+    assertEquals("flush.ms=1000", formatMap(t.options))
   }
 
   @Test
