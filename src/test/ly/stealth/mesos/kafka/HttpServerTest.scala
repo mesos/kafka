@@ -27,6 +27,7 @@ import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import scala.collection.JavaConversions._
+import net.elodina.mesos.util.IO
 
 class HttpServerTest extends MesosTestCase {
   @Before
@@ -356,7 +357,7 @@ class HttpServerTest extends MesosTestCase {
     val connection = url.openConnection().asInstanceOf[HttpURLConnection]
     try {
       val file = File.createTempFile(getClass.getSimpleName, new File(uri).getName)
-      Util.copyAndClose(connection.getInputStream, new FileOutputStream(file))
+      IO.copyAndClose(connection.getInputStream, new FileOutputStream(file))
       file.deleteOnExit()
       file
     } finally  {

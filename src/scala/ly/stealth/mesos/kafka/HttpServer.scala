@@ -30,6 +30,7 @@ import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
+import net.elodina.mesos.util.IO
 
 object HttpServer {
   var jar: File = null
@@ -131,7 +132,7 @@ object HttpServer {
       response.setContentType("application/zip")
       response.setHeader("Content-Length", "" + file.length())
       response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
-      Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
+      IO.copyAndClose(new FileInputStream(file), response.getOutputStream)
     }
 
     def handleHealth(response: HttpServletResponse): Unit = {

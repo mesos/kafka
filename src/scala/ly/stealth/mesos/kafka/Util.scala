@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import java.util
 import scala.collection.JavaConversions._
 import scala.util.parsing.json.JSON
-import java.io.{File, IOException, OutputStream, InputStream}
+import java.io.{File, IOException}
 import java.util.Date
 import java.text.SimpleDateFormat
 import org.apache.mesos.Protos._
@@ -109,24 +109,6 @@ object Util {
       val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
       if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
       node
-    }
-  }
-
-  def copyAndClose(in: InputStream, out: OutputStream): Unit = {
-    val buffer = new Array[Byte](16 * 1024)
-    var actuallyRead = 0
-
-    try {
-      while (actuallyRead != -1) {
-        actuallyRead = in.read(buffer)
-        if (actuallyRead != -1) out.write(buffer, 0, actuallyRead)
-      }
-    } finally {
-      try { in.close() }
-      catch { case ignore: IOException => }
-
-      try { out.close() }
-      catch { case ignore: IOException => }
     }
   }
 
