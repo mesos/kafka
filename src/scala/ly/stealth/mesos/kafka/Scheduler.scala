@@ -17,7 +17,7 @@
 
 package ly.stealth.mesos.kafka
 
-import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.{Period, Version}
 import java.util.concurrent.ConcurrentHashMap
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
@@ -25,7 +25,7 @@ import java.util
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Util.{Version, Str}
+import ly.stealth.mesos.kafka.Util.Str
 import org.apache.log4j._
 import scala.Some
 

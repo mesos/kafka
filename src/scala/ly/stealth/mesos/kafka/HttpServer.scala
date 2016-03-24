@@ -27,16 +27,15 @@ import java.util
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
 import ly.stealth.mesos.kafka.Util.{BindAddress, Range}
-import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.{Version, Period, IO}
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
-import net.elodina.mesos.util.IO
 
 object HttpServer {
   var jar: File = null
   var kafkaDist: File = null
-  var kafkaVersion: Util.Version = null
+  var kafkaVersion: Version = null
 
   val logger = Logger.getLogger(HttpServer.getClass)
   var server: Server = null
@@ -99,7 +98,7 @@ object HttpServer {
     val tgzIdx = distName.lastIndexOf(".tgz")
     val hIdx = distName.lastIndexOf("-")
     if (tgzIdx == -1 || hIdx == -1) throw new IllegalStateException("Can't extract version number from " + distName)
-    kafkaVersion = new Util.Version(distName.substring(hIdx + 1, tgzIdx))
+    kafkaVersion = new Version(distName.substring(hIdx + 1, tgzIdx))
   }
 
   private class Servlet extends HttpServlet {

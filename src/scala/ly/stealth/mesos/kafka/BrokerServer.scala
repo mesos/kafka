@@ -24,6 +24,7 @@ import java.util.Properties
 import java.util
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.BrokerServer.Distro
+import net.elodina.mesos.util.Version
 
 abstract class BrokerServer {
   def isStarted: Boolean
@@ -175,8 +176,8 @@ object BrokerServer {
       val extIdx = jarName.lastIndexOf(".jar")
       if (hIdx == -1 || extIdx == -1) return
 
-      val version = new Util.Version(jarName.substring(hIdx + 1, extIdx))
-      snappyHackEnabled = version.compareTo(new Util.Version(1,1,0)) <= 0
+      val version = new Version(jarName.substring(hIdx + 1, extIdx))
+      snappyHackEnabled = version.compareTo(new Version(1,1,0)) <= 0
     }
 
     override protected def loadClass(name: String, resolve: Boolean): Class[_] = {

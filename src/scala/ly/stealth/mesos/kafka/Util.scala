@@ -187,38 +187,6 @@ object Util {
     override def toString: String = if (start == end) "" + start else start + ".." + end
   }
 
-  class Version(s: String) extends Comparable[Version] {
-    private var parts: Array[Int] = null
-
-    def this(args: Int*) {
-      this(args.mkString("."))
-    }
-
-    parse
-    private def parse {
-      parts = if (s != "") s.split("\\.", -1).map(Integer.parseInt) else new Array[Int](0)
-    }
-
-    def asList: List[Int] = parts.toList
-
-    def compareTo(v: Version): Int = {
-      for (i <- 0 until Math.min(parts.length, v.parts.length)) {
-        val diff = parts(i) - v.parts(i)
-        if (diff != 0) return diff
-      }
-
-      parts.length - v.parts.length
-    }
-
-    override def hashCode(): Int = toString.hashCode
-
-    override def equals(obj: scala.Any): Boolean = {
-      obj.isInstanceOf[Version] && toString == "" + obj
-    }
-
-    override def toString: String = parts.mkString(".")
-  }
-
   class BindAddress(s: String) {
     private var _source: String = null
     private var _value: String = null

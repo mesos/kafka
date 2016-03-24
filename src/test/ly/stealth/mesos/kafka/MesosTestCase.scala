@@ -35,6 +35,7 @@ import ly.stealth.mesos.kafka.Cluster.FsStorage
 import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
 import java.net.ServerSocket
 import scala.concurrent.duration.Duration
+import net.elodina.mesos.util.Version
 
 @Ignore
 class MesosTestCase {
@@ -80,7 +81,7 @@ class MesosTestCase {
 
     HttpServer.jar = createTempFile("executor.jar", "executor")
     HttpServer.kafkaDist = createTempFile("kafka-0.9.3.0.tgz", "kafka")
-    HttpServer.kafkaVersion = new Util.Version("0.9.3.0")
+    HttpServer.kafkaVersion = new Version("0.9.3.0")
   }
 
   @After
