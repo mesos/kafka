@@ -11,4 +11,5 @@ src/vagrant/.vagrant
 kafka-mesos*.json
 kafka-mesos*.properties
 kafka-mesos*.jar
+jre*.tar.gz
 kafka*.tgz

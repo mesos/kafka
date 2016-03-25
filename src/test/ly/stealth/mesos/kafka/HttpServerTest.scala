@@ -22,13 +22,14 @@ import org.junit.{Test, After, Before}
 import org.junit.Assert._
 import java.io.{IOException, FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
-import Util.{Period, parseMap}
+import net.elodina.mesos.util.{Period, IO}
+import net.elodina.mesos.util.Strings.{parseMap, formatMap}
 import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import scala.collection.JavaConversions._
 
-class HttpServerTest extends MesosTestCase {
+class HttpServerTest extends KafkaMesosTestCase {
   @Before
   override def before {
     super.before
@@ -101,20 +102,20 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(broker.needsRestart)
 
     // modification is made before offer thus when it arrives needsRestart reset to false
-    Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:2.0;mem:8192;ports:9042..65000", hostname = "slave0")))
+    Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave0", "cpus:2.0;mem:8192;ports:9042..65000")))
     assertFalse(broker.needsRestart)
 
     // when running
-    Scheduler.statusUpdate(schedulerDriver, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, data = "slave0:9042"))
+    Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave0:9042"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
-    sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka=DEBUG\\, kafkaAppender"))
+    sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka\\=DEBUG\\\\\\, kafkaAppender"))
     assertTrue(broker.needsRestart)
 
     // once stopped needsRestart flag reset to false
     sendRequest("/broker/stop", parseMap("broker=0,timeout=0s"))
     assertTrue(broker.needsRestart)
-    Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:0.01;mem:128;ports:0..1")))
-    Scheduler.statusUpdate(schedulerDriver, taskStatus(id = Broker.nextTaskId(broker), state = TaskState.TASK_FINISHED))
+    Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+    Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
     assertFalse(broker.needsRestart)
   }
 
@@ -196,14 +197,14 @@ class HttpServerTest extends MesosTestCase {
 
     // two nodes
     def started(broker: Broker) {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:2.0;mem:2048;ports:9042..65000", hostname = "slave" + broker.id)))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, data = "slave" + broker.id + ":9042"))
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
       assertEquals(Broker.State.RUNNING, broker.task.state)
     }
 
     def stopped(broker: Broker): Unit = {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:0.01;mem:128;ports:0..1")))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(id = Broker.nextTaskId(broker), state = TaskState.TASK_FINISHED))
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
       assertFalse(broker.active)
       assertNull(broker.task)
     }
@@ -295,7 +296,7 @@ class HttpServerTest extends MesosTestCase {
     val t1: Topic = topics.getTopic("t1")
     assertNotNull(t1)
     assertEquals("t1", t1.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t1.options))
+    assertEquals("flush.ms=1000", formatMap(t1.options))
 
     assertEquals(2, t1.partitions.size())
     assertEquals(util.Arrays.asList(0), t1.partitions.get(0))
@@ -314,7 +315,7 @@ class HttpServerTest extends MesosTestCase {
 
     val t = topics.getTopic("t")
     assertEquals("t", t.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t.options))
+    assertEquals("flush.ms=1000", formatMap(t.options))
   }
 
   @Test
@@ -356,7 +357,7 @@ class HttpServerTest extends MesosTestCase {
     val connection = url.openConnection().asInstanceOf[HttpURLConnection]
     try {
       val file = File.createTempFile(getClass.getSimpleName, new File(uri).getName)
-      Util.copyAndClose(connection.getInputStream, new FileOutputStream(file))
+      IO.copyAndClose(connection.getInputStream, new FileOutputStream(file))
       file.deleteOnExit()
       file
     } finally  {

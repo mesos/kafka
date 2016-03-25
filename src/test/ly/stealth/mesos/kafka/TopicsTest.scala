@@ -4,8 +4,9 @@ import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
+import net.elodina.mesos.util.Strings.{parseMap, formatMap}
 
-class TopicsTest extends MesosTestCase {
+class TopicsTest extends KafkaMesosTestCase {
   var topics: Topics = null
 
   @Before
@@ -49,7 +50,7 @@ class TopicsTest extends MesosTestCase {
 
   @Test
   def addTopic {
-    topics.addTopic("t0", topics.fairAssignment(2, 1), options = Util.parseMap("flush.ms=1000"))
+    topics.addTopic("t0", topics.fairAssignment(2, 1), options = parseMap("flush.ms=1000"))
     topics.addTopic("t1")
 
     val _topics: util.List[Topic] = topics.getTopics
@@ -57,7 +58,7 @@ class TopicsTest extends MesosTestCase {
 
     val t0: Topic = _topics.get(0)
     assertEquals("t0", t0.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t0.options))
+    assertEquals("flush.ms=1000", formatMap(t0.options))
 
     assertEquals(2, t0.partitions.size())
     assertEquals(util.Arrays.asList(0), t0.partitions.get(0))
@@ -67,16 +68,16 @@ class TopicsTest extends MesosTestCase {
   @Test
   def updateTopic {
     var t: Topic = topics.addTopic("t")
-    topics.updateTopic(t, Util.parseMap("flush.ms=1000"))
+    topics.updateTopic(t, parseMap("flush.ms=1000"))
 
     t = topics.getTopic(t.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t.options))
+    assertEquals("flush.ms=1000", formatMap(t.options))
   }
 
   @Test
   def validateOptions {
-    assertNull(topics.validateOptions(Util.parseMap("flush.ms=1000")))
-    assertNotNull(topics.validateOptions(Util.parseMap("invalid=1000")))
+    assertNull(topics.validateOptions(parseMap("flush.ms=1000")))
+    assertNotNull(topics.validateOptions(parseMap("invalid=1000")))
   }
 
   // Topic
@@ -86,7 +87,7 @@ class TopicsTest extends MesosTestCase {
     topic.partitions.put(0, util.Arrays.asList(0, 1))
     topic.partitions.put(1, util.Arrays.asList(1, 2))
     topic.partitions.put(2, util.Arrays.asList(0, 2))
-    topic.options = Util.parseMap("a=1,b=2")
+    topic.options = parseMap("a=1,b=2")
 
     val read: Topic = new Topic()
     read.fromJson(Util.parseJson("" + topic.toJson))

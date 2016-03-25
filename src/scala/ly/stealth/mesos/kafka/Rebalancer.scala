@@ -29,7 +29,7 @@ import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import kafka.admin._
 import kafka.common.TopicAndPartition
 import kafka.utils.{ZkUtils, ZKStringSerializer}
-import ly.stealth.mesos.kafka.Util.Period
+import net.elodina.mesos.util.Period
 import org.apache.log4j.Logger
 
 class Rebalancer {

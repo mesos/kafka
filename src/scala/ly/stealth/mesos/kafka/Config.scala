@@ -20,7 +20,8 @@ package ly.stealth.mesos.kafka
 import java.io.{FileInputStream, File}
 import java.util.Properties
 import java.net.URI
-import ly.stealth.mesos.kafka.Util.{BindAddress, Period}
+import ly.stealth.mesos.kafka.Util.BindAddress
+import net.elodina.mesos.util.Period
 
 object Config {
   val DEFAULT_FILE = new File("kafka-mesos.properties")

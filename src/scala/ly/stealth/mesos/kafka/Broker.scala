@@ -27,7 +27,8 @@ import scala.collection
 import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
-import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range, Str}
+import ly.stealth.mesos.kafka.Util.BindAddress
+import net.elodina.mesos.util.{Strings, Period, Range, Repr}
 import java.text.SimpleDateFormat
 import scala.List
 import scala.collection.Map
@@ -212,15 +213,15 @@ class Broker(_id: String = "0") {
       if (failover.isWaitingDelay(now)) {
         var s = "failed " + failover.failures
         if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += " " + Str.dateTime(failover.failureTime)
-        s += ", next start " + Str.dateTime(failover.delayExpires)
+        s += " " + Repr.dateTime(failover.failureTime)
+        s += ", next start " + Repr.dateTime(failover.delayExpires)
         return s
       }
 
       if (failover.failures > 0) {
         var s = "starting " + (failover.failures + 1)
         if (failover.maxTries != null) s += "/" + failover.maxTries
-        s += ", failed " + Str.dateTime(failover.failureTime)
+        s += ", failed " + Repr.dateTime(failover.failureTime)
         return s
       }
 
@@ -254,10 +255,10 @@ class Broker(_id: String = "0") {
     if (node.contains("volume")) volume = node("volume").asInstanceOf[String]
     if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
 
-    if (node.contains("constraints")) constraints = Util.parseMap(node("constraints").asInstanceOf[String])
+    if (node.contains("constraints")) constraints = Strings.parseMap(node("constraints").asInstanceOf[String])
                                                     .mapValues(new Constraint(_)).view.force
-    if (node.contains("options")) options = Util.parseMap(node("options").asInstanceOf[String])
-    if (node.contains("log4jOptions")) log4jOptions = Util.parseMap(node("log4jOptions").asInstanceOf[String])
+    if (node.contains("options")) options = Strings.parseMap(node("options").asInstanceOf[String])
+    if (node.contains("log4jOptions")) log4jOptions = Strings.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
 
     if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
@@ -288,9 +289,9 @@ class Broker(_id: String = "0") {
     if (volume != null) obj("volume") = volume
     if (bindAddress != null) obj("bindAddress") = "" + bindAddress
 
-    if (!constraints.isEmpty) obj("constraints") = Util.formatMap(constraints)
-    if (!options.isEmpty) obj("options") = Util.formatMap(options)
-    if (!log4jOptions.isEmpty) obj("log4jOptions") = Util.formatMap(log4jOptions)
+    if (!constraints.isEmpty) obj("constraints") = Strings.formatMap(constraints)
+    if (!options.isEmpty) obj("options") = Strings.formatMap(options)
+    if (!log4jOptions.isEmpty) obj("log4jOptions") = Strings.formatMap(log4jOptions)
     if (jvmOptions != null) obj("jvmOptions") = jvmOptions
 
     obj("stickiness") = stickiness.toJson

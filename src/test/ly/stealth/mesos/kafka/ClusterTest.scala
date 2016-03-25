@@ -22,7 +22,7 @@ import java.util
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Broker.State
 
-class ClusterTest extends MesosTestCase {
+class ClusterTest extends KafkaMesosTestCase {
   var cluster: Cluster = new Cluster()
 
   @Before

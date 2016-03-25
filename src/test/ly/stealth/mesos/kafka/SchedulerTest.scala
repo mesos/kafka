@@ -22,10 +22,9 @@ import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.TaskState
 import java.util.Date
+import net.elodina.mesos.util.Strings.parseMap
 
-import scala.util.parsing.json.JSONObject
-
-class SchedulerTest extends MesosTestCase {
+class SchedulerTest extends KafkaMesosTestCase {
   @Test
   def newExecutor {
     val broker = new Broker("1")
@@ -45,12 +44,12 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def newTask {
     val broker = new Broker("1")
-    broker.options = Util.parseMap("a=1")
-    broker.log4jOptions = Util.parseMap("b=2")
+    broker.options = parseMap("a=1")
+    broker.log4jOptions = parseMap("b=2")
     broker.cpus = 0.5
     broker.mem = 256
 
-    val offer = this.offer(slaveId = "slave", hostname = "host", resources = s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
+    val offer = this.offer("id", "fw-id", "slave", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "")
     val reservation = broker.getReservation(offer)
 
     val task = Scheduler.newTask(broker, offer, reservation)
@@ -61,13 +60,13 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(resources(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000"), task.getResourcesList)
 
     // data
-    val data: util.Map[String, String] = Util.parseMap(task.getData.toStringUtf8)
+    val data: util.Map[String, String] = parseMap(task.getData.toStringUtf8)
     
     val readBroker: Broker = new Broker()
     readBroker.fromJson(Util.parseJson(data.get("broker")))
     BrokerTest.assertBrokerEquals(broker, readBroker)
 
-    val defaults = Util.parseMap(data.get("defaults"))
+    val defaults = parseMap(data.get("defaults"))
     assertEquals(broker.id, defaults.get("broker.id"))
     assertEquals("" + 1000, defaults.get("port"))
     assertEquals(Config.zk, defaults.get("zookeeper.connect"))
@@ -79,7 +78,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def syncBrokers {
     val broker = Scheduler.cluster.addBroker(new Broker())
-    val offer = this.offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
+    val offer = this.offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
 
     // broker !active
     Scheduler.syncBrokers(util.Arrays.asList(offer))
@@ -108,13 +107,13 @@ class SchedulerTest extends MesosTestCase {
     assertEquals("reconciling", Scheduler.acceptOffer(null))
 
     broker.task = null
-    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(resources = s"cpus:0.4; mem:${broker.mem}")))
-    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}; mem:99")))
+    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(s"cpus:0.4; mem:${broker.mem}")))
+    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(s"cpus:${broker.cpus}; mem:99")))
 
-    assertNull(Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")))
+    assertNull(Scheduler.acceptOffer(offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
-    assertEquals("", Scheduler.acceptOffer(offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}")))
+    assertEquals("", Scheduler.acceptOffer(offer(s"cpus:${broker.cpus}; mem:${broker.mem}")))
   }
 
   @Test
@@ -124,12 +123,12 @@ class SchedulerTest extends MesosTestCase {
     assertEquals(Broker.State.STARTING, broker.task.state)
 
     // broker started
-    Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, "localhost:9092"))
+    Scheduler.onBrokerStatus(taskStatus(broker.task.id, TaskState.TASK_RUNNING, "localhost:9092"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
     assertEquals("localhost:9092", "" + broker.task.endpoint)
 
     // broker finished
-    Scheduler.onBrokerStatus(taskStatus(id = broker.task.id, state = TaskState.TASK_FINISHED))
+    Scheduler.onBrokerStatus(taskStatus(broker.task.id, TaskState.TASK_FINISHED))
     assertNull(broker.task)
     assertEquals(0, broker.failover.failures)
   }
@@ -140,7 +139,7 @@ class SchedulerTest extends MesosTestCase {
     broker.task = new Broker.Task("task")
     assertEquals(Broker.State.STARTING, broker.task.state)
 
-    Scheduler.onBrokerStarted(broker, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, "localhost:9092"))
+    Scheduler.onBrokerStarted(broker, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "localhost:9092"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
     assertEquals("localhost:9092", "" + broker.task.endpoint)
   }
@@ -153,7 +152,7 @@ class SchedulerTest extends MesosTestCase {
     // finished
     broker.task = task
     broker.needsRestart = true
-    Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FINISHED))
+    Scheduler.onBrokerStopped(broker, taskStatus(TaskState.TASK_FINISHED))
     assertNull(broker.task)
     assertEquals(0, broker.failover.failures)
     assertFalse(broker.needsRestart)
@@ -162,7 +161,7 @@ class SchedulerTest extends MesosTestCase {
     broker.active = true
     broker.task = task
     broker.needsRestart = true
-    Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FAILED), new Date(0))
+    Scheduler.onBrokerStopped(broker, taskStatus(TaskState.TASK_FAILED), new Date(0))
     assertNull(broker.task)
     assertEquals(1, broker.failover.failures)
     assertEquals(new Date(0), broker.failover.failureTime)
@@ -171,7 +170,7 @@ class SchedulerTest extends MesosTestCase {
     // failed maxRetries exceeded
     broker.failover.maxTries = 2
     broker.task = task
-    Scheduler.onBrokerStopped(broker, taskStatus(state = TaskState.TASK_FAILED), new Date(1))
+    Scheduler.onBrokerStopped(broker, taskStatus(TaskState.TASK_FAILED), new Date(1))
     assertNull(broker.task)
     assertEquals(2, broker.failover.failures)
     assertEquals(new Date(1), broker.failover.failureTime)
@@ -183,7 +182,7 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def launchTask {
     val broker = Scheduler.cluster.addBroker(new Broker("100"))
-    val offer = this.offer(resources = s"cpus:${broker.cpus}; mem:${broker.mem}", attributes = "a=1,b=2")
+    val offer = this.offer("id", "fw-id", "slave-id", "host", s"cpus:${broker.cpus}; mem:${broker.mem}", "a=1,b=2")
     broker.needsRestart = true
 
     Scheduler.launchTask(broker, offer)
@@ -192,7 +191,7 @@ class SchedulerTest extends MesosTestCase {
 
     assertNotNull(broker.task)
     assertEquals(Broker.State.STARTING, broker.task.state)
-    assertEquals(Util.parseMap("a=1,b=2"), broker.task.attributes)
+    assertEquals(parseMap("a=1,b=2"), broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
@@ -233,10 +232,10 @@ class SchedulerTest extends MesosTestCase {
   @Test
   def otherTasksAttributes {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
-    broker0.task = new Broker.Task(_hostname = "host0", _attributes = Util.parseMap("a=1,b=2"))
+    broker0.task = new Broker.Task(_hostname = "host0", _attributes = parseMap("a=1,b=2"))
 
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
-    broker1.task = new Broker.Task(_hostname = "host1", _attributes = Util.parseMap("b=3"))
+    broker1.task = new Broker.Task(_hostname = "host1", _attributes = parseMap("b=3"))
 
     assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("hostname").asInstanceOf[Array[AnyRef]])
     assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])
@@ -299,9 +298,9 @@ class SchedulerTest extends MesosTestCase {
     val requestId = Scheduler.requestBrokerLog(broker, "stdout", 111)
     assertEquals(1, schedulerDriver.sentFrameworkMessages.size())
     val message = schedulerDriver.sentFrameworkMessages.get(0)
-    assertEquals(broker.task.executorId, message._1.getValue)
-    assertEquals(broker.task.slaveId, message._2.getValue)
-    assertEquals(LogRequest(requestId, 111, "stdout").toString, message._3)
+    assertEquals(broker.task.executorId, message.executorId)
+    assertEquals(broker.task.slaveId, message.slaveId)
+    assertEquals(LogRequest(requestId, 111, "stdout").toString, new String(message.data))
 
     val content = "1\n2\n3\n"
     val data = LogResponse(requestId, content).toJson.toString().getBytes

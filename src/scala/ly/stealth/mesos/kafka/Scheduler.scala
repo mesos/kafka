@@ -17,15 +17,17 @@
 
 package ly.stealth.mesos.kafka
 
+import net.elodina.mesos.util.{Strings, Period, Version, Repr}
 import java.util.concurrent.ConcurrentHashMap
-import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Util.{Version, Period, Str}
+import org.apache.log4j._
+import scala.Some
+
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -81,8 +83,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       val data = new util.HashMap[String, String]()
       data.put("broker", "" + broker.toJson)
-      data.put("defaults", Util.formatMap(defaults))
-      ByteString.copyFromUtf8(Util.formatMap(data))
+      data.put("defaults", Strings.formatMap(defaults))
+      ByteString.copyFromUtf8(Strings.formatMap(data))
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
@@ -97,7 +99,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
-    logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
+    logger.info("[registered] framework:" + Repr.id(id.getValue) + " master:" + Repr.master(master))
 
     cluster.frameworkId = id.getValue
     cluster.save()
@@ -107,27 +109,27 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def reregistered(driver: SchedulerDriver, master: MasterInfo): Unit = {
-    logger.info("[reregistered] master:" + Str.master(master))
+    logger.info("[reregistered] master:" + Repr.master(master))
     this.driver = driver
     reconcileTasksIfRequired(force = true)
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
-    logger.info("[resourceOffers]\n" + Str.offers(offers))
+    logger.info("[resourceOffers]\n" + Repr.offers(offers))
     syncBrokers(offers)
   }
 
   def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
-    logger.info("[offerRescinded] " + Str.id(id.getValue))
+    logger.info("[offerRescinded] " + Repr.id(id.getValue))
   }
 
   def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
-    logger.info("[statusUpdate] " + Str.taskStatus(status))
+    logger.info("[statusUpdate] " + Repr.status(status))
     onBrokerStatus(status)
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
-    logger.info("[frameworkMessage] executor:" + Str.id(executorId.getValue) + " slave:" + Str.id(slaveId.getValue) + " data: " + new String(data))
+    logger.info("[frameworkMessage] executor:" + Repr.id(executorId.getValue) + " slave:" + Repr.id(slaveId.getValue) + " data: " + new String(data))
 
     val broker = cluster.getBroker(Broker.idFromExecutorId(executorId.getValue))
 
@@ -163,11 +165,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def slaveLost(driver: SchedulerDriver, id: SlaveID): Unit = {
-    logger.info("[slaveLost] " + Str.id(id.getValue))
+    logger.info("[slaveLost] " + Repr.id(id.getValue))
   }
 
   def executorLost(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, status: Int): Unit = {
-    logger.info("[executorLost] executor:" + Str.id(executorId.getValue) + " slave:" + Str.id(slaveId.getValue) + " status:" + status)
+    logger.info("[executorLost] executor:" + Repr.id(executorId.getValue) + " slave:" + Repr.id(slaveId.getValue) + " status:" + status)
   }
 
   def error(driver: SchedulerDriver, message: String): Unit = {
@@ -181,7 +183,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       if (declineReason != null) {
         driver.declineOffer(offer.getId)
-        if (!declineReason.isEmpty) declineReasons.add(offer.getHostname + Str.id(offer.getId.getValue) + " - " + declineReason)
+        if (!declineReason.isEmpty) declineReasons.add(offer.getHostname + Repr.id(offer.getId.getValue) + " - " + declineReason)
       }
     }
     
@@ -266,7 +268,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       if (!broker.failover.isMaxTriesExceeded) {
         msg += ", waiting " + broker.failover.currentDelay
-        msg += ", next start ~ " + Str.dateTime(broker.failover.delayExpires)
+        msg += ", next start ~ " + Repr.dateTime(broker.failover.delayExpires)
       } else {
         broker.active = false
         msg += ", failure limit exceeded"
@@ -296,7 +298,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
     broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, attributes)
 
-    logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${offer.getHostname + Str.id(offer.getId.getValue)}\n ${Str.task(task_)}")
+    logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${offer.getHostname + Repr.id(offer.getId.getValue)}\n ${Repr.task(task_)}")
   }
 
   def forciblyStopBroker(broker: Broker): Unit = {
