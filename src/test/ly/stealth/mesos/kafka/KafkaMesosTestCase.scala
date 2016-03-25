@@ -7,6 +7,8 @@ import ly.stealth.mesos.kafka.Cluster.FsStorage
 import net.elodina.mesos.util.{IO, Net, Version}
 import org.junit.{Ignore, Before, After}
 import scala.concurrent.duration.Duration
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util
 
 @Ignore
 class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
@@ -107,4 +109,45 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
       f
     }
   }.start()
+}
+
+class TestBrokerServer extends BrokerServer {
+  var failOnStart: Boolean = false
+  private val started: AtomicBoolean = new AtomicBoolean(false)
+
+  def isStarted: Boolean = started.get()
+
+  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
+    if (failOnStart) throw new RuntimeException("failOnStart")
+    started.set(true)
+    new Broker.Endpoint("localhost", 9092)
+  }
+
+  def stop(): Unit = {
+    started.set(false)
+    started.synchronized { started.notify() }
+  }
+
+  def waitFor(): Unit = {
+    started.synchronized {
+      while (started.get)
+        started.wait()
+    }
+  }
+
+  def getClassLoader: ClassLoader = getClass.getClassLoader
+}
+
+class TestRebalancer extends Rebalancer {
+  var _running: Boolean = false
+  var _failOnStart: Boolean = false
+
+  override def running: Boolean = _running
+
+  override def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1): Unit = {
+    if (_failOnStart) throw new Rebalancer.Exception("failOnStart")
+    _running = true
+  }
+
+  override def state: String = if (running) "running" else ""
 }
