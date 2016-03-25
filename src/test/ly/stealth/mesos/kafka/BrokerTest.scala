@@ -26,8 +26,9 @@ import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Stickiness, State, Task, Failover}
 import java.util
+import org.apache.mesos.Protos.Offer
 
-class BrokerTest extends MesosTestCase {
+class BrokerTest extends KafkaMesosTestCase {
   var broker: Broker = null
 
   @Before
@@ -60,81 +61,86 @@ class BrokerTest extends MesosTestCase {
   def matches {
     // cpus
     broker.cpus = 0.5
-    assertNull(broker.matches(offer(resources = "cpus:0.2; cpus(role):0.3; ports:1000")))
-    assertEquals("cpus < 0.5", broker.matches(offer(resources = "cpus:0.2; cpus(role):0.2")))
+    assertNull(broker.matches(offer("cpus:0.2; cpus(role):0.3; ports:1000")))
+    assertEquals("cpus < 0.5", broker.matches(offer("cpus:0.2; cpus(role):0.2")))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
-    assertNull(broker.matches(offer(resources = "mem:70; mem(role):30; ports:1000")))
-    assertEquals("mem < 100", broker.matches(offer(resources = "mem:70; mem(role):29")))
+    assertNull(broker.matches(offer("mem:70; mem(role):30; ports:1000")))
+    assertEquals("mem < 100", broker.matches(offer("mem:70; mem(role):29")))
     broker.mem = 0
 
     // port
-    assertNull(broker.matches(offer(resources = "ports:1000")))
-    assertEquals("no suitable port", broker.matches(offer(resources = "")))
+    assertNull(broker.matches(offer("ports:1000")))
+    assertEquals("no suitable port", broker.matches(offer("")))
   }
 
   @Test
   def matches_hostname {
     val now = new Date(0)
-    assertNull(broker.matches(offer(hostname = "master")))
-    assertNull(broker.matches(offer(hostname = "slave")))
+    val resources: String = "ports:0..10"
+
+    assertNull(broker.matches(offer("master", resources)))
+    assertNull(broker.matches(offer("slave", resources)))
 
     // token
     broker.constraints = parseMap("hostname=like:master").mapValues(new Constraint(_))
-    assertNull(broker.matches(offer(hostname = "master")))
-    assertEquals("hostname doesn't match like:master", broker.matches(offer(hostname = "slave")))
+    assertNull(broker.matches(offer("master", resources)))
+    assertEquals("hostname doesn't match like:master", broker.matches(offer("slave", resources)))
 
     // like
     broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_))
-    assertNull(broker.matches(offer(hostname = "master")))
-    assertNull(broker.matches(offer(hostname = "master-2")))
-    assertEquals("hostname doesn't match like:master.*", broker.matches(offer(hostname = "slave")))
+    assertNull(broker.matches(offer("master", resources)))
+    assertNull(broker.matches(offer("master-2", resources)))
+    assertEquals("hostname doesn't match like:master.*", broker.matches(offer("slave", resources)))
 
     // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
-    assertNull(broker.matches(offer(hostname = "master")))
-    assertEquals("hostname doesn't match unique", broker.matches(offer(hostname = "master"), now, _ => Array("master")))
-    assertNull(broker.matches(offer(hostname = "master"), now, _ => Array("slave")))
+    assertNull(broker.matches(offer("master", resources)))
+    assertEquals("hostname doesn't match unique", broker.matches(offer("master", resources), now, _ => Array("master")))
+    assertNull(broker.matches(offer("master", resources), now, _ => Array("slave")))
 
     // groupBy
     broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
-    assertNull(broker.matches(offer(hostname = "master")))
-    assertNull(broker.matches(offer(hostname = "master"), now, _ => Array("master")))
-    assertEquals("hostname doesn't match groupBy", broker.matches(offer(hostname = "master"), now, _ => Array("slave")))
+    assertNull(broker.matches(offer("master", resources)))
+    assertNull(broker.matches(offer("master", resources), now, _ => Array("master")))
+    assertEquals("hostname doesn't match groupBy", broker.matches(offer("master", resources), now, _ => Array("slave")))
   }
 
   @Test
   def matches_stickiness {
     val host0 = "host0"
     val host1 = "host1"
+    val resources = "ports:0..10"
 
-    assertNull(broker.matches(offer(hostname = host0), new Date(0)))
-    assertNull(broker.matches(offer(hostname = host1), new Date(0)))
+    assertNull(broker.matches(offer(host0, resources), new Date(0)))
+    assertNull(broker.matches(offer(host1, resources), new Date(0)))
 
     broker.registerStart(host0)
     broker.registerStop(new Date(0))
 
-    assertNull(broker.matches(offer(hostname = host0), new Date(0)))
-    assertEquals("hostname != stickiness host", broker.matches(offer(hostname = host1), new Date(0)))
+    assertNull(broker.matches(offer(host0, resources), new Date(0)))
+    assertEquals("hostname != stickiness host", broker.matches(offer(host1, resources), new Date(0)))
   }
 
   @Test
   def matches_attributes {
     val now = new Date(0)
 
+    def offer(attributes: String): Offer = this.offer("id", "fw-id", "slave-id", "host", "ports:0..10", attributes)
+
     // like
     broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_))
-    assertNull(broker.matches(offer(attributes = "rack=1-1")))
-    assertNull(broker.matches(offer(attributes = "rack=1-2")))
-    assertEquals("rack doesn't match like:1-.*", broker.matches(offer(attributes = "rack=2-1")))
+    assertNull(broker.matches(offer("rack=1-1")))
+    assertNull(broker.matches(offer("rack=1-2")))
+    assertEquals("rack doesn't match like:1-.*", broker.matches(offer("rack=2-1")))
 
     // groupBy
     broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
-    assertNull(broker.matches(offer(attributes = "rack=1")))
-    assertNull(broker.matches(offer(attributes = "rack=1"), now, _ => Array("1")))
-    assertEquals("rack doesn't match groupBy", broker.matches(offer(attributes = "rack=2"), now, _ => Array("1")))
+    assertNull(broker.matches(offer("rack=1")))
+    assertNull(broker.matches(offer("rack=1"), now, _ => Array("1")))
+    assertEquals("rack doesn't match groupBy", broker.matches(offer("rack=2"), now, _ => Array("1")))
   }
 
   @Test
@@ -142,19 +148,19 @@ class BrokerTest extends MesosTestCase {
     broker.cpus = 2
     broker.mem = 200
     // ignore non-dynamically reserved disk
-    var reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk:1000"))
+    var reservation = broker.getReservation(offer("cpus:2; mem:100; ports:1000; disk:1000"))
     assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
     // Ignore resources with a principal
-    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(*,principal):100"))
+    reservation = broker.getReservation(offer("cpus:2; mem:100; ports:1000; mem(*,principal):100"))
     assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
     // Ignore resources with a principal + role
-    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(role,principal):100"))
+    reservation = broker.getReservation(offer("cpus:2; mem:100; ports:1000; mem(role,principal):100"))
     assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
     // pay attention resources with a role
-    reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; mem(role):100"))
+    reservation = broker.getReservation(offer("cpus:2; mem:100; ports:1000; mem(role):100"))
     assertEquals(resources("cpus:2; mem:100; mem(role):100; ports:1000"), reservation.toResources)
   }
 
@@ -164,7 +170,7 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 200
     broker.volume = "test"
 
-    val reservation = broker.getReservation(offer(resources = "cpus:2; mem:100; ports:1000; disk(role,principal)[test:mount_point]:100"))
+    val reservation = broker.getReservation(offer("cpus:2; mem:100; ports:1000; disk(role,principal)[test:mount_point]:100"))
     assertEquals(resources("cpus:2; mem:100; ports:1000; disk(role,principal)[test:data]:100"), reservation.toResources)
 
   }
@@ -174,28 +180,28 @@ class BrokerTest extends MesosTestCase {
     broker.mem = 100
 
     // shared resources
-    var reservation = broker.getReservation(offer(resources = "cpus:3; mem:200; ports:1000..2000"))
+    var reservation = broker.getReservation(offer("cpus:3; mem:200; ports:1000..2000"))
     assertEquals(resources("cpus:2; mem:100; ports:1000"), reservation.toResources)
 
     // role resources
-    reservation = broker.getReservation(offer(resources = "cpus(role):3; mem(role):200; ports(role):1000..2000"))
+    reservation = broker.getReservation(offer("cpus(role):3; mem(role):200; ports(role):1000..2000"))
     assertEquals(resources("cpus(role):2; mem(role):100; ports(role):1000"), reservation.toResources)
 
     // mixed resources
-    reservation = broker.getReservation(offer(resources = "cpus:2; cpus(role):1; mem:100; mem(role):99; ports:1000..2000; ports(role):3000"))
+    reservation = broker.getReservation(offer("cpus:2; cpus(role):1; mem:100; mem(role):99; ports:1000..2000; ports(role):3000"))
     assertEquals(resources("cpus:1; cpus(role):1; mem:1; mem(role):99; ports(role):3000"), reservation.toResources)
 
     // not enough resources
-    reservation = broker.getReservation(offer(resources = "cpus:0.5; cpus(role):0.5; mem:1; mem(role):1; ports:1000"))
+    reservation = broker.getReservation(offer("cpus:0.5; cpus(role):0.5; mem:1; mem(role):1; ports:1000"))
     assertEquals(resources("cpus:0.5; cpus(role):0.5; mem:1; mem(role):1; ports:1000"), reservation.toResources)
 
     // no port
-    reservation = broker.getReservation(offer(resources = ""))
+    reservation = broker.getReservation(offer(""))
     assertEquals(-1, reservation.port)
 
     // two non-default roles
     try {
-      broker.getReservation(offer(resources = "cpus(r1):0.5; mem(r2):100"))
+      broker.getReservation(offer("cpus(r1):0.5; mem(r2):100"))
       fail()
     } catch {
       case e: IllegalArgumentException =>

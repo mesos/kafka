@@ -5,7 +5,7 @@ import org.junit.Assert._
 import java.util
 import net.elodina.mesos.util.Strings.parseMap
 
-class ExprTest extends MesosTestCase {
+class ExprTest extends KafkaMesosTestCase {
   @Before
   override def before {
     super.before

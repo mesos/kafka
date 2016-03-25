@@ -6,7 +6,7 @@ import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import net.elodina.mesos.util.Strings.{parseMap, formatMap}
 
-class TopicsTest extends MesosTestCase {
+class TopicsTest extends KafkaMesosTestCase {
   var topics: Topics = null
 
   @Before

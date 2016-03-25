@@ -25,7 +25,7 @@ import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
 import net.elodina.mesos.util.{Strings, Period}
 
-class CliTest extends MesosTestCase {
+class CliTest extends KafkaMesosTestCase {
   val out: ByteArrayOutputStream = new ByteArrayOutputStream()
 
   @Before
@@ -231,14 +231,14 @@ class CliTest extends MesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
 
     def started(broker: Broker) {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:2.0;mem:2048;ports:9042..65000", hostname = "slave" + broker.id)))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, data = "slave" + broker.id + ":9042"))
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
       assertEquals(Broker.State.RUNNING, broker.task.state)
     }
 
     def stopped(broker: Broker): Unit = {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:0.01;mem:128;ports:0..1")))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(id = Broker.nextTaskId(broker), state = TaskState.TASK_FINISHED))
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
       assertFalse(broker.active)
       assertNull(broker.task)
     }

@@ -29,7 +29,7 @@ import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import scala.collection.JavaConversions._
 
-class HttpServerTest extends MesosTestCase {
+class HttpServerTest extends KafkaMesosTestCase {
   @Before
   override def before {
     super.before
@@ -102,11 +102,11 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(broker.needsRestart)
 
     // modification is made before offer thus when it arrives needsRestart reset to false
-    Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:2.0;mem:8192;ports:9042..65000", hostname = "slave0")))
+    Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave0", "cpus:2.0;mem:8192;ports:9042..65000")))
     assertFalse(broker.needsRestart)
 
     // when running
-    Scheduler.statusUpdate(schedulerDriver, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, data = "slave0:9042"))
+    Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave0:9042"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
     sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka\\=DEBUG\\\\\\, kafkaAppender"))
     assertTrue(broker.needsRestart)
@@ -114,8 +114,8 @@ class HttpServerTest extends MesosTestCase {
     // once stopped needsRestart flag reset to false
     sendRequest("/broker/stop", parseMap("broker=0,timeout=0s"))
     assertTrue(broker.needsRestart)
-    Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:0.01;mem:128;ports:0..1")))
-    Scheduler.statusUpdate(schedulerDriver, taskStatus(id = Broker.nextTaskId(broker), state = TaskState.TASK_FINISHED))
+    Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+    Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
     assertFalse(broker.needsRestart)
   }
 
@@ -197,14 +197,14 @@ class HttpServerTest extends MesosTestCase {
 
     // two nodes
     def started(broker: Broker) {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:2.0;mem:2048;ports:9042..65000", hostname = "slave" + broker.id)))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(id = broker.task.id, state = TaskState.TASK_RUNNING, data = "slave" + broker.id + ":9042"))
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
       assertEquals(Broker.State.RUNNING, broker.task.state)
     }
 
     def stopped(broker: Broker): Unit = {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer(resources = "cpus:0.01;mem:128;ports:0..1")))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(id = Broker.nextTaskId(broker), state = TaskState.TASK_FINISHED))
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
       assertFalse(broker.active)
       assertNull(broker.task)
     }
