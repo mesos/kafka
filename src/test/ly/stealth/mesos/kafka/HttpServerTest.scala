@@ -17,16 +17,19 @@
 
 package ly.stealth.mesos.kafka
 
+import org.apache.mesos.Protos.TaskState
 import org.junit.{Test, After, Before}
 import org.junit.Assert._
-import java.io.{FileOutputStream, File}
+import java.io.{IOException, FileOutputStream, File}
 import java.net.{HttpURLConnection, URL}
-import Util.{Period, parseMap}
+import net.elodina.mesos.util.{Period, IO}
+import net.elodina.mesos.util.Strings.{parseMap, formatMap}
 import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
+import scala.collection.JavaConversions._
 
-class HttpServerTest extends MesosTestCase {
+class HttpServerTest extends KafkaMesosTestCase {
   @Before
   override def before {
     super.before
@@ -73,7 +76,7 @@ class HttpServerTest extends MesosTestCase {
   @Test
   def broker_update {
     sendRequest("/broker/add", parseMap("broker=0"))
-    val json = sendRequest("/broker/update", parseMap("broker=0,cpus=1,heap=128,failoverDelay=5s"))
+    var json = sendRequest("/broker/update", parseMap("broker=0,cpus=1,heap=128,failoverDelay=5s"))
     val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
 
     assertEquals(1, brokerNodes.size)
@@ -86,6 +89,34 @@ class HttpServerTest extends MesosTestCase {
     assertEquals(new Period("5s"), broker.failover.delay)
 
     BrokerTest.assertBrokerEquals(broker, responseBroker)
+
+    // needsRestart flag
+    assertFalse(broker.needsRestart)
+    // needsRestart is false despite update when broker stopped
+    json = sendRequest("/broker/update", parseMap("broker=0,mem=2048"))
+    assertFalse(broker.needsRestart)
+
+    // when broker starting
+    sendRequest("/broker/start", parseMap(s"broker=0,timeout=0s"))
+    sendRequest("/broker/update", parseMap("broker=0,mem=4096"))
+    assertTrue(broker.needsRestart)
+
+    // modification is made before offer thus when it arrives needsRestart reset to false
+    Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave0", "cpus:2.0;mem:8192;ports:9042..65000")))
+    assertFalse(broker.needsRestart)
+
+    // when running
+    Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave0:9042"))
+    assertEquals(Broker.State.RUNNING, broker.task.state)
+    sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka\\=DEBUG\\\\\\, kafkaAppender"))
+    assertTrue(broker.needsRestart)
+
+    // once stopped needsRestart flag reset to false
+    sendRequest("/broker/stop", parseMap("broker=0,timeout=0s"))
+    assertTrue(broker.needsRestart)
+    Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+    Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
+    assertFalse(broker.needsRestart)
   }
 
   @Test
@@ -151,6 +182,83 @@ class HttpServerTest extends MesosTestCase {
     assertFalse(broker1.active)
   }
 
+  @Test(timeout = 5000)
+  def broker_restart: Unit = {
+    def assertErrorContains(params: String, str: String) =
+      try { sendRequest("/broker/restart", parseMap(params)); fail() }
+      catch { case e: IOException => assertTrue(e.getMessage.contains(str))}
+
+    assertErrorContains("broker=0,timeout=0s", "broker 0 not found")
+
+    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
+    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
+
+    assertErrorContains("broker=0,timeout=0s", "broker 0 is not running")
+
+    // two nodes
+    def started(broker: Broker) {
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
+      assertEquals(Broker.State.RUNNING, broker.task.state)
+    }
+
+    def stopped(broker: Broker): Unit = {
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
+      assertFalse(broker.active)
+      assertNull(broker.task)
+    }
+
+    def start(broker: Broker) = sendRequest("/broker/start", parseMap(s"broker=${broker.id},timeout=0s"))
+    def stop(broker: Broker) = sendRequest("/broker/stop", parseMap(s"broker=${broker.id},timeout=0s"))
+    def restart(params: String): Map[String, Object] = sendRequest("/broker/restart", parseMap(params))
+
+    start(broker0); started(broker0); start(broker1); started(broker1)
+
+    // 0 stop timeout
+    var json = restart("broker=*,timeout=300ms")
+    assertEquals(Map("status" -> "timeout", "message" -> "broker 0 timeout on stop"), json)
+
+    stopped(broker0); start(broker0); started(broker0)
+
+    // 0 start timeout
+    delay("150ms") { stopped(broker0) }
+    json = restart("broker=*,timeout=300ms")
+    assertEquals(Map("status" -> "timeout", "message" -> "broker 0 timeout on start"), json)
+
+    started(broker0)
+
+    // 0 start, but 1 isn't running
+    delay("150ms") { stopped(broker0) }
+    delay("175ms") { stop(broker1); stopped(broker1) }
+    delay("300ms") { started(broker0) }
+    assertErrorContains("broker=*,timeout=500ms", "broker 1 is not running")
+
+    start(broker1); started(broker1)
+
+    // 1 stop timeout
+    delay("150ms") { stopped(broker0) }
+    delay("250ms") { started(broker0) }
+    json = restart("broker=*,timeout=400ms")
+    assertEquals(Map("status" -> "timeout", "message" -> "broker 1 timeout on stop"), json)
+
+    stopped(broker1); start(broker1); started(broker1)
+
+    // restarted
+    delay("150ms") { stopped(broker0) }
+    delay("250ms") { started(broker0) }
+    delay("350ms") { stopped(broker1) }
+    delay("450ms") { started(broker1) }
+    json = restart("broker=*,timeout=1s")
+
+    assertEquals(json("status"), "restarted")
+    for((brokerJson, expectedBroker) <- json("brokers").asInstanceOf[List[Map[String, Object]]].zip(Seq(broker0, broker1))) {
+      val actualBroker = new Broker()
+      actualBroker.fromJson(brokerJson)
+      BrokerTest.assertBrokerEquals(expectedBroker, actualBroker)
+    }
+  }
+
   @Test
   def topic_list {
     var json = sendRequest("/topic/list", parseMap(""))
@@ -188,7 +296,7 @@ class HttpServerTest extends MesosTestCase {
     val t1: Topic = topics.getTopic("t1")
     assertNotNull(t1)
     assertEquals("t1", t1.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t1.options))
+    assertEquals("flush.ms=1000", formatMap(t1.options))
 
     assertEquals(2, t1.partitions.size())
     assertEquals(util.Arrays.asList(0), t1.partitions.get(0))
@@ -207,7 +315,7 @@ class HttpServerTest extends MesosTestCase {
 
     val t = topics.getTopic("t")
     assertEquals("t", t.name)
-    assertEquals("flush.ms=1000", Util.formatMap(t.options))
+    assertEquals("flush.ms=1000", formatMap(t.options))
   }
 
   @Test
@@ -249,7 +357,7 @@ class HttpServerTest extends MesosTestCase {
     val connection = url.openConnection().asInstanceOf[HttpURLConnection]
     try {
       val file = File.createTempFile(getClass.getSimpleName, new File(uri).getName)
-      Util.copyAndClose(connection.getInputStream, new FileOutputStream(file))
+      IO.copyAndClose(connection.getInputStream, new FileOutputStream(file))
       file.deleteOnExit()
       file
     } finally  {

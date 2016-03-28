@@ -24,7 +24,7 @@ import kafka.utils.{ZKStringSerializer, ZkUtils}
 import scala.collection.JavaConversions._
 import java.util
 
-class RebalancerTest extends MesosTestCase {
+class RebalancerTest extends KafkaMesosTestCase {
   var rebalancer: Rebalancer = null
   var zkClient: ZkClient = null
 

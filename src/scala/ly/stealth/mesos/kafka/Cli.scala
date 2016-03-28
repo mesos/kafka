@@ -23,8 +23,9 @@ import scala.io.Source
 import java.io._
 import java.util
 import scala.collection.JavaConversions._
-import java.util.{Properties, Collections}
-import ly.stealth.mesos.kafka.Util.{BindAddress, Str, Period}
+import java.util.{Date, Properties, Collections}
+import ly.stealth.mesos.kafka.Util.{BindAddress}
+import net.elodina.mesos.util.{Strings, Period, Repr}
 import ly.stealth.mesos.kafka.Topics.Topic
 
 object Cli {
@@ -129,7 +130,7 @@ object Cli {
     finally { reader.close() }
 
     val map = new util.HashMap[String, String](props.toMap)
-    Util.formatMap(map)
+    Strings.formatMap(map)
   }
 
   private def newParser(): OptionParser = {
@@ -395,6 +396,8 @@ object Cli {
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
+        case "restart" => handleRestart(arg, args)
+        case "log" => handleLog(arg, args)
         case _ => throw new Error("unsupported broker command " + cmd)
       }
     }
@@ -415,6 +418,10 @@ object Cli {
           handleRemove(null, help = true)
         case "start" | "stop" =>
           handleStartStop(null, null, cmd == "start", help = true)
+        case "restart" =>
+          handleRestart(null, null, help = true)
+        case "log" =>
+          handleLog(null, null, help = true)
         case _ =>
           throw new Error(s"unsupported broker command $cmd")
       }
@@ -632,6 +639,108 @@ object Cli {
       }
     }
 
+    private def handleRestart(expr: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("timeout", "time to wait until broker restarts (30s, 1m, 1h). Default - 2m").withRequiredArg().ofType(classOf[String])
+
+      if (help) {
+        printLine(s"Restart broker\nUsage: broker restart <broker-expr> [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printBrokerExprExamples(out)
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          printLine()
+          throw new Error(e.getMessage)
+      }
+
+      val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+
+      val params = new util.LinkedHashMap[String, String]()
+      params.put("broker", expr)
+      if (timeout != null) params.put("timeout", timeout)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/broker/restart", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val status = json("status").asInstanceOf[String]
+
+      // restarted|timeout
+      if (status == "timeout") throw new Error(json("message").asInstanceOf[String])
+
+      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      val brokers = "broker" + (if (brokerNodes.size > 1) "s" else "")
+      printLine(s"$brokers $status:")
+
+      for (brokerNode <- brokerNodes) {
+        val broker: Broker = new Broker()
+        broker.fromJson(brokerNode)
+
+        printBroker(broker, 1)
+        printLine()
+      }
+    }
+
+    private def handleLog(brokerId: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("timeout", "timeout (30s, 1m, 1h). Default - 30s").withRequiredArg().ofType(classOf[String])
+      parser.accepts("name", "name of log file (stdout, stderr, server.log). Default - stdout").withRequiredArg().ofType(classOf[String])
+      parser.accepts("lines", "maximum number of lines to read from the end of file. Default - 100").withRequiredArg().ofType(classOf[Integer])
+
+      if (help) {
+        printLine(s"Retrieve broker log\nUsage: broker log <broker-id> [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          printLine()
+          throw new Error(e.getMessage)
+      }
+
+      val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+      val name: String = options.valueOf("name").asInstanceOf[String]
+      val lines: Integer = options.valueOf("lines").asInstanceOf[java.lang.Integer]
+
+      val params = new util.LinkedHashMap[String, String]()
+      params.put("broker", brokerId)
+      if (timeout != null) params.put("timeout", timeout)
+      if (name != null) params.put("name", name)
+      if (lines != null) params.put("lines", "" + lines)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/broker/log", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val status = json("status").asInstanceOf[String]
+      val content = json("content").asInstanceOf[String]
+
+      if (status == "timeout") throw new Error(s"broker $brokerId log retrieve timeout")
+      else printLine(content)
+
+      if (!content.isEmpty && content.last != '\n') printLine()
+    }
+
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list brokers", 1)
@@ -640,18 +749,20 @@ object Cli {
       printLine("remove     - remove broker", 1)
       printLine("start      - start broker", 1)
       printLine("stop       - stop broker", 1)
+      printLine("restart    - restart broker", 1)
+      printLine("log        - retrieve broker log", 1)
     }
 
     private def printBroker(broker: Broker, indent: Int): Unit = {
       printLine("id: " + broker.id, indent)
       printLine("active: " + broker.active, indent)
-      printLine("state: " + broker.state(), indent)
+      printLine("state: " + broker.state() + (if (broker.needsRestart) " (modified, needs restart)" else ""), indent)
       printLine("resources: " + brokerResources(broker), indent)
 
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
-      if (!broker.constraints.isEmpty) printLine("constraints: " + Util.formatMap(broker.constraints), indent)
-      if (!broker.options.isEmpty) printLine("options: " + Util.formatMap(broker.options), indent)
-      if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Util.formatMap(broker.log4jOptions), indent)
+      if (!broker.constraints.isEmpty) printLine("constraints: " + Strings.formatMap(broker.constraints), indent)
+      if (!broker.options.isEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
+      if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)
       if (broker.jvmOptions != null) printLine("jvm-options: " + broker.jvmOptions, indent)
 
       var failover = "failover:"
@@ -663,7 +774,7 @@ object Cli {
       var stickiness = "stickiness:"
       stickiness += " period:" + broker.stickiness.period
       if (broker.stickiness.hostname != null) stickiness += ", hostname:" + broker.stickiness.hostname
-      if (broker.stickiness.stopTime != null) stickiness += ", expires:" + Str.dateTime(broker.stickiness.expires)
+      if (broker.stickiness.stopTime != null) stickiness += ", expires:" + Repr.dateTime(broker.stickiness.expires)
       printLine(stickiness, indent)
 
       val task = broker.task
@@ -672,7 +783,16 @@ object Cli {
         printLine("id: " + broker.task.id, indent + 1)
         printLine("state: " + task.state, indent + 1)
         if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
-        if (!task.attributes.isEmpty) printLine("attributes: " + Util.formatMap(task.attributes), indent + 1)
+        if (!task.attributes.isEmpty) printLine("attributes: " + Strings.formatMap(task.attributes), indent + 1)
+      }
+
+      val metrics = broker.metrics
+      if (metrics != null) {
+        printLine("metrics: ", indent)
+        printLine("collected: " + Repr.dateTime(new Date(metrics.timestamp)), indent + 1)
+        printLine("under-replicated-partitions: " + metrics.underReplicatedPartitions, indent + 1)
+        printLine("offline-partitions-count: " + metrics.offlinePartitionsCount, indent + 1)
+        printLine("is-active-controller: " + metrics.activeControllerCount, indent + 1)
       }
     }
     
@@ -916,7 +1036,7 @@ object Cli {
     private def printTopic(topic: Topic, indent: Int): Unit = {
       printLine("name: " + topic.name, indent)
       printLine("partitions: " + topic.partitionsState, indent)
-      if (!topic.options.isEmpty) printLine("options: " + Util.formatMap(topic.options), indent)
+      if (!topic.options.isEmpty) printLine("options: " + Strings.formatMap(topic.options), indent)
     }
   }
 }

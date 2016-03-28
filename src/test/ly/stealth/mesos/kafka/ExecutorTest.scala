@@ -17,14 +17,17 @@
 
 package ly.stealth.mesos.kafka
 
+import java.util
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.{Status, TaskState}
+import net.elodina.mesos.util.Strings
 
-class ExecutorTest extends MesosTestCase {
+class ExecutorTest extends KafkaMesosTestCase {
   @Test(timeout = 5000)
   def startBroker_success {
-    Executor.startBroker(executorDriver, task())
+    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson))
+    Executor.startBroker(executorDriver, task("id", "task", "slave", data))
     executorDriver.waitForStatusUpdates(1)
     assertEquals(1, executorDriver.statusUpdates.size())
 
@@ -70,7 +73,9 @@ class ExecutorTest extends MesosTestCase {
 
   @Test(timeout = 5000)
   def launchTask {
-    Executor.launchTask(executorDriver, task())
+    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson))
+    Executor.launchTask(executorDriver, task("id", "task", "slave", data))
+
     executorDriver.waitForStatusUpdates(1)
     assertTrue(Executor.server.isStarted)
   }

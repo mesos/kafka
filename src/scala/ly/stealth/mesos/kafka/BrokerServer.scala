@@ -24,6 +24,7 @@ import java.util.Properties
 import java.util
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.BrokerServer.Distro
+import net.elodina.mesos.util.Version
 
 abstract class BrokerServer {
   def isStarted: Boolean
@@ -175,8 +176,8 @@ object BrokerServer {
       val extIdx = jarName.lastIndexOf(".jar")
       if (hIdx == -1 || extIdx == -1) return
 
-      val version = new Util.Version(jarName.substring(hIdx + 1, extIdx))
-      snappyHackEnabled = version.compareTo(new Util.Version(1,1,0)) <= 0
+      val version = new Version(jarName.substring(hIdx + 1, extIdx))
+      snappyHackEnabled = version.compareTo(new Version(1,1,0)) <= 0
     }
 
     override protected def loadClass(name: String, resolve: Boolean): Class[_] = {
@@ -200,6 +201,38 @@ object BrokerServer {
         if (resolve) resolveClass(c)
         c
       }
+    }
+  }
+
+  object Metrics {
+    import scala.collection.JavaConverters._
+    import javax.management.{MBeanServer, MBeanServerFactory, ObjectName}
+
+    val activeControllerCountObj = new ObjectName("kafka.controller:type=KafkaController,name=ActiveControllerCount")
+    val offlinePartitionsCountObj = new ObjectName("kafka.controller:type=KafkaController,name=OfflinePartitionsCount")
+    val underReplicatedPartitionsObj = new ObjectName("kafka.server:type=ReplicaManager,name=UnderReplicatedPartitions")
+
+    def attribute[T](server: MBeanServer, objName: ObjectName, attribute: String): T = {
+      server.getAttribute(objName, attribute).asInstanceOf[T]
+    }
+
+    def value[T](server: MBeanServer, objName: ObjectName): T = {
+      attribute[T](server, objName, "Value")
+    }
+
+    def collect: Broker.Metrics = {
+      val servers = MBeanServerFactory.findMBeanServer(null).asScala.toList
+      servers.find(s => s.getDomains.exists(_.equals("kafka.server"))).map { server: MBeanServer =>
+        val metrics: Broker.Metrics = new Broker.Metrics()
+
+        metrics.activeControllerCount = value(server, activeControllerCountObj)
+        metrics.offlinePartitionsCount = value(server, offlinePartitionsCountObj)
+        metrics.underReplicatedPartitions = value(server, underReplicatedPartitionsObj)
+
+        metrics.timestamp = System.currentTimeMillis()
+
+        metrics
+      }.getOrElse(null)
     }
   }
 }

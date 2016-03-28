@@ -26,7 +26,8 @@ import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 import java.util
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
-import ly.stealth.mesos.kafka.Util.{BindAddress, Period, Range}
+import ly.stealth.mesos.kafka.Util.BindAddress
+import net.elodina.mesos.util._
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
@@ -34,7 +35,7 @@ import scala.util.parsing.json.JSONObject
 object HttpServer {
   var jar: File = null
   var kafkaDist: File = null
-  var kafkaVersion: Util.Version = null
+  var kafkaVersion: Version = null
 
   val logger = Logger.getLogger(HttpServer.getClass)
   var server: Server = null
@@ -92,12 +93,12 @@ object HttpServer {
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
     if (kafkaDist == null) throw new IllegalStateException(kafkaMask + " not found in in current dir")
 
-    // extract version
+    // extract version: "kafka-dist-1.2.3.tgz" => "1.2.3"
     val distName: String = kafkaDist.getName
     val tgzIdx = distName.lastIndexOf(".tgz")
     val hIdx = distName.lastIndexOf("-")
     if (tgzIdx == -1 || hIdx == -1) throw new IllegalStateException("Can't extract version number from " + distName)
-    kafkaVersion = new Util.Version(distName.substring(hIdx + 1, tgzIdx))
+    kafkaVersion = new Version(distName.substring(hIdx + 1, tgzIdx))
   }
 
   private class Servlet extends HttpServlet {
@@ -131,7 +132,7 @@ object HttpServer {
       response.setContentType("application/zip")
       response.setHeader("Content-Length", "" + file.length())
       response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
-      Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
+      IO.copyAndClose(new FileInputStream(file), response.getOutputStream)
     }
 
     def handleHealth(response: HttpServletResponse): Unit = {
@@ -149,6 +150,8 @@ object HttpServer {
       else if (uri == "add" || uri == "update") handleAddUpdateBroker(request, response)
       else if (uri == "remove") handleRemoveBroker(request, response)
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
+      else if (uri == "restart") handleRestartBroker(request, response)
+      else if (uri == "log") handleBrokerLog(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -213,19 +216,19 @@ object HttpServer {
 
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
-        try { options = Util.parseMap(request.getParameter("options"), nullValues = false).filterKeys(Broker.isOptionOverridable).view.force }
+        try { options = Strings.parseMap(request.getParameter("options")).filterKeys(Broker.isOptionOverridable).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
       var log4jOptions: util.Map[String, String] = null
       if (request.getParameter("log4jOptions") != null)
-        try { log4jOptions = Util.parseMap(request.getParameter("log4jOptions")) }
+        try { log4jOptions = Strings.parseMap(request.getParameter("log4jOptions")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid log4jOptions: " + e.getMessage) }
 
       val jvmOptions: String = request.getParameter("jvmOptions")
 
       var constraints: util.Map[String, Constraint] = null
       if (request.getParameter("constraints") != null)
-        try { constraints = Util.parseMap(request.getParameter("constraints"), nullValues = false).mapValues(new Constraint(_)).view.force }
+        try { constraints = Strings.parseMap(request.getParameter("constraints")).mapValues(new Constraint(_)).view.force }
         catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
 
 
@@ -261,7 +264,6 @@ object HttpServer {
           else broker = new Broker(id)
         else
           if (broker == null) errors.add(s"Broker $id not found")
-          else if (broker.active) errors.add(s"Broker $id is active")
 
         brokers.add(broker)
       }
@@ -287,6 +289,7 @@ object HttpServer {
         if (failoverMaxTries != null) broker.failover.maxTries = if (failoverMaxTries != "") Integer.valueOf(failoverMaxTries) else null
 
         if (add) cluster.addBroker(broker)
+        else if (broker.active || broker.task != null) broker.needsRestart = true
       }
       cluster.save()
 
@@ -373,6 +376,105 @@ object HttpServer {
       response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
+    def handleRestartBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+
+      var timeout: Period = new Period("2m")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+      val expr: String = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
+
+      var ids: util.List[String] = null
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
+
+      val brokers = new util.ArrayList[Broker]()
+      for (id <- ids) {
+        val broker = cluster.getBroker(id)
+        if (broker == null) { response.sendError(400, s"broker $id not found"); return }
+        if (!broker.active || broker.task == null || !broker.task.running) { response.sendError(400, s"broker $id is not running"); return }
+        brokers.add(broker)
+      }
+
+      def timeoutJson(broker: Broker, stage: String): JSONObject =
+        new JSONObject(Map("status" -> "timeout", "message" -> s"broker ${broker.id} timeout on $stage"))
+
+      for (broker <- brokers) {
+        if (!broker.active || broker.task == null || !broker.task.running) { response.sendError(400, s"broker ${broker.id} is not running"); return }
+
+        // stop
+        broker.active = false
+        broker.failover.resetFailures()
+        val begin = System.currentTimeMillis()
+        cluster.save()
+
+        if (!broker.waitFor(null, timeout)) { response.getWriter.println("" + timeoutJson(broker, "stop")); return }
+
+        val startTimeout = new Period(Math.max(timeout.ms - (System.currentTimeMillis() - begin), 0L) + "ms")
+
+        // start
+        broker.active = true
+        cluster.save()
+
+        if (!broker.waitFor(State.RUNNING, startTimeout)) { response.getWriter.println("" + timeoutJson(broker, "start")); return }
+      }
+
+      response.getWriter.println(JSONObject(Map("status" -> "restarted", "brokers" -> new JSONArray(brokers.map(_.toJson).toList))))
+    }
+
+    def handleBrokerLog(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+
+      var timeout: Period = new Period("30s")
+      if (request.getParameter("timeout") != null)
+        try { timeout = new Period(request.getParameter("timeout")) }
+        catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+
+      val id: String = request.getParameter("broker")
+      if (id == null) { response.sendError(400, "broker required"); return }
+
+      var name: String = request.getParameter("name")
+      if (name == null) name = "stdout"
+
+      var lines: Int = 100
+      if (request.getParameter("lines") != null)
+        try { lines = Integer.parseInt(request.getParameter("lines")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid lines"); return  }
+      if (lines <= 0) { response.sendError(400, "lines has to be greater than 0"); return }
+
+      val broker = cluster.getBroker(id)
+      if (broker == null) { response.sendError(400, "broker " + id + " not found"); return }
+      if (!broker.active) { response.sendError(400, "broker " + id + " is not active"); return }
+      if (broker.task == null || !broker.task.running) { response.sendError(400, "broker " + id + " is not running"); return }
+
+      val requestId = Scheduler.requestBrokerLog(broker, name, lines)
+
+      if (requestId == -1) { response.sendError(500, "disconnected from the master"); return }
+
+      def receivedLog: Boolean = Scheduler.receivedLog(requestId)
+
+      def waitForLog(): String = {
+        var t = timeout.ms
+        while (t > 0 && !receivedLog) {
+          val delay = Math.min(100, t)
+          Thread.sleep(delay)
+          t -= delay
+        }
+
+        if (receivedLog) "ok" else "timeout"
+      }
+
+      val status = waitForLog()
+      val content = if (status == "ok") Scheduler.logContent(requestId) else ""
+
+      Scheduler.removeLog(requestId)
+
+      response.getWriter.println(JSONObject(Map("status" -> status, "content" -> content)))
+    }
+
     def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       request.setAttribute("jsonResponse", true)
       response.setContentType("application/json; charset=utf-8")
@@ -426,7 +528,7 @@ object HttpServer {
 
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
-        try { options = Util.parseMap(request.getParameter("options"), nullValues = false) }
+        try { options = Strings.parseMap(request.getParameter("options")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid options: " + e.getMessage) }
 
       if (!add && options == null)

@@ -17,14 +17,15 @@
 
 package ly.stealth.mesos.kafka
 
+import org.apache.mesos.Protos.TaskState
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import java.util
 import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
-import Util.Period
+import net.elodina.mesos.util.{Strings, Period}
 
-class CliTest extends MesosTestCase {
+class CliTest extends KafkaMesosTestCase {
   val out: ByteArrayOutputStream = new ByteArrayOutputStream()
 
   @Before
@@ -72,6 +73,12 @@ class CliTest extends MesosTestCase {
     assertOutContains("id: 0")
     assertOutContains("id: 1")
     assertOutContains("id: 2")
+
+    // when broker needs restart
+    val broker = Scheduler.cluster.getBroker("0")
+    broker.needsRestart = true
+    exec("broker list")
+    assertOutContains("(modified, needs restart)")
   }
 
   @Test
@@ -98,7 +105,7 @@ class CliTest extends MesosTestCase {
 
     assertEquals(new Period("10s"), broker.failover.delay)
     assertEquals(new Period("20s"), broker.failover.maxDelay)
-    assertEquals(Util.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
+    assertEquals(Strings.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
   }
 
   @Test
@@ -146,6 +153,116 @@ class CliTest extends MesosTestCase {
     try { exec("broker stop 0 --timeout=1ms"); fail() }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker stop timeout")) }
     assertFalse(broker.active)
+  }
+
+  @Test(timeout = 60000)
+  def broker_log: Unit = {
+    // no broker
+    assertCliErrorContains("broker log 0", "broker 0 not found")
+
+    // broker isn't active or running
+    val broker = Scheduler.cluster.addBroker(new Broker("0"))
+    assertCliErrorContains("broker log 0", "broker 0 is not active")
+
+    broker.active = true
+    assertCliErrorContains("broker log 0", "broker 0 is not running")
+
+    // not running when task is null
+    assertCliErrorContains("broker log 0", "broker 0 is not running")
+
+    import Broker.State._
+
+    broker.task = new Broker.Task("id", "slave", "executor", "host")
+    for(state <- Seq(STOPPED, STARTING, RUNNING, RECONCILING, STOPPING) if state != RUNNING) {
+      broker.task.state = state
+      assertCliErrorContains("broker log 0", "broker 0 is not running")
+    }
+
+    def setLogContent(content: String, delay: Period = new Period("100ms")) =
+      new Thread {
+        override def run(): Unit = {
+          Thread.sleep(delay.ms)
+          Scheduler.logs.keys().take(1).foreach { rid => Scheduler.logs.put(rid, Some(content)) }
+        }
+      }.start()
+
+    setLogContent("something")
+    // retrieve log only for active and running broker
+    broker.task.state = RUNNING
+    try { exec("broker log 0 --timeout 1s") }
+    catch { case e: Cli.Error => fail("") }
+
+    assertOutContains("something")
+
+    // with name
+    setLogContent("something with name")
+    exec("broker log 0 --name server.log --timeout 1s")
+    assertOutContains("something with name")
+
+    // with lines
+    setLogContent("something with lines")
+    exec("broker log 0 --lines 200 --timeout 1s")
+    assertOutContains("something with lines")
+
+    // with name, lines
+    setLogContent("something with name with lines with timeout")
+    exec("broker log 0 --name controller.log --lines 300 --timeout 1s")
+    assertOutContains("something with name with lines with timeout")
+
+    // timed out
+    assertCliErrorContains("broker log 0 --timeout 1s", "broker 0 log retrieve timeout")
+
+    // disconnected
+    Scheduler.disconnected(schedulerDriver)
+    assertCliErrorContains("broker log 0 --timeout 1s", "disconnected from the master")
+  }
+
+  @Test
+  def broker_restart: Unit = {
+    exec("help broker")
+    assertOutContains("restart    - restart broker")
+
+    exec("help broker restart")
+    assertOutContains("Restart broker")
+    assertOutContains("Usage: broker restart <broker-expr> [options]")
+    assertOutContains("--timeout")
+
+    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
+    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
+
+    def started(broker: Broker) {
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
+      assertEquals(Broker.State.RUNNING, broker.task.state)
+    }
+
+    def stopped(broker: Broker): Unit = {
+      Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+      Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
+      assertFalse(broker.active)
+      assertNull(broker.task)
+    }
+
+    for(broker <- Scheduler.cluster.getBrokers) {
+      exec("broker start " + broker.id + " --timeout 0s")
+      started(broker)
+    }
+
+    // timeout
+    assertCliErrorContains("broker restart * --timeout 200ms", "broker 0 timeout on stop")
+
+    // restarted
+    exec("broker start " + broker0.id + " --timeout 0s")
+    started(broker0)
+
+    delay("150ms") { stopped(broker0) }
+    delay("250ms") { started(broker0) }
+    delay("450ms") { stopped(broker1) }
+    delay("650ms") { started(broker1) }
+    exec("broker restart 0..1 --timeout 1s")
+    assertOutContains("brokers restarted:")
+    assertOutContains("id: 0")
+    assertOutContains("id: 1")
   }
 
   @Test
@@ -254,4 +371,8 @@ class CliTest extends MesosTestCase {
       if (!cmd.isEmpty) args.add(arg)
     Cli.exec(args.toArray(new Array[String](args.length)))
   }
+
+  private def assertCliErrorContains(cmd: String, str: String) =
+    try { exec(cmd); fail() }
+    catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains(str)) }
 }

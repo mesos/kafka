@@ -7,6 +7,7 @@ import kafka.utils.{ZKStringSerializer, ZkUtils}
 import org.I0Itec.zkclient.ZkClient
 import ly.stealth.mesos.kafka.Broker.Task
 import java.lang.Comparable
+import net.elodina.mesos.util.Strings
 
 object Expr {
   def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): util.List[String] = {
@@ -17,7 +18,7 @@ object Expr {
       val filterIdx = expr.lastIndexOf("[")
       if (filterIdx == -1) throw new IllegalArgumentException("Invalid expr " + expr)
       
-      attributes = Util.parseMap(expr.substring(filterIdx + 1, expr.length - 1))
+      attributes = Strings.parseMap(expr.substring(filterIdx + 1, expr.length - 1), true)
       expr = expr.substring(0, filterIdx)
     }
 
@@ -113,7 +114,7 @@ object Expr {
             values.put(k, value)
           }
 
-          Util.formatMap(values)
+          Strings.formatMap(values)
         }
       }
 

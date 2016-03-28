@@ -15,8 +15,6 @@
 
 FROM ubuntu:14.04
 
-# Enable apt-proxy if present
-COPY .docker/apt-proxy* /tmp/apt-proxy
 RUN \
   if [ -f "/tmp/apt-proxy" ]; then \
     APT_PROXY=$(cat "/tmp/apt-proxy"); \
@@ -41,3 +39,5 @@ COPY .docker/kafka* /opt/kafka-mesos/
 
 WORKDIR /opt/kafka-mesos
 EXPOSE 7000
+
+ENTRYPOINT ["/usr/bin/java", "-jar", "/opt/kafka-mesos/kafka-mesos-0.9.5.0.jar", "scheduler"]
