@@ -30,6 +30,7 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     Scheduler.cluster.rebalancer = new TestRebalancer()
     Scheduler.reconciles = 0
     Scheduler.reconcileTime = null
+    Scheduler.logs.clear()
 
     Scheduler.registered(schedulerDriver, frameworkId(), master())
     Executor.server = new TestBrokerServer()
