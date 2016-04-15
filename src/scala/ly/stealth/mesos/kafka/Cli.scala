@@ -466,6 +466,7 @@ object Cli {
       parser.accepts("port", "port or range (31092, 31090..31100). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("volume", "pre-reserved persistent volume id").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("bind-address", "broker bind address (broker0, 192.168.50.*, if:eth1). Default - auto").withRequiredArg().ofType(classOf[java.lang.String])
+      parser.accepts("syslog", "enable syslog logging. Default - false").withRequiredArg().ofType(classOf[java.lang.String])
       parser.accepts("stickiness-period", "stickiness period to preserve same node for broker (5m, 10m, 1h)").withRequiredArg().ofType(classOf[String])
 
       parser.accepts("options", "options or file. Examples:\n log.dirs=/tmp/kafka/$id,num.io.threads=16\n file:server.properties").withRequiredArg()
@@ -510,6 +511,7 @@ object Cli {
       val port = options.valueOf("port").asInstanceOf[String]
       val volume = options.valueOf("volume").asInstanceOf[String]
       val bindAddress = options.valueOf("bind-address").asInstanceOf[String]
+      val syslog = options.valueOf("syslog").asInstanceOf[String]
       val stickinessPeriod = options.valueOf("stickiness-period").asInstanceOf[String]
 
       val constraints = options.valueOf("constraints").asInstanceOf[String]
@@ -530,6 +532,7 @@ object Cli {
       if (port != null) params.put("port", port)
       if (volume != null) params.put("volume", volume)
       if (bindAddress != null) params.put("bindAddress", bindAddress)
+      if (syslog != null) params.put("syslog", syslog)
       if (stickinessPeriod != null) params.put("stickinessPeriod", stickinessPeriod)
 
       if (options_ != null) params.put("options", optionsOrFile(options_))
@@ -760,6 +763,7 @@ object Cli {
       printLine("resources: " + brokerResources(broker), indent)
 
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
+      if (broker.syslog) printLine("syslog: " + broker.syslog, indent)
       if (!broker.constraints.isEmpty) printLine("constraints: " + Strings.formatMap(broker.constraints), indent)
       if (!broker.options.isEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
       if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)

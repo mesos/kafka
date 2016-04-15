@@ -209,6 +209,10 @@ object HttpServer {
         try { new BindAddress(request.getParameter("bindAddress")) }
         catch { case e: IllegalArgumentException => errors.add("Invalid bindAddress") }
 
+      var syslog: java.lang.Boolean = null
+      if (request.getParameter("syslog") != null)
+        syslog = java.lang.Boolean.valueOf(request.getParameter("syslog"))
+
       var stickinessPeriod: Period = null
       if (request.getParameter("stickinessPeriod") != null)
         try { stickinessPeriod = new Period(request.getParameter("stickinessPeriod")) }
@@ -277,6 +281,7 @@ object HttpServer {
         if (port != null) broker.port = if (port != "") new Range(port) else null
         if (volume != null) broker.volume = if (volume != "") volume else null
         if (bindAddress != null) broker.bindAddress = if (bindAddress != "") new BindAddress(bindAddress) else null
+        if (syslog != null) broker.syslog = syslog
         if (stickinessPeriod != null) broker.stickiness.period = stickinessPeriod
 
         if (constraints != null) broker.constraints = constraints
