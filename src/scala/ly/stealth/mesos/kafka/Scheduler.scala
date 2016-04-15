@@ -54,7 +54,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     val env = new mutable.HashMap[String, String]()
-    env("MESOS_FRAMEWORK_NAME") = Config.frameworkName
+    env("MESOS_SYSLOG_TAG") = Config.frameworkName + "-" + broker.id
     if (broker.syslog) env("MESOS_SYSLOG") = "true"
 
     val envBuilder = Environment.newBuilder()

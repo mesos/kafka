@@ -24,7 +24,7 @@ import java.util.Properties
 import java.util
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.BrokerServer.Distro
-import net.elodina.mesos.util.Version
+import net.elodina.mesos.util.{IO, Version}
 
 abstract class BrokerServer {
   def isStarted: Boolean
@@ -43,7 +43,7 @@ class KafkaServer extends BrokerServer {
   def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
     if (isStarted) throw new IllegalStateException("started")
 
-    BrokerServer.Distro.configureLog4j(broker.log4jOptions)
+    BrokerServer.Distro.configureLog4j(broker)
     val options = broker.options(defaults)
     BrokerServer.Distro.startReporters(options)
 
@@ -102,7 +102,7 @@ object BrokerServer {
     private def newKafkaConfig(props: Properties): Object = {
       val configClass = loader.loadClass("kafka.server.KafkaConfig")
       var config: Object = null
-    
+
       // in kafka <= 0.8.x constructor is KafkaConfig(java.util.Properties)
       try { config = configClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object] }
       catch { case e: NoSuchMethodException => }
@@ -118,9 +118,26 @@ object BrokerServer {
       config
     }
 
-    def configureLog4j(options: util.Map[String, String]): Unit = {
+    def configureLog4j(broker: Broker): Unit = {
+      if (broker.syslog) {
+        val pattern = System.getenv("MESOS_SYSLOG_TAG") + ": %d [%t] %-5p %c %x - %m%n"
+
+        IO.replaceInFile(new File(Distro.dir + "/config/log4j.properties"), Map[String, String](
+          "log4j.rootLogger=INFO, stdout" ->
+          s"""
+            |log4j.rootLogger=INFO, stdout, syslog
+            |
+            |log4j.appender.syslog=org.apache.log4j.net.SyslogAppender
+            |log4j.appender.syslog.syslogHost=localhost
+            |log4j.appender.syslog.header=true
+            |log4j.appender.syslog.layout=org.apache.log4j.PatternLayout
+            |log4j.appender.syslog.layout.conversionPattern=$pattern
+          """.stripMargin
+        ))
+      }
+
       System.setProperty("kafka.logs.dir", "" + new File(Distro.dir, "log"))
-      val props: Properties = this.props(options, "log4j.properties")
+      val props: Properties = this.props(broker.log4jOptions, "log4j.properties")
 
       val configurator: Class[_] = loader.loadClass("org.apache.log4j.PropertyConfigurator")
       configurator.getMethod("configure", classOf[Properties]).invoke(null, props)
