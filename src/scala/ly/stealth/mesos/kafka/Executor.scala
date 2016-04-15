@@ -210,7 +210,7 @@ object Executor extends org.apache.mesos.Executor {
 
     if (System.getenv("MESOS_SYSLOG") != null) {
       val frameworkName = System.getenv("MESOS_SYSLOG_TAG")
-      val appender = new SyslogAppender(new PatternLayout(frameworkName + ": " + pattern), "localhost", SyslogAppender.LOG_USER)
+      val appender = new SyslogAppender(new PatternLayout(frameworkName + ": " + pattern.substring(3)), "localhost", SyslogAppender.LOG_USER)
 
       appender.setHeader(true)
       root.addAppender(appender)

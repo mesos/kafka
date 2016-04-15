@@ -120,7 +120,7 @@ object BrokerServer {
 
     def configureLog4j(broker: Broker): Unit = {
       if (broker.syslog) {
-        val pattern = System.getenv("MESOS_SYSLOG_TAG") + ": %d [%t] %-5p %c %x - %m%n"
+        val pattern = System.getenv("MESOS_SYSLOG_TAG") + ": [%t] %-5p %c %x - %m%n"
 
         IO.replaceInFile(new File(Distro.dir + "/config/log4j.properties"), Map[String, String](
           "log4j.rootLogger=INFO, stdout" ->
