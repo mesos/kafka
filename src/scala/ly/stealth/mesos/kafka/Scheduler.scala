@@ -88,7 +88,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
-      .setName("broker-" + broker.id)
+      .setName(Config.frameworkName + "-" + broker.id)
       .setTaskId(TaskID.newBuilder.setValue(Broker.nextTaskId(broker)).build)
       .setSlaveId(offer.getSlaveId)
       .setData(taskData)

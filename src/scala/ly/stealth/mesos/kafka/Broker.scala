@@ -305,14 +305,10 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
-  def nextTaskId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
-  def nextExecutorId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
+  def nextTaskId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
+  def nextExecutorId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
 
-  def idFromTaskId(taskId: String): String = {
-    val parts: Array[String] = taskId.split("-")
-    if (parts.length < 2) throw new IllegalArgumentException(taskId)
-    parts(1)
-  }
+  def idFromTaskId(taskId: String): String = taskId.dropRight(37).replace(Config.frameworkName + "-", "")
 
   def idFromExecutorId(executorId: String): String = idFromTaskId(executorId)
 
