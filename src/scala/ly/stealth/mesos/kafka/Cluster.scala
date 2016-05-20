@@ -72,7 +72,7 @@ class Cluster {
     if (!brokers.isEmpty) {
       val brokerNodes = new ListBuffer[JSONObject]()
       for (broker <- brokers)
-        brokerNodes.add(broker.toJson)
+        brokerNodes.add(broker.toJson(false))
       obj("brokers") = new JSONArray(brokerNodes.toList)
     }
 

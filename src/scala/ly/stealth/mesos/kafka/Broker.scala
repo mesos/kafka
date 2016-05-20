@@ -277,7 +277,7 @@ class Broker(_id: String = "0") {
     if (node.contains("needsRestart")) needsRestart = node("needsRestart").asInstanceOf[Boolean]
   }
 
-  def toJson: JSONObject = {
+  def toJson(includeMetrics: Boolean = true): JSONObject = {
     val obj = new collection.mutable.LinkedHashMap[String, Any]()
     obj("id") = id
     obj("active") = active
@@ -297,7 +297,7 @@ class Broker(_id: String = "0") {
     obj("stickiness") = stickiness.toJson
     obj("failover") = failover.toJson
     if (task != null) obj("task") = task.toJson
-    if (metrics != null) obj("metrics") = metrics.toJson
+    if (metrics != null && includeMetrics) obj("metrics") = metrics.toJson
     if (needsRestart) obj("needsRestart") = needsRestart
 
     new JSONObject(obj.toMap)
@@ -584,30 +584,23 @@ object Broker {
     }
   }
 
-  class Metrics {
-    var underReplicatedPartitions: Int = 0
-    var offlinePartitionsCount: Int = 0
-    var activeControllerCount: Int = 0
+  class Metrics(_data: Map[String, Number] = Map(), _timestamp: Long = 0) {
+    private var data = _data
+    var timestamp: Long = _timestamp
 
-    var timestamp: Long = 0
+    def apply(metric: String) = data.get(metric)
 
     def fromJson(node: Map[String, Object]): Unit = {
-      underReplicatedPartitions = node("underReplicatedPartitions").asInstanceOf[Number].intValue()
-      offlinePartitionsCount = node("offlinePartitionsCount").asInstanceOf[Number].intValue()
-      activeControllerCount = node("activeControllerCount").asInstanceOf[Number].intValue()
-
+      data = node.filter {
+        case ("timestamp", _) => false
+        case _ => true
+      }.mapValues(v => v.asInstanceOf[Number])
       timestamp = node("timestamp").asInstanceOf[Number].longValue()
     }
 
     def toJson: JSONObject = {
-      val obj = new collection.mutable.LinkedHashMap[String, Any]()
-
-      obj("underReplicatedPartitions") = underReplicatedPartitions
-      obj("offlinePartitionsCount") = offlinePartitionsCount
-      obj("activeControllerCount") = activeControllerCount
-
+      val obj = new collection.mutable.LinkedHashMap[String, Any]() ++ data
       obj("timestamp") = timestamp
-
       new JSONObject(obj.toMap)
     }
   }

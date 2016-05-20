@@ -168,7 +168,7 @@ object HttpServer {
       val brokerNodes = new ListBuffer[JSONObject]()
       for (id <- ids) {
         val broker = cluster.getBroker(id)
-        if (broker != null) brokerNodes.add(cluster.getBroker(id).toJson)
+        if (broker != null) brokerNodes.add(cluster.getBroker(id).toJson())
       }
 
       response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
@@ -294,7 +294,7 @@ object HttpServer {
       cluster.save()
 
       val brokerNodes = new ListBuffer[JSONObject]()
-      for (broker <- brokers) brokerNodes.add(broker.toJson)
+      for (broker <- brokers) brokerNodes.add(broker.toJson())
 
       response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
     }
@@ -372,7 +372,7 @@ object HttpServer {
       val status = waitForBrokers()
       val brokerNodes = new ListBuffer[JSONObject]()
 
-      for (broker <- brokers) brokerNodes.add(broker.toJson)
+      for (broker <- brokers) brokerNodes.add(broker.toJson())
       response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
@@ -422,7 +422,7 @@ object HttpServer {
         if (!broker.waitFor(State.RUNNING, startTimeout)) { response.getWriter.println("" + timeoutJson(broker, "start")); return }
       }
 
-      response.getWriter.println(JSONObject(Map("status" -> "restarted", "brokers" -> new JSONArray(brokers.map(_.toJson).toList))))
+      response.getWriter.println(JSONObject(Map("status" -> "restarted", "brokers" -> new JSONArray(brokers.map(_.toJson()).toList))))
     }
 
     def handleBrokerLog(request: HttpServletRequest, response: HttpServletResponse): Unit = {

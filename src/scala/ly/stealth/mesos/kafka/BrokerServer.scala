@@ -26,6 +26,8 @@ import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.BrokerServer.Distro
 import net.elodina.mesos.util.Version
 
+import scala.collection.mutable
+
 abstract class BrokerServer {
   def isStarted: Boolean
   def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint
@@ -208,31 +210,51 @@ object BrokerServer {
     import scala.collection.JavaConverters._
     import javax.management.{MBeanServer, MBeanServerFactory, ObjectName}
 
-    val activeControllerCountObj = new ObjectName("kafka.controller:type=KafkaController,name=ActiveControllerCount")
-    val offlinePartitionsCountObj = new ObjectName("kafka.controller:type=KafkaController,name=OfflinePartitionsCount")
-    val underReplicatedPartitionsObj = new ObjectName("kafka.server:type=ReplicaManager,name=UnderReplicatedPartitions")
+    private val metricCache = mutable.Map[String, (String, Option[String])]()
 
-    def attribute[T](server: MBeanServer, objName: ObjectName, attribute: String): T = {
-      server.getAttribute(objName, attribute).asInstanceOf[T]
+    private def getMetricName(objName: ObjectName): String = {
+      val nameParts = Seq(
+        objName.getDomain,
+        objName.getKeyProperty("type"),
+        objName.getKeyProperty("name"),
+        objName.getKeyProperty("request"),
+        objName.getKeyProperty("processor"),
+        objName.getKeyProperty("delayedOperation")
+      ).filter(n => n != null)
+      String.join(",", nameParts)
     }
 
-    def value[T](server: MBeanServer, objName: ObjectName): T = {
-      attribute[T](server, objName, "Value")
+    private def getMetricGetter(server: MBeanServer, objName: ObjectName): Option[String] = {
+      val getters = server.getMBeanInfo(objName)
+      if (getters.getAttributes.exists(bean => bean.getName == "Value")) {
+        Some("Value")
+      } else if (getters.getAttributes.exists(bean => bean.getName == "OneMinuteRate")) {
+        Some("OneMinuteRate")
+      } else {
+        None
+      }
+    }
+
+    private def getMetric[T](server: MBeanServer, objName: ObjectName): (String, Option[T]) = {
+      metricCache.getOrElseUpdate(objName.getCanonicalName, {
+        getMetricName(objName) -> getMetricGetter(server, objName)
+      }) match {
+        case (n, getter) => n -> getter.map(g => server.getAttribute(objName, g).asInstanceOf[T])
+      }
     }
 
     def collect: Broker.Metrics = {
       val servers = MBeanServerFactory.findMBeanServer(null).asScala.toList
       servers.find(s => s.getDomains.exists(_.equals("kafka.server"))).map { server: MBeanServer =>
-        val metrics: Broker.Metrics = new Broker.Metrics()
-
-        metrics.activeControllerCount = value(server, activeControllerCountObj)
-        metrics.offlinePartitionsCount = value(server, offlinePartitionsCountObj)
-        metrics.underReplicatedPartitions = value(server, underReplicatedPartitionsObj)
-
-        metrics.timestamp = System.currentTimeMillis()
-
-        metrics
-      }.getOrElse(null)
+        val metrics = server.queryNames(null, null).filter(o => o.getDomain.startsWith("kafka."))
+        new Broker.Metrics(
+          metrics.map(m => getMetric(server, m) match {
+            case (name, value) => name -> value.getOrElse(0.asInstanceOf[Number])
+          }
+          ).toMap,
+          System.currentTimeMillis()
+        )
+      }.orNull
     }
   }
 }

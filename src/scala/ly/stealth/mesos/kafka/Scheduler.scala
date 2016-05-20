@@ -82,7 +82,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         defaults += ("log.dirs" -> "data/kafka-logs")
 
       val data = new util.HashMap[String, String]()
-      data.put("broker", "" + broker.toJson)
+      data.put("broker", "" + broker.toJson(false))
       data.put("defaults", Strings.formatMap(defaults))
       ByteString.copyFromUtf8(Strings.formatMap(data))
     }
