@@ -408,6 +408,18 @@ object Scheduler extends org.apache.mesos.Scheduler {
     System.exit(status)
   }
 
+  def stop(): Unit = {
+    if (driver != null) {
+      // Warning: stop(false) and stop() are dangerous, calling them will destroy the framework
+      // and kill all running tasks / executors.
+      driver.stop(true)
+    }
+  }
+
+  def kill(): Unit = {
+    System.exit(1)
+  }
+
   private def initLogging() {
     HttpServer.initLogging()
     BasicConfigurator.resetConfiguration()
