@@ -71,7 +71,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
       .setCommand(commandBuilder)
-      .setName("broker-" + broker.id)
+      .setName("kafka.broker")
+      .setSource(Config.frameworkName + ".broker." + broker.id)
       .build()
   }
 
