@@ -447,8 +447,29 @@ class BrokerTest extends KafkaMesosTestCase {
     failover.failures = 4
     assertEquals(new Period("5s"), failover.currentDelay)
 
+    failover.failures = 32
+    assertEquals(new Period("5s"), failover.currentDelay)
+
+    failover.failures = 33
+    assertEquals(new Period("5s"), failover.currentDelay)
+
     failover.failures = 100
     assertEquals(new Period("5s"), failover.currentDelay)
+
+    // multiplier boundary
+    failover.maxDelay = new Period(Integer.MAX_VALUE + "s")
+
+    failover.failures = 30
+    assertEquals(new Period((1 << 29) + "s"), failover.currentDelay)
+
+    failover.failures = 31
+    assertEquals(new Period((1 << 30) + "s"), failover.currentDelay)
+
+    failover.failures = 32
+    assertEquals(new Period((1 << 30) + "s"), failover.currentDelay)
+
+    failover.failures = 100
+    assertEquals(new Period((1 << 30) + "s"), failover.currentDelay)
   }
 
   @Test
