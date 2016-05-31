@@ -27,6 +27,7 @@ import java.io.{FileWriter, File}
 import org.I0Itec.zkclient.ZkClient
 import kafka.utils.ZKStringSerializer
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
+import net.elodina.mesos.util.Version
 
 class Cluster {
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
@@ -68,6 +69,7 @@ class Cluster {
 
   def toJson: JSONObject = {
     val obj = new mutable.LinkedHashMap[String, Object]()
+    obj("version") = "" + Scheduler.version
 
     if (!brokers.isEmpty) {
       val brokerNodes = new ListBuffer[JSONObject]()
@@ -95,9 +97,14 @@ object Cluster {
       val json: String = loadJson
       if (json == null) return
       
-      val node: Map[String, Object] = Util.parseJson(json)
+      var node: Map[String, Object] = Util.parseJson(json)
+      val fromVersion: Version = new Version(if (node.contains("version")) node("version").asInstanceOf[String] else "0.9.5.0")
+      node = Migration.apply(fromVersion, Scheduler.version, node)
+
       cluster.brokers.clear()
       cluster.fromJson(node)
+
+      save(cluster)
     }
     
     def save(cluster: Cluster): Unit = {

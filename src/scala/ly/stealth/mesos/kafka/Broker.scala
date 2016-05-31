@@ -255,7 +255,7 @@ class Broker(_id: String = "0") {
     if (node.contains("port")) port = new Range(node("port").asInstanceOf[String])
     if (node.contains("volume")) volume = node("volume").asInstanceOf[String]
     if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
-    if (node.contains("syslog")) syslog = node("syslog").asInstanceOf[Boolean]
+    syslog = node("syslog").asInstanceOf[Boolean]
 
     if (node.contains("constraints")) constraints = Strings.parseMap(node("constraints").asInstanceOf[String])
                                                     .mapValues(new Constraint(_)).view.force
@@ -263,7 +263,7 @@ class Broker(_id: String = "0") {
     if (node.contains("log4jOptions")) log4jOptions = Strings.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
 
-    if (node.contains("stickiness")) stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
+    stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
     failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
 
     if (node.contains("task")) {
