@@ -1,7 +1,8 @@
 apply plugin: 'scala'
 apply plugin: 'idea'
 
-version = '0.9.5.1'
+version = new File('src/scala/ly/stealth/mesos/kafka/Scheduler.scala').readLines().findResult(
+        { x -> x.contains("new Version(\"") ? x.substring(x.indexOf("new Version(\"") + 13, x.lastIndexOf("\")")) : null })
 
 jar.archiveName = "kafka-mesos-${version}.jar"
 
