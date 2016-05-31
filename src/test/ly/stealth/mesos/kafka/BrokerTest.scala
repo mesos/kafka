@@ -343,6 +343,7 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.port = new Range("0..100")
     broker.volume = "volume"
     broker.bindAddress = new Util.BindAddress("192.168.0.1")
+    broker.syslog = true
 
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_))
     broker.options = parseMap("a=1")
@@ -569,6 +570,7 @@ object BrokerTest {
     assertEquals(expected.port, actual.port)
     assertEquals(expected.volume, actual.volume)
     assertEquals(expected.bindAddress, actual.bindAddress)
+    assertEquals(expected.syslog, actual.syslog)
 
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)

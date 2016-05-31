@@ -27,6 +27,8 @@ import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import org.apache.log4j._
 import scala.Some
+import org.apache.mesos.Protos.Environment.Variable
+import scala.collection.mutable
 
 
 object Scheduler extends org.apache.mesos.Scheduler {
@@ -50,6 +52,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
       commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jre/" + Config.jre.getName))
       cmd = "jre/bin/" + cmd
     }
+
+    val env = new mutable.HashMap[String, String]()
+    env("MESOS_SYSLOG_TAG") = Config.frameworkName + "-" + broker.id
+    if (broker.syslog) env("MESOS_SYSLOG") = "true"
+
+    val envBuilder = Environment.newBuilder()
+    for ((name, value) <- env)
+      envBuilder.addVariables(Variable.newBuilder().setName(name).setValue(value))
+    commandBuilder.setEnvironment(envBuilder)
 
     commandBuilder
       .addUris(CommandInfo.URI.newBuilder().setValue(Config.api + "/jar/" + HttpServer.jar.getName).setExtract(false))

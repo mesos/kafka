@@ -44,6 +44,7 @@ class Broker(_id: String = "0") {
   var port: Range = null
   var volume: String = null
   var bindAddress: BindAddress = null
+  var syslog: Boolean = false
 
   var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
   var options: util.Map[String, String] = new util.LinkedHashMap()
@@ -254,6 +255,7 @@ class Broker(_id: String = "0") {
     if (node.contains("port")) port = new Range(node("port").asInstanceOf[String])
     if (node.contains("volume")) volume = node("volume").asInstanceOf[String]
     if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
+    if (node.contains("syslog")) syslog = node("syslog").asInstanceOf[Boolean]
 
     if (node.contains("constraints")) constraints = Strings.parseMap(node("constraints").asInstanceOf[String])
                                                     .mapValues(new Constraint(_)).view.force
@@ -288,6 +290,7 @@ class Broker(_id: String = "0") {
     if (port != null) obj("port") = "" + port
     if (volume != null) obj("volume") = volume
     if (bindAddress != null) obj("bindAddress") = "" + bindAddress
+    obj("syslog") = syslog
 
     if (!constraints.isEmpty) obj("constraints") = Strings.formatMap(constraints)
     if (!options.isEmpty) obj("options") = Strings.formatMap(options)

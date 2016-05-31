@@ -25,6 +25,7 @@ import org.apache.log4j._
 import java.util
 import com.google.protobuf.ByteString
 import scala.util.parsing.json.JSONObject
+import org.apache.log4j.net.SyslogAppender
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)
@@ -205,8 +206,17 @@ object Executor extends org.apache.mesos.Executor {
     val logger = Logger.getLogger(Executor.getClass.getPackage.getName)
     logger.setLevel(if (System.getProperty("debug") != null) Level.DEBUG else Level.INFO)
 
-    val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
-    root.addAppender(new ConsoleAppender(layout))
+    val pattern = "%d [%t] %-5p %c %x - %m%n"
+
+    if (System.getenv("MESOS_SYSLOG") != null) {
+      val frameworkName = System.getenv("MESOS_SYSLOG_TAG")
+      val appender = new SyslogAppender(new PatternLayout(frameworkName + ": " + pattern.substring(3)), "localhost", SyslogAppender.LOG_USER)
+
+      appender.setHeader(true)
+      root.addAppender(appender)
+    }
+
+    root.addAppender(new ConsoleAppender(new PatternLayout(pattern)))
   }
 }
 
