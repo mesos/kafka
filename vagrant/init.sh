@@ -17,7 +17,7 @@
 
 install_mesos() {
     mode=$1 # master | slave
-    apt-get -qy install mesos=0.25.0*
+    apt-get -qy install mesos=0.28.0*
 
     echo "zk://master:2181/mesos" > /etc/mesos/zk
     echo '5mins' > /etc/mesos-slave/executor_registration_timeout
