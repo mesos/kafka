@@ -53,7 +53,7 @@ if [[ $1 != "master" && $1 != "slave" ]]; then
 fi
 mode=$1
 
-cd /vagrant/src/vagrant
+cd /vagrant/vagrant
 
 # name resolution
 cp .vagrant/hosts /etc/hosts
