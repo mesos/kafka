@@ -308,14 +308,10 @@ class Broker(_id: String = "0") {
 }
 
 object Broker {
-  def nextTaskId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
-  def nextExecutorId(broker: Broker): String = "broker-" + broker.id + "-" + UUID.randomUUID()
+  def nextTaskId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
+  def nextExecutorId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
 
-  def idFromTaskId(taskId: String): String = {
-    val parts: Array[String] = taskId.split("-")
-    if (parts.length < 2) throw new IllegalArgumentException(taskId)
-    parts(1)
-  }
+  def idFromTaskId(taskId: String): String = taskId.dropRight(37).replace(Config.frameworkName + "-", "")
 
   def idFromExecutorId(executorId: String): String = idFromTaskId(executorId)
 
@@ -371,7 +367,7 @@ object Broker {
     def currentDelay: Period = {
       if (failures == 0) return new Period("0")
 
-      val multiplier = 1 << (failures - 1)
+      val multiplier = 1 << Math.min(30, failures - 1)
       val d = delay.ms * multiplier
 
       if (d > maxDelay.ms) maxDelay else new Period(delay.value * multiplier + delay.unit)

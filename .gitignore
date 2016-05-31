@@ -6,7 +6,7 @@ project/*
 todo.txt
 
 src/docker/.docker
-src/vagrant/.vagrant
+vagrant/.vagrant
 
 kafka-mesos*.json
 kafka-mesos*.properties
