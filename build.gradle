@@ -1,6 +1,9 @@
-apply plugin: 'scala'
-apply plugin: 'idea'
-apply plugin: 'distribution'
+plugins {
+    id 'scala'
+    id 'idea'
+    id 'distribution'
+    id 'de.undercouch.download' version '2.1.0'
+}
 
 version = new File('src/scala/ly/stealth/mesos/kafka/Scheduler.scala').readLines().findResult(
         { x -> x.contains("new Version(\"") ? x.substring(x.indexOf("new Version(\"") + 13, x.lastIndexOf("\")")) : null })
@@ -88,4 +91,10 @@ distributions.main {
 distTar {
     dependsOn jar
     compression Compression.GZIP
+}
+
+import de.undercouch.gradle.tasks.download.Download
+task downloadKafka(type: Download) {
+    src "https://archive.apache.org/dist/kafka/${kafkaVersion}/kafka_${scalaVersion}-${kafkaVersion}.tgz"
+    dest rootDir
 }
