@@ -28,6 +28,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
 import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util._
+import org.eclipse.jetty.server.Request
 import ly.stealth.mesos.kafka.Broker.State
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
