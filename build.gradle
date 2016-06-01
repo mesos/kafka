@@ -1,5 +1,6 @@
 apply plugin: 'scala'
 apply plugin: 'idea'
+apply plugin: 'distribution'
 
 version = new File('src/scala/ly/stealth/mesos/kafka/Scheduler.scala').readLines().findResult(
         { x -> x.contains("new Version(\"") ? x.substring(x.indexOf("new Version(\"") + 13, x.lastIndexOf("\")")) : null })
@@ -13,6 +14,7 @@ repositories {
 
 buildDir = 'out/gradle'
 libsDirName = '../../'
+distsDirName = '../../'
 
 sourceSets {
     main {
@@ -64,4 +66,21 @@ jar {
 
 task wrapper(type: Wrapper) {
     gradleVersion = '2.8'
+}
+
+distributions.main {
+    contents {
+        from(rootDir) {
+            include jar.archiveName
+            include "README.md"
+            include "LICENSE"
+            include "kafka-mesos.properties"
+            include "kafka-mesos.sh"
+        }
+    }
+}
+
+distTar {
+    dependsOn jar
+    compression Compression.GZIP
 }
