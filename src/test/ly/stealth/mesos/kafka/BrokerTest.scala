@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.BindAddress
-import net.elodina.mesos.util.{Period, Range}
+import net.elodina.mesos.util.{Period, Range, Constraint}
 import net.elodina.mesos.util.Strings.parseMap
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
@@ -98,14 +98,14 @@ class BrokerTest extends KafkaMesosTestCase {
     // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_))
     assertNull(broker.matches(offer("master", resources)))
-    assertEquals("hostname doesn't match unique", broker.matches(offer("master", resources), now, _ => Array("master")))
-    assertNull(broker.matches(offer("master", resources), now, _ => Array("slave")))
+    assertEquals("hostname doesn't match unique", broker.matches(offer("master", resources), now, _ => util.Arrays.asList("master")))
+    assertNull(broker.matches(offer("master", resources), now, _ => util.Arrays.asList("slave")))
 
     // groupBy
     broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_))
     assertNull(broker.matches(offer("master", resources)))
-    assertNull(broker.matches(offer("master", resources), now, _ => Array("master")))
-    assertEquals("hostname doesn't match groupBy", broker.matches(offer("master", resources), now, _ => Array("slave")))
+    assertNull(broker.matches(offer("master", resources), now, _ => util.Arrays.asList("master")))
+    assertEquals("hostname doesn't match groupBy", broker.matches(offer("master", resources), now, _ => util.Arrays.asList("slave")))
   }
 
   @Test
@@ -139,8 +139,8 @@ class BrokerTest extends KafkaMesosTestCase {
     // groupBy
     broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_))
     assertNull(broker.matches(offer("rack=1")))
-    assertNull(broker.matches(offer("rack=1"), now, _ => Array("1")))
-    assertEquals("rack doesn't match groupBy", broker.matches(offer("rack=2"), now, _ => Array("1")))
+    assertNull(broker.matches(offer("rack=1"), now, _ => util.Arrays.asList("1")))
+    assertEquals("rack doesn't match groupBy", broker.matches(offer("rack=2"), now, _ => util.Arrays.asList("1")))
   }
 
   @Test

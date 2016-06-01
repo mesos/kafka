@@ -28,7 +28,7 @@ import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
 import java.util._
 import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
 import ly.stealth.mesos.kafka.Util.BindAddress
-import net.elodina.mesos.util.{Strings, Period, Range, Repr}
+import net.elodina.mesos.util.{Strings, Period, Range, Repr, Constraint}
 import java.text.SimpleDateFormat
 import scala.List
 import scala.collection.Map
@@ -623,8 +623,8 @@ object Broker {
     val STOPPING = "stopping"
   }
 
-  type OtherAttributes = (String) => Array[String]
-  def NoAttributes: OtherAttributes = _ => Array()
+  type OtherAttributes = (String) => util.Collection[String]
+  def NoAttributes: OtherAttributes = _ => Collections.emptyList()
 
   private def dateTimeFormat: SimpleDateFormat = {
     val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")

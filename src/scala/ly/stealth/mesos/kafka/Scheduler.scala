@@ -367,7 +367,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
   }
 
-  private[kafka] def otherTasksAttributes(name: String): Array[String] = {
+  private[kafka] def otherTasksAttributes(name: String): util.Collection[String] = {
     def value(task: Broker.Task, name: String): String = {
       if (name == "hostname") return task.hostname
       task.attributes.get(name)
@@ -380,7 +380,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         if (v != null) values.add(v)
       }
 
-    values.toArray(Array[String]())
+    values
   }
 
   def start() {

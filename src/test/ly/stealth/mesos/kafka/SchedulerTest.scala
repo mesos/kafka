@@ -237,9 +237,9 @@ class SchedulerTest extends KafkaMesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
     broker1.task = new Broker.Task(_hostname = "host1", _attributes = parseMap("b=3"))
 
-    assertArrayEquals(Array[AnyRef]("host0", "host1"), Scheduler.otherTasksAttributes("hostname").asInstanceOf[Array[AnyRef]])
-    assertArrayEquals(Array[AnyRef]("1"), Scheduler.otherTasksAttributes("a").asInstanceOf[Array[AnyRef]])
-    assertArrayEquals(Array[AnyRef]("2", "3"), Scheduler.otherTasksAttributes("b").asInstanceOf[Array[AnyRef]])
+    assertEquals(util.Arrays.asList("host0", "host1"), Scheduler.otherTasksAttributes("hostname"))
+    assertEquals(util.Arrays.asList("1"), Scheduler.otherTasksAttributes("a"))
+    assertEquals(util.Arrays.asList("2", "3"), Scheduler.otherTasksAttributes("b"))
   }
 
   @Test
