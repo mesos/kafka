@@ -117,6 +117,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cluster.save()
 
     this.driver = driver
+    checkMesosVersion(master)
     reconcileTasksIfRequired(force = true)
   }
 
@@ -365,6 +366,19 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     if (force || !statuses.isEmpty)
       driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
+  }
+
+  private def checkMesosVersion(master: MasterInfo): Unit = {
+    if (master == null) return
+
+    val minVersion: Version = new Version("0.23.0")
+    var version: Version = if (master.getVersion != null) new Version(master.getVersion) else null
+
+    if (version == null || version.compareTo(minVersion) < 0) {
+      val versionStr: String = if (version == null) "?(<0.23.0)" else "" + version
+      logger.fatal("Unsupported Mesos version " + versionStr + ", expected version " + minVersion + "+")
+      driver.stop
+    }
   }
 
   private[kafka] def otherTasksAttributes(name: String): util.Collection[String] = {
