@@ -253,10 +253,12 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertNull(broker1.metrics)
 
     val metrics0 = new Broker.Metrics()
-    metrics0.underReplicatedPartitions = 2
-    metrics0.offlinePartitionsCount = 3
-    metrics0.activeControllerCount = 1
-    metrics0.timestamp = System.currentTimeMillis()
+    metrics0.fromJson(Map[String, Object](
+      "underReplicatedPartitions" -> 2.asInstanceOf[Object],
+      "offlinePartitionsCount" -> 3.asInstanceOf[Object],
+      "activeControllerCount" -> 1.asInstanceOf[Object],
+      "timestamp" -> System.currentTimeMillis().asInstanceOf[Object]
+    ))
 
     val data = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics0.toJson)).toString().getBytes
 
@@ -267,9 +269,9 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertNull(broker1.metrics)
 
     def assertMetricsEquals(expected: Broker.Metrics, actual: Broker.Metrics): Unit = {
-      assertEquals(expected.underReplicatedPartitions, actual.underReplicatedPartitions)
-      assertEquals(expected.offlinePartitionsCount, actual.offlinePartitionsCount)
-      assertEquals(expected.activeControllerCount, actual.activeControllerCount)
+      assertEquals(expected("underReplicatedPartitions"), actual("underReplicatedPartitions"))
+      assertEquals(expected("offlinePartitionsCount"), actual("offlinePartitionsCount"))
+      assertEquals(expected("activeControllerCount"), actual("activeControllerCount"))
       assertEquals(expected.timestamp, actual.timestamp)
     }
 
@@ -279,8 +281,10 @@ class SchedulerTest extends KafkaMesosTestCase {
     broker1.active = false
 
     val metrics1 = new Broker.Metrics()
-    metrics1.offlinePartitionsCount = 1
-    metrics1.timestamp = System.currentTimeMillis()
+    metrics1.fromJson(Map(
+      "offlinePartitionsCount" -> 1.asInstanceOf[Object],
+      "timestamp" -> System.currentTimeMillis().asInstanceOf[Object]
+    ))
 
     val data1 = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics1.toJson)).toString().getBytes
 

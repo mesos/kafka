@@ -354,7 +354,7 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.task = new Task("1", "slave", "executor", "host")
 
     val read: Broker = new Broker()
-    read.fromJson(Util.parseJson("" + broker.toJson))
+    read.fromJson(Util.parseJson("" + broker.toJson()))
 
     BrokerTest.assertBrokerEquals(broker, read)
   }

@@ -794,9 +794,25 @@ object Cli {
       if (metrics != null) {
         printLine("metrics: ", indent)
         printLine("collected: " + Repr.dateTime(new Date(metrics.timestamp)), indent + 1)
-        printLine("under-replicated-partitions: " + metrics.underReplicatedPartitions, indent + 1)
-        printLine("offline-partitions-count: " + metrics.offlinePartitionsCount, indent + 1)
-        printLine("is-active-controller: " + metrics.activeControllerCount, indent + 1)
+        printLine("under-replicated-partitions: " +
+          metrics("kafka.server,ReplicaManager,UnderReplicatedPartitions")
+              .orElse(metrics("underReplicatedPartitions"))
+              .getOrElse(0),
+          indent + 1)
+        printLine("offline-partitions-count: " +
+          metrics("kafka.controller,KafkaController,OfflinePartitionsCount")
+              .orElse(metrics("offlinePartitionsCount"))
+              .getOrElse(0),
+          indent + 1)
+        printLine("is-active-controller: " +
+          metrics("kafka.controller,KafkaController,ActiveControllerCount")
+              .orElse(metrics("activeControllerCount"))
+              .getOrElse(0),
+          indent + 1)
+      } else if (broker.state() == Broker.State.RUNNING) {
+        // No metrics yet, but the broker is running so we should recieve them soon.
+        printLine("metrics: ", indent)
+        printLine("waiting for broker to report metrics", indent + 1)
       }
     }
     

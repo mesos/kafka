@@ -26,7 +26,7 @@ import net.elodina.mesos.util.Strings
 class ExecutorTest extends KafkaMesosTestCase {
   @Test(timeout = 5000)
   def startBroker_success {
-    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson))
+    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson()))
     Executor.startBroker(executorDriver, task("id", "task", "slave", data))
     executorDriver.waitForStatusUpdates(1)
     assertEquals(1, executorDriver.statusUpdates.size())
@@ -73,7 +73,7 @@ class ExecutorTest extends KafkaMesosTestCase {
 
   @Test(timeout = 5000)
   def launchTask {
-    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson))
+    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson()))
     Executor.launchTask(executorDriver, task("id", "task", "slave", data))
 
     executorDriver.waitForStatusUpdates(1)

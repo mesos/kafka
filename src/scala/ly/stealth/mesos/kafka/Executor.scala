@@ -112,6 +112,7 @@ object Executor extends org.apache.mesos.Executor {
             } catch {
               case e: InterruptedException => return
               case e: Throwable => logger.warn("", e)
+              Thread.sleep(1000L)
             }
           }
         }
