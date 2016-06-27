@@ -74,6 +74,10 @@ class Broker(_id: String = "0") {
     result
   }
 
+  def interpolatedLog4jOptions(): Map[String, String] = {
+    log4jOptions.mapValues(v => v.replace("$id", id))
+  }
+
   @volatile var task: Broker.Task = null
 
   def matches(offer: Offer, now: Date = new Date(), otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {

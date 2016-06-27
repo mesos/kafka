@@ -139,7 +139,7 @@ object BrokerServer {
       }
 
       System.setProperty("kafka.logs.dir", "" + new File(Distro.dir, "log"))
-      val props: Properties = this.props(broker.log4jOptions, "log4j.properties")
+      val props: Properties = this.props(broker.interpolatedLog4jOptions(), "log4j.properties")
 
       val configurator: Class[_] = loader.loadClass("org.apache.log4j.PropertyConfigurator")
       configurator.getMethod("configure", classOf[Properties]).invoke(null, props)
