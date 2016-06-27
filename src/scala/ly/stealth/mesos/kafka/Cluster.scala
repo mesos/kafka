@@ -135,8 +135,7 @@ object Cluster {
 
   class ZkStorage(val path: String) extends Storage {
     createChrootIfRequired()
-
-    def zkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
+    val zkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
 
     private def createChrootIfRequired(): Unit = {
       val slashIdx: Int = Config.zk.indexOf('/')
@@ -151,16 +150,17 @@ object Cluster {
     }
 
     protected def loadJson: String = {
-      val zkClient = this.zkClient
-      try { zkClient.readData(path, true).asInstanceOf[String] }
-      finally { zkClient.close() }
+      zkClient.readData(path, true).asInstanceOf[String]
     }
 
     protected def saveJson(json: String): Unit = {
-      val zkClient = this.zkClient
-      try { zkClient.createPersistent(path, json) }
-      catch { case e: ZkNodeExistsException => zkClient.writeData(path, json) }
-      finally { zkClient.close() }
+      if (zkClient.exists(path)) {
+        zkClient.writeData(path, json)
+      }
+      else {
+        try { zkClient.createPersistent(path, json) }
+        catch { case e: ZkNodeExistsException => zkClient.writeData(path, json) }
+      }
     }
   }
 }
