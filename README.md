@@ -29,6 +29,7 @@ For issues https://github.com/mesos/kafka/issues
 * [Stopping brokers](#stopping-brokers-in-the-cluster)
 * [Restarting brokers](#restarting-brokers-in-the-cluster)
 * [Removing brokers](#removing-brokers-from-the-cluster)
+* [Cloning brokers](#cloning-brokers)
 * [Retrieving broker log](#retrieving-broker-log)
 * [Rebalancing brokers in the cluster](#rebalancing-topics)
 * [Listing topics](#listing-topics)
@@ -730,6 +731,35 @@ Removing brokers from the cluster
 # ./kafka-mesos.sh help broker remove
 Remove broker
 Usage: broker remove <broker-expr> [options]
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+broker-expr examples:
+  0      - broker 0
+  0,1    - brokers 0,1
+  0..2   - brokers 0,1,2
+  0,1..2 - brokers 0,1,2
+  *      - any broker
+attribute filtering:
+  *[rack=r1]           - any broker having rack=r1
+  *[hostname=slave*]   - any broker on host with name starting with 'slave'
+  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
+```
+
+Cloning Brokers
+---------------
+
+```
+# ./kafka-mesos.sh help broker clone
+Clone broker
+Usage: broker clone <broker-expr> [options]
+
+Option    Description
+------    -----------
+--source  source broker id to copy settings from
 
 Generic Options
 Option  Description

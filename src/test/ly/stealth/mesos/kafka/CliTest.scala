@@ -155,6 +155,20 @@ class CliTest extends KafkaMesosTestCase {
     assertFalse(broker.active)
   }
 
+  @Test
+  def broker_clone: Unit = {
+    val broker = new Broker("0")
+    broker.cpus = 5
+    broker.options = Map("test" -> "abc")
+    Scheduler.cluster.addBroker(broker)
+    exec("broker clone 1 --source 0")
+
+    val newBroker = Scheduler.cluster.getBroker("1")
+    assertNotNull(newBroker)
+    assertEquals(newBroker.id, "1")
+    assertEquals(newBroker.cpus, 5, 0)
+  }
+
   @Test(timeout = 60000)
   def broker_log: Unit = {
     // no broker

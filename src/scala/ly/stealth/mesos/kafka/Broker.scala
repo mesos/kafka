@@ -305,6 +305,27 @@ class Broker(_id: String = "0") {
 
     new JSONObject(obj.toMap)
   }
+
+  def clone(newId: String): Broker = {
+    val nb = new Broker(newId)
+    nb.cpus = cpus
+    nb.mem = mem
+    nb.heap = heap
+    nb.port = port
+    nb.volume = volume
+    nb.bindAddress = bindAddress
+    nb.syslog = syslog
+    nb.stickiness.period = stickiness.period
+    nb.constraints = new util.LinkedHashMap[String, Constraint]() ++= constraints
+    nb.options = new util.LinkedHashMap[String, String]() ++= options
+    nb.log4jOptions = new util.LinkedHashMap[String, String]() ++= log4jOptions
+    nb.jvmOptions = jvmOptions
+    nb.failover.delay = failover.delay
+    nb.failover.maxDelay = failover.maxDelay
+    nb.failover.maxTries = failover.maxTries
+
+    nb
+  }
 }
 
 object Broker {
