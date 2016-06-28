@@ -123,9 +123,11 @@ object HttpServer {
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/kafka/")) downloadFile(HttpServer.kafkaDist, response)
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
-      else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/api/broker")) handleBrokerApi(request, response)
       else if (uri.startsWith("/api/topic")) handleTopicApi(request, response)
+      else if (uri.startsWith("/health")) handleHealth(response)
+      else if (uri.startsWith("/quitquitquit")) handleQuit(request, response)
+      else if (uri.startsWith("/abortabortabort")) handleAbort(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -619,6 +621,20 @@ object HttpServer {
       result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handleQuit(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      if (request.getMethod != "POST") {
+        response.sendError(405, "wrong method")
+      }
+      Scheduler.stop()
+    }
+
+    def handleAbort(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      if (request.getMethod != "POST") {
+        response.sendError(405, "wrong method")
+      }
+      Scheduler.kill()
     }
   }
 
