@@ -191,12 +191,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
     val declineReasons = new util.ArrayList[String]()
+    var didSomething = false
     for (offer <- offers) {
       val declineReason = acceptOffer(offer)
 
       if (declineReason != null) {
         driver.declineOffer(offer.getId)
         if (!declineReason.isEmpty) declineReasons.add(offer.getHostname + Repr.id(offer.getId.getValue) + " - " + declineReason)
+      } else {
+        didSomething = true
       }
     }
     
@@ -207,11 +210,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
         logger.info(s"Stopping broker ${broker.id}: killing task ${broker.task.id}")
         driver.killTask(TaskID.newBuilder.setValue(broker.task.id).build)
         broker.task.state = Broker.State.STOPPING
+        didSomething = true
       }
     }
 
-    reconcileTasksIfRequired()
-    cluster.save()
+    didSomething |= reconcileTasksIfRequired()
+    if (didSomething) {
+      cluster.save()
+      logger.info("Saving cluster state")
+    }
   }
 
   private[kafka] def acceptOffer(offer: Offer): String = {
@@ -332,9 +339,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] var reconciles: Int = 0
   private[kafka] var reconcileTime: Date = null
 
-  private[kafka] def reconcileTasksIfRequired(force: Boolean = false, now: Date = new Date()): Unit = {
+  private[kafka] def reconcileTasksIfRequired(force: Boolean = false, now: Date = new Date()): Boolean = {
+    var didSomething = false
     if (reconcileTime != null && now.getTime - reconcileTime.getTime < RECONCILE_DELAY.ms)
-      return
+      return false
 
     if (!isReconciling) reconciles = 0
     reconciles += 1
@@ -345,9 +353,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
         logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for broker ${broker.id}, sending killTask for task ${broker.task.id}")
         driver.killTask(TaskID.newBuilder().setValue(broker.task.id).build())
         broker.task = null
+        didSomething = true
       }
 
-      return
+      return didSomething
     }
 
     val statuses = new util.ArrayList[TaskStatus]
@@ -362,10 +371,13 @@ object Scheduler extends org.apache.mesos.Scheduler {
           .setState(TaskState.TASK_STAGING)
           .build()
         )
+        didSomething = true
       }
 
     if (force || !statuses.isEmpty)
       driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
+
+    didSomething
   }
 
   private def checkMesosVersion(master: MasterInfo): Unit = {
