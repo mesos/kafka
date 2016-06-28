@@ -141,6 +141,21 @@ class HttpServerTest extends KafkaMesosTestCase {
   }
 
   @Test
+  def broker_clone {
+    val cluster = Scheduler.cluster
+    cluster.addBroker(new Broker("0"))
+
+    var json = sendRequest("/broker/clone", Map("broker" -> "1", "source" -> "0"))
+    var brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
+    assertEquals(1, brokerNodes.size)
+
+    val broker = new Broker()
+    broker.fromJson(brokerNodes(0))
+
+    assertEquals(broker.id, "1")
+  }
+
+  @Test
   def broker_remove {
     val cluster = Scheduler.cluster
     cluster.addBroker(new Broker("0"))

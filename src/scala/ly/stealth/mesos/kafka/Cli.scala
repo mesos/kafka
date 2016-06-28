@@ -395,6 +395,7 @@ object Cli {
         case "list" => handleList(arg)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
+        case "clone" => handleClone(arg, args)
         case "start" | "stop" => handleStartStop(arg, args, cmd == "start")
         case "restart" => handleRestart(arg, args)
         case "log" => handleLog(arg, args)
@@ -416,6 +417,8 @@ object Cli {
           handleAddUpdate(null, null, cmd == "add", help = true)
         case "remove" =>
           handleRemove(null, help = true)
+        case "clone" =>
+          handleClone(null, null, help = true)
         case "start" | "stop" =>
           handleStartStop(null, null, cmd == "start", help = true)
         case "restart" =>
@@ -580,6 +583,48 @@ object Cli {
       val brokers = "broker" + (if (ids.contains(",")) "s" else "")
 
       printLine(s"$brokers $ids removed")
+    }
+
+    private def handleClone(expr: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      parser.accepts("source", "source broker id to copy settings from").withRequiredArg().ofType(classOf[String])
+
+      if (help) {
+        printLine("Clone broker\nUsage: broker clone <broker-expr> [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printBrokerExprExamples(out)
+        return
+      }
+
+      var options: OptionSet = null
+      try { options = parser.parse(args: _*) }
+      catch {
+        case e: OptionException =>
+          parser.printHelpOn(out)
+          printLine()
+          throw new Error(e.getMessage)
+      }
+
+      val sourceBrokerId = options.valueOf("source").asInstanceOf[String]
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/broker/clone", Map("broker" -> expr, "source" -> sourceBrokerId)) }
+      catch { case e: IOException => throw new Error("" + e) }
+      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      val brokers = "broker" + (if (brokerNodes.length > 1) "s" else "")
+
+      printLine(s"$brokers added:")
+      for (brokerNode <- brokerNodes) {
+        val broker: Broker = new Broker()
+        broker.fromJson(brokerNode)
+
+        printBroker(broker, 1)
+        printLine()
+      }
     }
 
     private def handleStartStop(expr: String, args: Array[String], start: Boolean, help: Boolean = false): Unit = {
@@ -750,6 +795,7 @@ object Cli {
       printLine("add        - add broker", 1)
       printLine("update     - update broker", 1)
       printLine("remove     - remove broker", 1)
+      printLine("clone      - clone broker", 1)
       printLine("start      - start broker", 1)
       printLine("stop       - stop broker", 1)
       printLine("restart    - restart broker", 1)

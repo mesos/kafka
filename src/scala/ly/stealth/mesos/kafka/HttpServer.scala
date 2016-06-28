@@ -155,6 +155,7 @@ object HttpServer {
       else if (uri == "start" || uri == "stop") handleStartStopBroker(request, response)
       else if (uri == "restart") handleRestartBroker(request, response)
       else if (uri == "log") handleBrokerLog(request, response)
+      else if (uri == "clone") handleCloneBroker(request, response)
       else response.sendError(404, "uri not found")
     }
 
@@ -481,6 +482,34 @@ object HttpServer {
       Scheduler.removeLog(requestId)
 
       response.getWriter.println(JSONObject(Map("status" -> status, "content" -> content)))
+    }
+
+    def handleCloneBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val cluster: Cluster = Scheduler.cluster
+
+      val expr: String = request.getParameter("broker")
+      if (expr == null) { response.sendError(400, "broker required"); return }
+
+      var ids: util.List[String] = null
+      try { ids = Expr.expandBrokers(cluster, expr) }
+      catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
+
+      val sourceBrokerId: String = request.getParameter("source")
+      if (sourceBrokerId == null) { response.sendError(400, "source broker required"); return }
+
+      val sourceBroker = cluster.getBroker(sourceBrokerId)
+      if (sourceBroker == null) { response.sendError(400, s"broker $sourceBrokerId not found"); return }
+
+      val brokerNodes = new ListBuffer[JSONObject]()
+      for (id <- ids) {
+        val newBroker = sourceBroker.clone(id)
+        cluster.addBroker(newBroker)
+
+        brokerNodes.add(newBroker.toJson())
+      }
+      cluster.save()
+
+      response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
     }
 
     def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
