@@ -43,7 +43,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jar.getName
     cmd += " -Xmx" + broker.heap + "m"
-    if (broker.jvmOptions != null) cmd += " " + broker.jvmOptions
+    if (broker.jvmOptions != null) cmd += " " + broker.jvmOptions.replace("$id", broker.id)
 
     if (Config.debug) cmd += " -Ddebug"
     cmd += " ly.stealth.mesos.kafka.Executor"
