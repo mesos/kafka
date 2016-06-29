@@ -59,7 +59,7 @@ class ExecutorTest extends KafkaMesosTestCase {
 
   @Test
   def stopExecutor {
-    Executor.server.start(null)
+    Executor.server.start(null, null)
     assertTrue(Executor.server.isStarted)
     assertEquals(Status.DRIVER_RUNNING, executorDriver.status)
 
@@ -82,7 +82,7 @@ class ExecutorTest extends KafkaMesosTestCase {
 
   @Test(timeout = 5000)
   def killTask {
-    Executor.server.start(null)
+    Executor.server.start(null, null)
     Executor.killTask(executorDriver, taskId())
 
     Executor.server.waitFor()
@@ -91,7 +91,7 @@ class ExecutorTest extends KafkaMesosTestCase {
 
   @Test
   def shutdown {
-    Executor.server.start(null)
+    Executor.server.start(null, null)
     Executor.shutdown(executorDriver)
     assertFalse(Executor.server.isStarted)
   }

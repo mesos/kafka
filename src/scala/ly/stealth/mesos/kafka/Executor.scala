@@ -74,15 +74,24 @@ object Executor extends org.apache.mesos.Executor {
         val broker = new Broker()
         broker.fromJson(Util.parseJson(data.get("broker")))
 
+        def send(metrics: Broker.Metrics): Unit = {
+          try {
+            driver.sendFrameworkMessage(
+              JSONObject(Map("metrics" -> metrics.toJson)).toString().getBytes())
+          }
+          catch {
+            case t: Exception =>
+              logger.error("Error posting metrics", t)
+          }
+        }
+
         val defaults = Strings.parseMap(data.get("defaults"))
-        val endpoint = server.start(broker, defaults)
+        val endpoint = server.start(broker, send, defaults)
 
         var status = TaskStatus.newBuilder
           .setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
           .setData(ByteString.copyFromUtf8("" + endpoint))
         driver.sendStatusUpdate(status.build)
-
-        startCollectingMetrics()
 
         server.waitFor()
         status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED)
@@ -94,29 +103,6 @@ object Executor extends org.apache.mesos.Executor {
       } finally {
         stopExecutor(driver)
       }
-    }
-
-    def startCollectingMetrics(): Unit = {
-      new Thread {
-        def send(driver: ExecutorDriver, metrics: Broker.Metrics): Unit = {
-          driver.sendFrameworkMessage(JSONObject(Map("metrics" -> metrics.toJson)).toString().getBytes)
-        }
-
-        override def run(): Unit = {
-          setName("BrokerMetrics")
-          while (true) {
-            try {
-              val metrics = BrokerServer.Metrics.collect
-              if (metrics != null) send(driver, metrics)
-              Thread.sleep(30000L)
-            } catch {
-              case e: InterruptedException => return
-              case e: Throwable => logger.warn("", e)
-              Thread.sleep(1000L)
-            }
-          }
-        }
-      }.start()
     }
 
     new Thread {
