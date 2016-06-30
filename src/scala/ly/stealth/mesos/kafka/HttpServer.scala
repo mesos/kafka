@@ -564,6 +564,16 @@ object HttpServer {
         try { replicas = Integer.parseInt(request.getParameter("replicas")) }
         catch { case e: NumberFormatException => errors.add("Invalid replicas") }
 
+      var fixedStartIndex: Int = -1
+      if (request.getParameter("fixedStartIndex") != null)
+        try { fixedStartIndex = Integer.parseInt(request.getParameter("fixedStartIndex")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid fixedStartIndex"); return  }
+
+      var startPartitionId: Int = -1
+      if (request.getParameter("startPartitionId") != null)
+        try { startPartitionId = Integer.parseInt(request.getParameter("startPartitionId")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid startPartitionId"); return  }
+
       var options: util.Map[String, String] = null
       if (request.getParameter("options") != null)
         try { options = Strings.parseMap(request.getParameter("options")) }
@@ -585,7 +595,12 @@ object HttpServer {
 
       val topicNodes= new ListBuffer[JSONObject]
       for (name <- topicNames) {
-        if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas, brokerIds), options)
+        if (add)
+          topics.addTopic(
+            name,
+            topics.fairAssignment(partitions, replicas, brokerIds, startPartitionId, fixedStartIndex),
+            options
+          )
         else topics.updateTopic(topics.getTopic(name), options)
 
         topicNodes.add(topics.getTopic(name).toJson)
@@ -623,9 +638,18 @@ object HttpServer {
         try { replicas = Integer.parseInt(request.getParameter("replicas")) }
         catch { case e: NumberFormatException => response.sendError(400, "invalid replicas"); return  }
 
+      var fixedStartIndex: Int = -1
+      if (request.getParameter("fixedStartIndex") != null)
+        try { fixedStartIndex = Integer.parseInt(request.getParameter("fixedStartIndex")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid fixedStartIndex"); return  }
+
+      var startPartitionId: Int = -1
+      if (request.getParameter("startPartitionId") != null)
+        try { startPartitionId = Integer.parseInt(request.getParameter("startPartitionId")) }
+        catch { case e: NumberFormatException => response.sendError(400, "invalid startPartitionId"); return  }
 
       def startRebalance: (String, String) = {
-        try { rebalancer.start(topics, brokers, replicas) }
+        try { rebalancer.start(topics, brokers, replicas, fixedStartIndex, startPartitionId) }
         catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)

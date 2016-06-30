@@ -987,6 +987,8 @@ object Cli {
         parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
         parser.accepts("partitions", "partitions count. Default - 1").withRequiredArg().ofType(classOf[Integer])
         parser.accepts("replicas", "replicas count. Default - 1").withRequiredArg().ofType(classOf[Integer])
+        parser.accepts("fixedStartIndex", "index into the broker set to start assigning partitions at.  Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
+        parser.accepts("startPartitionId", "partition id to begin assignment at. Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
       }
       parser.accepts("options", "topic options. Example: flush.ms=60000,retention.ms=6000000").withRequiredArg().ofType(classOf[String])
 
@@ -1021,6 +1023,8 @@ object Cli {
       val partitions = options.valueOf("partitions").asInstanceOf[Integer]
       val replicas = options.valueOf("replicas").asInstanceOf[Integer]
       val options_ = options.valueOf("options").asInstanceOf[String]
+      val fixedStartIndex = options.valueOf("fixedStartIndex").asInstanceOf[Integer]
+      val startPartitionId = options.valueOf("startPartitionId").asInstanceOf[Integer]
 
       val params = new util.LinkedHashMap[String, String]
       params.put("topic", name)
@@ -1028,6 +1032,8 @@ object Cli {
       if (partitions != null) params.put("partitions", "" + partitions)
       if (replicas != null) params.put("replicas", "" + replicas)
       if (options != null) params.put("options", options_)
+      if (fixedStartIndex != null) params.put("fixedStartIndex", "" + fixedStartIndex)
+      if (startPartitionId != null) params.put("startPartitionId", "" + startPartitionId)
 
       var json: Map[String, Object] = null
       try { json = sendRequest(s"/topic/$cmd", params) }
@@ -1051,8 +1057,10 @@ object Cli {
     private def handleRebalance(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
       val parser = newParser()
       parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
-      parser.accepts("replicas", "replicas count. Default - 1").withRequiredArg().ofType(classOf[Integer])
+      parser.accepts("replicas", "replicas count. Default - -1 (no change)").withRequiredArg().ofType(classOf[Integer])
       parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
+      parser.accepts("fixedStartIndex", "index into the broker set to start assigning partitions at.  Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
+      parser.accepts("startPartitionId", "partition id to begin assignment at. Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
 
       if (help) {
         printLine("Rebalance topics\nUsage: topic rebalance <topic-expr>|status [options]\n")
@@ -1081,12 +1089,16 @@ object Cli {
       val broker: String = options.valueOf("broker").asInstanceOf[String]
       val replicas: Integer = options.valueOf("replicas").asInstanceOf[Integer]
       val timeout: String = options.valueOf("timeout").asInstanceOf[String]
+      val fixedStartIndex = options.valueOf("fixedStartIndex").asInstanceOf[Integer]
+      val startPartitionId = options.valueOf("startPartitionId").asInstanceOf[Integer]
 
       val params = new util.LinkedHashMap[String, String]()
       if (exprOrStatus != "status") params.put("topic", exprOrStatus)
       if (broker != null) params.put("broker", broker)
       if (replicas != null) params.put("replicas", "" + replicas)
       if (timeout != null) params.put("timeout", timeout)
+      if (fixedStartIndex != null) params.put("fixedStartIndex", "" + fixedStartIndex)
+      if (startPartitionId != null) params.put("startPartitionId", "" + startPartitionId)
 
       var json: Map[String, Object] = null
       try { json = sendRequest("/topic/rebalance", params) }

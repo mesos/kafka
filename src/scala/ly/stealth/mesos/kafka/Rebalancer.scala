@@ -46,14 +46,14 @@ class Rebalancer {
     finally { zkClient.close() }
   }
 
-  def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1): Unit = {
+  def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1): Unit = {
     if (topics.isEmpty) throw new Rebalancer.Exception("no topics")
 
     logger.info(s"Starting rebalance for topics ${topics.mkString(",")} on brokers ${brokers.mkString(",")} with ${if (replicas == -1) "<default>" else replicas} replicas")
     val zkClient = newZkClient
     try {
       val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
-      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(brokers.map(Integer.parseInt), topics, assignment, replicas)
+      val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(brokers.map(Integer.parseInt), topics, assignment, replicas, fixedStartIndex, startPartitionId)
 
       reassignPartitions(zkClient, reassignment)
       this.reassignment = reassignment
@@ -105,7 +105,7 @@ class Rebalancer {
     matches
   }
 
-  private def getReassignments(brokerIds: Seq[Int], topics: util.List[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
+  private def getReassignments(brokerIds: Seq[Int], topics: util.List[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
     var reassignment : Map[TopicAndPartition, Seq[Int]] = new mutable.HashMap[TopicAndPartition, List[Int]]()
 
     val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
@@ -114,7 +114,7 @@ class Rebalancer {
       val rf: Int = if (replicas != -1) replicas else entry._2.valuesIterator.next().size
       val partitions: Int = entry._2.size
     
-      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, rf, 0, 0)
+      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, rf, fixedStartIndex, startPartitionId)
       reassignment ++= assignedReplicas.map(replicaEntry => TopicAndPartition(topic, replicaEntry._1) -> replicaEntry._2)
     }
 

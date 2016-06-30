@@ -48,7 +48,7 @@ class Topics {
     val zkClient = newZkClient
 
     try {
-      var names = ZkUtils.getAllTopics(zkClient)
+      val names = ZkUtils.getAllTopics(zkClient)
 
       val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtils.getPartitionAssignmentForTopics(zkClient, names)
       val configs = AdminUtils.fetchAllTopicConfigs(zkClient)
@@ -99,7 +99,7 @@ class Topics {
     }
   }
 
-  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: util.List[Int] = null): util.Map[Int, util.List[Int]] = {
+  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: util.List[Int] = null, fixedStartIndex: Int = -1, startPartitionId: Int = -1): util.Map[Int, util.List[Int]] = {
     var brokers_ = brokers
 
     if (brokers_ == null) {
@@ -108,7 +108,7 @@ class Topics {
       finally { zkClient.close() }
     }
 
-    AdminUtils.assignReplicasToBrokers(brokers_, partitions, replicas, 0, 0).mapValues(new util.ArrayList[Int](_))
+    AdminUtils.assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId).mapValues(new util.ArrayList[Int](_))
   }
 
   def addTopic(name: String, assignment: util.Map[Int, util.List[Int]] = null, options: util.Map[String, String] = null): Topic = {
