@@ -26,7 +26,7 @@ import scala.collection.JavaConversions._
 import java.util.{Date, Properties, Collections}
 import ly.stealth.mesos.kafka.Util.{BindAddress}
 import net.elodina.mesos.util.{Strings, Period, Repr}
-import ly.stealth.mesos.kafka.Topics.Topic
+import ly.stealth.mesos.kafka.Topics.{Partition, Topic}
 
 object Cli {
   var api: String = null
@@ -911,6 +911,7 @@ object Cli {
         case "list" => handleList(arg)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "rebalance" => handleRebalance(arg, args)
+        case "partitions" => handlePartitions(arg)
         case _ => throw new Error("unsupported topic command " + cmd)
       }
     }
@@ -929,6 +930,8 @@ object Cli {
           handleAddUpdate(null, null, cmd == "add", help = true)
         case "rebalance" =>
           handleRebalance(null, null, help = true)
+        case "partitions" =>
+          handlePartitions(null, help = true)
         case _ =>
           throw new Error(s"unsupported topic command $cmd")
       }
@@ -1091,12 +1094,44 @@ object Cli {
       if (error.isEmpty && !state.isEmpty) printLine(state)
     }
 
+    def handlePartitions(expr: String, help: Boolean = false): Unit = {
+      if (help) {
+        printLine("List partitions\nUsage: topic partition [<topic>]\n")
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printTopicExprExamples(out)
+
+        return
+      }
+
+      val params = new util.LinkedHashMap[String, String]
+      if (expr != null) params.put("topic", expr)
+
+      var json: Map[String, Object] = null
+      try { json = sendRequest("/partition/list", params) }
+      catch { case e: IOException => throw new Error("" + e) }
+
+      val partitionNodes: List[Map[String, Object]] = json("partitions").asInstanceOf[List[Map[String, Object]]]
+      val partitions = partitionNodes.map(p => new Partition().fromJson(p))
+      printLine("  part | leader | expected | brokers (*not-isr)", 1)
+      for (p <- partitions) {
+        val isr = p.isr.toSet
+        val brokerIsrs = p.replicas.map(b => if (isr.contains(b)) b.toString else s"*$b")
+        val displayIsr = s"[${brokerIsrs.mkString(", ")}]"
+        val errorString = if (isr != p.replicas.toSet) "!" else " "
+
+        printLine(f"$errorString ${p.id}%4d | ${p.leader}%6d | ${p.expectedLeader}%8d | $displayIsr", 1)
+      }
+    }
+
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list topics", 1)
       printLine("add        - add topic", 1)
       printLine("update     - update topic", 1)
       printLine("rebalance  - rebalance topics", 1)
+      printLine("partitions - list partition details for a topic", 1)
     }
 
     private def printTopic(topic: Topic, indent: Int): Unit = {

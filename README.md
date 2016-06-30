@@ -35,6 +35,7 @@ For issues https://github.com/mesos/kafka/issues
 * [Listing topics](#listing-topics)
 * [Adding topic](#adding-topic)
 * [Updating topic](#updating-topic)
+* [Listing topic partitions details](#listing-topic-partition-details)
 
 [Using the REST API](#using-the-rest-api)    
 
@@ -876,6 +877,26 @@ topic-expr examples:
   t0,t1     - topics t0, t1
   *         - any topic
   t*        - topics starting with 't'
+```
+
+Listing topic partition details
+-------------------------------
+```
+#./kafka-mesos.sh help topic partitions
+ Picked up _JAVA_OPTIONS: -Djava.net.preferIPv4Stack=true
+ List partitions
+ Usage: topic partition [<topic>]
+ 
+ Generic Options
+ Option  Description
+ ------  -----------
+ --api   Api url. Example: http://master:7000
+ 
+ topic-expr examples:
+   t0        - topic t0
+   t0,t1     - topics t0, t1
+   *         - any topic
+   t*        - topics starting with 't'
 ```
 
 Rebalancing topics

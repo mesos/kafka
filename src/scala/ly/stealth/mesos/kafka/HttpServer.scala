@@ -125,6 +125,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/api/broker")) handleBrokerApi(request, response)
       else if (uri.startsWith("/api/topic")) handleTopicApi(request, response)
+      else if (uri.startsWith("/api/partition")) handlePartitionApi(request, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/quitquitquit")) handleQuit(request, response)
       else if (uri.startsWith("/abortabortabort")) handleAbort(request, response)
@@ -650,6 +651,24 @@ object HttpServer {
       result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handlePartitionApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/partition".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "list") handleListPartitions(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleListPartitions(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topics: Topics = Scheduler.cluster.topics
+      val topicName = request.getParameter("topic")
+      val partitions = topics.getPartitions(topicName)
+      response.getWriter.println(
+        JSONObject(Map("partitions" -> new JSONArray(partitions.sortBy(p => p.id).map(_.toJson)))))
     }
 
     def handleQuit(request: HttpServletRequest, response: HttpServletResponse): Unit = {

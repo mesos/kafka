@@ -20,6 +20,10 @@ package ly.stealth.mesos.kafka
 import java.util
 import java.util.Properties
 
+import kafka.api.LeaderAndIsr
+import kafka.common.TopicAndPartition
+import kafka.controller.LeaderIsrAndControllerEpoch
+
 import scala.collection.JavaConversions._
 import scala.collection.{mutable, Seq, Map}
 
@@ -59,6 +63,33 @@ class Topics {
 
       topics
     } finally {
+      zkClient.close()
+    }
+  }
+
+  private val NoLeader = LeaderIsrAndControllerEpoch(LeaderAndIsr(LeaderAndIsr.NoLeader, -1, List(), -1), -1)
+
+  def getPartitions(topic: String): List[Topics.Partition] = {
+    val zkClient = newZkClient
+
+    try {
+      val assignments = ZkUtils.getPartitionAssignmentForTopics(zkClient, Seq(topic))
+      val topicAndPartitions = assignments(topic).map { case (k, _) => TopicAndPartition(topic, k) }.toSet
+      val leaderAndisr = ZkUtils.getPartitionLeaderAndIsrForTopics(zkClient, topicAndPartitions)
+
+      topicAndPartitions.map(tap => {
+        val replicas = assignments(topic).getOrElse(tap.partition, Seq())
+        val partitionLeader = leaderAndisr.getOrElse(tap, NoLeader)
+        new Topics.Partition(
+          tap.partition,
+          replicas,
+          partitionLeader.leaderAndIsr.isr,
+          partitionLeader.leaderAndIsr.leader,
+          replicas.headOption.getOrElse(-1)
+        )
+      }).toList
+    }
+    finally {
       zkClient.close()
     }
   }
@@ -111,7 +142,41 @@ class Topics {
 
 object Topics {
   class Exception(message: String) extends java.lang.Exception(message)
-  
+
+  class Partition(
+      _id: Int = 0,
+      _replicas: util.List[Int] = null,
+      _isr: util.List[Int] = null,
+      _leader: Int = 0,
+      _expectedLeader: Int = 0) {
+    var id = _id
+    var replicas = _replicas
+    var isr = _isr
+    var leader = _leader
+    var expectedLeader = _expectedLeader
+
+    def fromJson(node: Map[String, Object]): Topics.Partition = {
+      id = node("id").asInstanceOf[Int]
+      replicas = node("replicas").asInstanceOf[List[Int]]
+      isr = node("isr").asInstanceOf[List[Int]]
+      leader = node("leader").asInstanceOf[Int]
+      expectedLeader = node("expectedLeader").asInstanceOf[Int]
+
+      this
+    }
+
+    def toJson: JSONObject = {
+      val obj = new mutable.LinkedHashMap[String, Any]()
+      obj("id") = id
+      obj("replicas") = replicas
+      obj("isr") = isr
+      obj("leader") = leader
+      obj("expectedLeader") = expectedLeader
+
+      new JSONObject(obj.toMap)
+    }
+  }
+
   class Topic(
     _name: String = null,
     _partitions: util.Map[Int, util.List[Int]] = new util.HashMap[Int, util.List[Int]](),
