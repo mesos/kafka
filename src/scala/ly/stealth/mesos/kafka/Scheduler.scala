@@ -128,7 +128,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]): Unit = {
-    logger.info("[resourceOffers]\n" + Repr.offers(offers))
+    logger.debug("[resourceOffers]\n" + Repr.offers(offers))
     syncBrokers(offers)
   }
 
@@ -142,7 +142,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
-    logger.info("[frameworkMessage] executor:" + Repr.id(executorId.getValue) + " slave:" + Repr.id(slaveId.getValue) + " data: " + new String(data))
+    logger.debug("[frameworkMessage] executor:" + Repr.id(executorId.getValue) + " slave:" + Repr.id(slaveId.getValue) + " data: " + new String(data))
 
     val broker = cluster.getBroker(Broker.idFromExecutorId(executorId.getValue))
 
