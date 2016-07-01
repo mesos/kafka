@@ -69,25 +69,30 @@ class Topics {
 
   private val NoLeader = LeaderIsrAndControllerEpoch(LeaderAndIsr(LeaderAndIsr.NoLeader, -1, List(), -1), -1)
 
-  def getPartitions(topic: String): List[Topics.Partition] = {
+  def getPartitions(topics: util.List[String]): Map[String, Set[Topics.Partition]] = {
     val zkClient = newZkClient
 
     try {
-      val assignments = ZkUtils.getPartitionAssignmentForTopics(zkClient, Seq(topic))
-      val topicAndPartitions = assignments(topic).map { case (k, _) => TopicAndPartition(topic, k) }.toSet
+      // returns topic name -> (partition -> brokers)
+      val assignments = ZkUtils.getPartitionAssignmentForTopics(zkClient, topics)
+      val topicAndPartitions = assignments.flatMap {
+        case (topic, partitions) => partitions.map {
+          case (partition, _)  => TopicAndPartition(topic, partition)
+        }
+      }.toSet
       val leaderAndisr = ZkUtils.getPartitionLeaderAndIsrForTopics(zkClient, topicAndPartitions)
 
       topicAndPartitions.map(tap => {
-        val replicas = assignments(topic).getOrElse(tap.partition, Seq())
+        val replicas = assignments(tap.topic).getOrElse(tap.partition, Seq())
         val partitionLeader = leaderAndisr.getOrElse(tap, NoLeader)
-        new Topics.Partition(
+        tap.topic -> new Topics.Partition(
           tap.partition,
           replicas,
           partitionLeader.leaderAndIsr.isr,
           partitionLeader.leaderAndIsr.leader,
           replicas.headOption.getOrElse(-1)
         )
-      }).toList
+      }).groupBy(_._1).mapValues(v => v.map(_._2))
     }
     finally {
       zkClient.close()

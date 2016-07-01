@@ -664,11 +664,20 @@ object HttpServer {
     }
 
     def handleListPartitions(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-      val topics: Topics = Scheduler.cluster.topics
-      val topicName = request.getParameter("topic")
-      val partitions = topics.getPartitions(topicName)
+      val topicExpr = request.getParameter("topic")
+      var topics: util.List[String] = null
+      if (topicExpr != null)
+        try { topics = Expr.expandTopics(topicExpr)}
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+
+      val topicsAndPartitions = Scheduler.cluster.topics.getPartitions(topics)
       response.getWriter.println(
-        JSONObject(Map("partitions" -> new JSONArray(partitions.sortBy(p => p.id).map(_.toJson)))))
+        new JSONObject(
+          topicsAndPartitions.mapValues(
+            v => new JSONArray(v.map(_.toJson).toList)
+          ).toMap
+        )
+      )
     }
 
     def handleQuit(request: HttpServletRequest, response: HttpServletResponse): Unit = {
