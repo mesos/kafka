@@ -125,6 +125,7 @@ object HttpServer {
       else if (uri.startsWith("/jre/") && Config.jre != null) downloadFile(Config.jre, response)
       else if (uri.startsWith("/api/broker")) handleBrokerApi(request, response)
       else if (uri.startsWith("/api/topic")) handleTopicApi(request, response)
+      else if (uri.startsWith("/api/partition")) handlePartitionApi(request, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/quitquitquit")) handleQuit(request, response)
       else if (uri.startsWith("/abortabortabort")) handleAbort(request, response)
@@ -650,6 +651,33 @@ object HttpServer {
       result("state") = rebalancer.state
 
       response.getWriter.println(JSONObject(result.toMap))
+    }
+
+    def handlePartitionApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/partition".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "list") handleListPartitions(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleListPartitions(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val topicExpr = request.getParameter("topic")
+      var topics: util.List[String] = null
+      if (topicExpr != null)
+        try { topics = Expr.expandTopics(topicExpr)}
+        catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
+
+      val topicsAndPartitions = Scheduler.cluster.topics.getPartitions(topics)
+      response.getWriter.println(
+        new JSONObject(
+          topicsAndPartitions.mapValues(
+            v => new JSONArray(v.map(_.toJson).toList)
+          ).toMap
+        )
+      )
     }
 
     def handleQuit(request: HttpServletRequest, response: HttpServletResponse): Unit = {
