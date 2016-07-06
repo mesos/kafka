@@ -118,7 +118,7 @@ class TestBrokerServer extends BrokerServer {
 
   def isStarted: Boolean = started.get()
 
-  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
+  def start(broker: Broker, send: Broker.Metrics => Unit, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
     if (failOnStart) throw new RuntimeException("failOnStart")
     started.set(true)
     new Broker.Endpoint("localhost", 9092)

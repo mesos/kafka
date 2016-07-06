@@ -17,6 +17,8 @@
 
 package ly.stealth.mesos.kafka
 
+import java.util.concurrent.TimeUnit
+
 import org.apache.log4j.Logger
 import java.io.{FileInputStream, File}
 import java.net.{URL, URLClassLoader}
@@ -26,11 +28,9 @@ import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.BrokerServer.Distro
 import net.elodina.mesos.util.{IO, Version}
 
-import scala.collection.mutable
-
 abstract class BrokerServer {
   def isStarted: Boolean
-  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint
+  def start(broker: Broker, send: Broker.Metrics => Unit, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint
   def stop(): Unit
   def waitFor(): Unit
   def getClassLoader: ClassLoader
@@ -39,10 +39,11 @@ abstract class BrokerServer {
 class KafkaServer extends BrokerServer {
   val logger = Logger.getLogger(classOf[KafkaServer])
   @volatile var server: Object = null
+  @volatile var collector: MetricsCollector = null
 
   def isStarted: Boolean = server != null
 
-  def start(broker: Broker, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
+  def start(broker: Broker, send: Broker.Metrics => Unit, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
     if (isStarted) throw new IllegalStateException("started")
 
     BrokerServer.Distro.configureLog4j(broker)
@@ -53,6 +54,8 @@ class KafkaServer extends BrokerServer {
     server = BrokerServer.Distro.newServer(options)
     server.getClass.getMethod("startup").invoke(server)
 
+    collector = BrokerServer.Distro.startCollector(send)
+
     new Broker.Endpoint(options.get("host.name"), Integer.parseInt(options.get("port")))
   }
 
@@ -60,10 +63,12 @@ class KafkaServer extends BrokerServer {
     if (!isStarted) throw new IllegalStateException("!started")
 
     logger.info("Stopping KafkaServer")
+    collector.shutdown()
     server.getClass.getMethod("shutdown").invoke(server)
 
     waitFor()
     server = null
+    collector = null
   }
 
   def waitFor(): Unit = {
@@ -99,6 +104,15 @@ object BrokerServer {
       val verifiableProps: Object = verifiablePropsClass.getConstructor(classOf[Properties]).newInstance(props).asInstanceOf[Object]
 
       metricsReporterClass.getMethod("startReporters", verifiableProps.getClass).invoke(metricsReporter, verifiableProps)
+      metricsReporter
+    }
+
+    def startCollector(send: Broker.Metrics => Unit): MetricsCollector = {
+      val collector = new MetricsCollector(send)
+      collector.start(60, TimeUnit.SECONDS)
+      collector.run()
+
+      collector
     }
 
     private def newKafkaConfig(props: Properties): Object = {
@@ -144,21 +158,21 @@ object BrokerServer {
       val configurator: Class[_] = loader.loadClass("org.apache.log4j.PropertyConfigurator")
       configurator.getMethod("configure", classOf[Properties]).invoke(null, props)
     }
-    
+
     private def props(options: util.Map[String, String], defaultsFile: String): Properties = {
       val p: Properties = new Properties()
       val stream: FileInputStream = new FileInputStream(dir + "/config/" + defaultsFile)
-      
+
       try { p.load(stream) }
       finally { stream.close() }
-      
+
       for ((k, v) <- options)
         if (v != null) p.setProperty(k, v)
         else p.remove(k)
 
       p
     }
-    
+
     private def init(): Unit = {
       // find kafka dir
       for (file <- new File(".").listFiles())
@@ -206,6 +220,11 @@ object BrokerServer {
         // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
         if (snappyHackEnabled && snappyHackedClasses.contains(name))
           return super.loadClass(name, true)
+        // Always load com.yammer.metrics from the root ClassLoader.
+        // This ensures that both our MetricsCollector and Kafka see the same
+        // MetricsRegistry.
+        if (name.startsWith("com.yammer.metrics"))
+          return super.loadClass(name, true)
 
         // Check class is loaded
         var c: Class[_] = findLoadedClass(name)
@@ -220,58 +239,6 @@ object BrokerServer {
         if (resolve) resolveClass(c)
         c
       }
-    }
-  }
-
-  object Metrics {
-    import scala.collection.JavaConverters._
-    import javax.management.{MBeanServer, MBeanServerFactory, ObjectName}
-
-    private val metricCache = mutable.Map[String, (String, Option[String])]()
-
-    private def getMetricName(objName: ObjectName): String = {
-      val nameParts = Seq(
-        objName.getDomain,
-        objName.getKeyProperty("type"),
-        objName.getKeyProperty("name"),
-        objName.getKeyProperty("request"),
-        objName.getKeyProperty("processor"),
-        objName.getKeyProperty("delayedOperation")
-      ).filter(n => n != null)
-      String.join(",", nameParts)
-    }
-
-    private def getMetricGetter(server: MBeanServer, objName: ObjectName): Option[String] = {
-      val getters = server.getMBeanInfo(objName)
-      if (getters.getAttributes.exists(bean => bean.getName == "Value")) {
-        Some("Value")
-      } else if (getters.getAttributes.exists(bean => bean.getName == "OneMinuteRate")) {
-        Some("OneMinuteRate")
-      } else {
-        None
-      }
-    }
-
-    private def getMetric[T](server: MBeanServer, objName: ObjectName): (String, Option[T]) = {
-      metricCache.getOrElseUpdate(objName.getCanonicalName, {
-        getMetricName(objName) -> getMetricGetter(server, objName)
-      }) match {
-        case (n, getter) => n -> getter.map(g => server.getAttribute(objName, g).asInstanceOf[T])
-      }
-    }
-
-    def collect: Broker.Metrics = {
-      val servers = MBeanServerFactory.findMBeanServer(null).asScala.toList
-      servers.find(s => s.getDomains.exists(_.equals("kafka.server"))).map { server: MBeanServer =>
-        val metrics = server.queryNames(null, null).filter(o => o.getDomain.startsWith("kafka."))
-        new Broker.Metrics(
-          metrics.map(m => getMetric(server, m) match {
-            case (name, value) => name -> value.getOrElse(0.asInstanceOf[Number])
-          }
-          ).toMap,
-          System.currentTimeMillis()
-        )
-      }.orNull
     }
   }
 }
