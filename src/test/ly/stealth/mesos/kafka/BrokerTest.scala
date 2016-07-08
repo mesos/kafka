@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,10 @@
 
 package ly.stealth.mesos.kafka
 
+import com.google.protobuf.Descriptors
+import org.apache.mesos.Protos.Resource.DiskInfo
+import org.apache.mesos.Protos.Resource.DiskInfo.{Persistence, Source}
+import org.apache.mesos.Protos.Resource.DiskInfo.Source.{Mount, Type}
 import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.BindAddress
@@ -26,7 +30,7 @@ import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Stickiness, State, Task, Failover}
 import java.util
-import org.apache.mesos.Protos.Offer
+import org.apache.mesos.Protos.{Value, Volume, Resource, Offer}
 
 class BrokerTest extends KafkaMesosTestCase {
   var broker: Broker = null
@@ -171,9 +175,52 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.volume = "test"
 
     val reservation = broker.getReservation(offer("cpus:2; mem:100; ports:1000; disk(role,principal)[test:mount_point]:100"))
-    assertEquals(resources("cpus:2; mem:100; ports:1000; disk(role,principal)[test:data]:100"), reservation.toResources)
-
+    val resource = resources("cpus:2; mem:100; ports:1000; disk(role,principal)[test:data]:100")
+    assertEquals(resource, reservation.toResources)
   }
+
+  def diskResourceWithSource(disk: String, `type`: Source.Type, path: String): Resource = {
+    val withoutSource = resources(disk).get(0)
+    val sourceBuilder = Source.newBuilder()
+    sourceBuilder.setType(`type`)
+    if (`type` == Source.Type.MOUNT) {
+      sourceBuilder.setMount(Source.Mount.newBuilder().setRoot(path))
+    } else {
+      sourceBuilder.setPath(Source.Path.newBuilder().setRoot(path))
+    }
+
+    withoutSource.
+      toBuilder.
+      setDisk(
+        withoutSource.
+          getDisk.
+          toBuilder.
+          setSource(sourceBuilder)).
+      build
+  }
+  @Test
+  def getReservations_volumeMount(): Unit = {
+    broker.cpus = 2
+    broker.cpus = 2
+    broker.mem = 200
+    broker.volume = "test"
+
+    val persistentVolumeResource = diskResourceWithSource(
+      "disk(role,principal)[test:mount_point]:100",
+      Source.Type.MOUNT,
+      "/mnt/path")
+
+
+    val thisOffer = offer("").toBuilder().
+      addAllResources(resources("cpus:2; mem:100; ports:1000")).
+      addResources(persistentVolumeResource).
+      build()
+
+    val reservation = broker.getReservation(thisOffer)
+
+    assertEquals(reservation.diskSource, persistentVolumeResource.getDisk().getSource())
+  }
+
   @Test
   def getReservations {
     broker.cpus = 2
@@ -370,18 +417,18 @@ class BrokerTest extends KafkaMesosTestCase {
   @Test
   def Reservation_toResources {
     // shared
-    var reservation = new Broker.Reservation(null, _sharedCpus =  0.5, _sharedMem = 100, _sharedPort = 1000)
+    var reservation = new Broker.Reservation(null, sharedCpus = 0.5, sharedMem = 100, sharedPort = 1000)
     assertEquals(resources("cpus:0.5; mem:100; ports:1000"), reservation.toResources)
 
     // role
-    reservation = new Broker.Reservation("role", _roleCpus =  0.5, _roleMem = 100, _rolePort = 1000)
+    reservation = new Broker.Reservation("role", roleCpus = 0.5, roleMem = 100, rolePort = 1000)
     assertEquals(resources("cpus(role):0.5; mem(role):100; ports(role):1000"), reservation.toResources)
 
     // shared + role
-    reservation = new Broker.Reservation("role", _sharedCpus = 0.3, _roleCpus =  0.7, _sharedMem = 50, _roleMem = 100, _sharedPort = 1000, _rolePort = 2000)
+    reservation = new Broker.Reservation("role", sharedCpus = 0.3, roleCpus = 0.7, sharedMem = 50, roleMem = 100, sharedPort = 1000, rolePort = 2000)
     assertEquals(resources("cpus:0.3; cpus(role):0.7; mem:50; mem(role):100; ports:1000; ports(role):2000"), reservation.toResources)
   }
-  
+
   // Stickiness
   @Test
   def Stickiness_allowsHostname {
@@ -426,7 +473,7 @@ class BrokerTest extends KafkaMesosTestCase {
 
     BrokerTest.assertStickinessEquals(stickiness, read)
   }
-  
+
 
   // Failover
   @Test
