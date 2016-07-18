@@ -952,6 +952,7 @@ object Cli {
         case "list" => handleList(arg, args)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "rebalance" => handleRebalance(arg, args)
+        case "realign" => handleRealign(arg, args)
         case "partitions" => handlePartitions(arg)
         case _ => throw new Error("unsupported topic command " + cmd)
       }
@@ -971,6 +972,8 @@ object Cli {
           handleAddUpdate(null, null, cmd == "add", help = true)
         case "rebalance" =>
           handleRebalance(null, null, help = true)
+        case "realign" =>
+          handleRealign(null, null, help = true)
         case "partitions" =>
           handlePartitions(null, help = true)
         case _ =>
@@ -1088,16 +1091,30 @@ object Cli {
       }
     }
 
-    private def handleRebalance(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
+    private def buildRebalanceBaseParser(): OptionParser = {
       val parser = newParser()
       parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
       parser.accepts("replicas", "replicas count. Default - -1 (no change)").withRequiredArg().ofType(classOf[Integer])
       parser.accepts("timeout", "timeout (30s, 1m, 1h). 0s - no timeout").withRequiredArg().ofType(classOf[String])
       parser.accepts("fixedStartIndex", "index into the broker set to start assigning partitions at.  Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
-      parser.accepts("startPartitionId", "partition id to begin assignment at. Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
+      return parser
+    }
 
+    private def handleRebalance(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = buildRebalanceBaseParser()
+      parser.accepts("startPartitionId", "partition id to begin assignment at. Default - -1 (random)").withRequiredArg().ofType(classOf[Integer])
+      performRebalance("Rebalance", parser, exprOrStatus, args, help)
+    }
+
+    private def handleRealign(exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
+      performRebalance("Realign", buildRebalanceBaseParser(), exprOrStatus, args, help)
+    }
+
+    private def performRebalance(verb: String, parser: OptionParser, exprOrStatus: String, args: Array[String], help: Boolean = false): Unit = {
+
+      val lowercaseVerb = verb.toLowerCase()
       if (help) {
-        printLine("Rebalance topics\nUsage: topic rebalance <topic-expr>|status [options]\n")
+        printLine(s"$verb topics\nUsage: topic $lowercaseVerb <topic-expr>|status [options]\n")
         parser.printHelpOn(out)
 
         printLine()
@@ -1126,6 +1143,7 @@ object Cli {
       if (timeout != null) params.put("timeout", timeout)
       if (fixedStartIndex != null) params.put("fixedStartIndex", "" + fixedStartIndex)
       if (startPartitionId != null) params.put("startPartitionId", "" + startPartitionId)
+      if (lowercaseVerb == "realign") params.put("realign", "true")
 
       var json: Map[String, Object] = null
       try { json = sendRequest("/topic/rebalance", params) }
@@ -1138,9 +1156,9 @@ object Cli {
       val is: String = if (status == "idle" || status == "running") "is " else ""
       val colon: String = if (state.isEmpty &&  error.isEmpty) "" else ":"
 
-      // started|completed|failed|running|idle|timeout
-      if (status == "timeout") throw new Error("Rebalance timeout:\n" + state)
-      printLine(s"Rebalance $is$status$colon $error")
+      // started|completed|failed|running|idle [(no-op)]|timeout
+      if (status == "timeout") throw new Error(s"$verb timeout:\n" + state)
+      printLine(s"$verb $is$status$colon $error")
       if (error.isEmpty && !state.isEmpty) printLine(state)
     }
 
@@ -1184,6 +1202,7 @@ object Cli {
       printLine("add        - add topic", 1)
       printLine("update     - update topic", 1)
       printLine("rebalance  - rebalance topics", 1)
+      printLine("realign    - realign topics, keeping existing broker assignments where possible", 1)
       printLine("partitions - list partition details for a topic", 1)
     }
 

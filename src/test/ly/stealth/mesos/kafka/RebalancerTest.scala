@@ -66,7 +66,8 @@ class RebalancerTest extends KafkaMesosTestCase {
     Scheduler.cluster.topics.addTopic("topic", Map(0 -> util.Arrays.asList(0), 1 -> util.Arrays.asList(0)))
     ZkUtilsWrapper().createPersistentPath(ZkUtils.ReassignPartitionsPath, "")
 
-    try { rebalancer.start(util.Arrays.asList("t1"), util.Arrays.asList("0", "1")); fail() }
+    Scheduler.cluster.addBroker(new Broker("2"))
+    try { rebalancer.start(util.Arrays.asList("topic"), util.Arrays.asList("1", "2")); fail() }
     catch {
       case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("in progress"))
     }

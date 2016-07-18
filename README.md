@@ -32,6 +32,7 @@ For issues https://github.com/mesos/kafka/issues
 * [Cloning brokers](#cloning-brokers)
 * [Retrieving broker log](#retrieving-broker-log)
 * [Rebalancing brokers in the cluster](#rebalancing-topics)
+* [Realigning brokers in the cluster](#realigning-topics)
 * [Listing topics](#listing-topics)
 * [Adding topic](#adding-topic)
 * [Updating topic](#updating-topic)
@@ -933,6 +934,44 @@ attribute filtering:
   *[rack=r1]           - any broker having rack=r1
   *[hostname=slave*]   - any broker on host with name starting with 'slave'
   0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
+```
+
+Realigning topics
+----------------------------------
+```
+#./kafka-mesos.sh help topic realign
+ Realign topics
+ Usage: topic realign <topic-expr>|status [options]
+
+ Option                       Description
+ ------                       -----------
+ --broker                     <broker-expr>. Default - *. See below.
+ --fixedStartIndex <Integer>  index into the broker set to start assigning partitions at.  Default - -1
+                                (random)
+ --replicas <Integer>         replicas count. Default - -1 (no change)
+ --timeout                    timeout (30s, 1m, 1h). 0s - no timeout
+
+ Generic Options
+ Option  Description
+ ------  -----------
+ --api   Api url. Example: http://master:7000
+
+ topic-expr examples:
+   t0        - topic t0
+   t0,t1     - topics t0, t1
+   *         - any topic
+   t*        - topics starting with 't'
+
+ broker-expr examples:
+   0      - broker 0
+   0,1    - brokers 0,1
+   0..2   - brokers 0,1,2
+   0,1..2 - brokers 0,1,2
+   *      - any broker
+ attribute filtering:
+   *[rack=r1]           - any broker having rack=r1
+   *[hostname=slave*]   - any broker on host with name starting with 'slave'
+   0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1
 ```
 
 Using the REST API

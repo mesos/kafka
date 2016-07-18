@@ -30,6 +30,7 @@ import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util._
 import org.eclipse.jetty.server.Request
 import ly.stealth.mesos.kafka.Broker.State
+import scala.util.{Try, Failure}
 import scala.util.parsing.json.JSONArray
 import scala.util.parsing.json.JSONObject
 
@@ -700,14 +701,25 @@ object HttpServer {
         try { startPartitionId = Integer.parseInt(request.getParameter("startPartitionId")) }
         catch { case e: NumberFormatException => response.sendError(400, "invalid startPartitionId"); return  }
 
+      var realign: Boolean = false
+      if (request.getParameter("realign") != null) {
+        realign = Try(request.getParameter("realign").toBoolean).getOrElse(false)
+        if(startPartitionId != -1) {
+          response.sendError(400, "startPartitionId incompatible with realign")
+          return
+        }
+      }
+
       def startRebalance: (String, String) = {
-        try { rebalancer.start(topics, brokers, replicas, fixedStartIndex, startPartitionId) }
+        try { rebalancer.start(topics, brokers, replicas, fixedStartIndex, startPartitionId, realign) }
         catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
 
         if (timeout.ms > 0)
           if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", null)
           else return ("completed", null)
 
+        if (realign && !rebalancer.running)
+          return ("idle (no-op)", null)
         ("started", null)
       }
 
