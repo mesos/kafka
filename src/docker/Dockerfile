@@ -36,8 +36,11 @@ RUN \
 
 # Add kafka-mesos & kafka
 COPY .docker/kafka* /opt/kafka-mesos/
+COPY ./docker-entrypoint.sh /docker-entrypoint.sh
 
 WORKDIR /opt/kafka-mesos
 EXPOSE 7000
 
-ENTRYPOINT ["/usr/bin/java", "-jar", "/opt/kafka-mesos/kafka-mesos-0.9.5.0.jar", "scheduler"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+
+CMD ["scheduler"]

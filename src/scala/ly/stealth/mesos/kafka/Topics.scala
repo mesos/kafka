@@ -80,7 +80,7 @@ class Topics {
           case (partition, _)  => TopicAndPartition(topic, partition)
         }
       }.toSet
-      val leaderAndisr = ZkUtils.getPartitionLeaderAndIsrForTopics(zkClient, topicAndPartitions)
+      val leaderAndisr =  ZkUtils.getPartitionLeaderAndIsrForTopics(zkClient, topicAndPartitions)
 
       topicAndPartitions.map(tap => {
         val replicas = assignments(tap.topic).getOrElse(tap.partition, Seq())

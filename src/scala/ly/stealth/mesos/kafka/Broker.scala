@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,11 @@
 package ly.stealth.mesos.kafka
 
 import java.util
+import org.apache.mesos.Protos.Resource.DiskInfo.Source.Mount
 import org.apache.mesos.Protos.Resource.{ReservationInfo, DiskInfo}
-import org.apache.mesos.Protos.Resource.DiskInfo.Persistence
+import org.apache.mesos.Protos.Resource.DiskInfo.{Source, Persistence}
 import org.apache.mesos.Protos.Volume.Mode
+import org.apache.mesos.Protos.Resource.DiskInfo.Source.Type
 
 import scala.collection.JavaConversions._
 import scala.collection
@@ -62,7 +64,7 @@ class Broker(_id: String = "0") {
   def options(defaults: util.Map[String, String] = null): util.Map[String, String] = {
     val result = new util.LinkedHashMap[String, String]()
     if (defaults != null) result.putAll(defaults)
-    
+
     result.putAll(options)
 
     if (bindAddress != null)
@@ -132,6 +134,7 @@ class Broker(_id: String = "0") {
     var reservedVolume: String = null
     var reservedVolumeSize: Double = 0
     var reservedVolumePrincipal: String = null
+    var reservedVolumeSource: Source = null
 
     for (resource <- offer.getResourcesList) {
       if (resource.getRole == "*") {
@@ -156,6 +159,8 @@ class Broker(_id: String = "0") {
           reservedVolume = volume
           reservedVolumeSize = resource.getScalar.getValue
           reservedVolumePrincipal = resource.getReservation.getPrincipal
+          // will be NULL for root volumes
+          reservedVolumeSource = resource.getDisk.getSource
         }
       }
     }
@@ -174,7 +179,8 @@ class Broker(_id: String = "0") {
       reservedSharedCpus, reservedRoleCpus,
       reservedSharedMem, reservedRoleMem,
       reservedSharedPort, reservedRolePort,
-      reservedVolume, reservedVolumeSize, reservedVolumePrincipal
+      reservedVolume, reservedVolumeSize,
+      reservedVolumePrincipal, reservedVolumeSource
     )
   }
 
@@ -198,7 +204,7 @@ class Broker(_id: String = "0") {
     active && task == null && !failover.isWaitingDelay(now)
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
-  
+
   def registerStart(hostname: String): Unit = {
     stickiness.registerStart(hostname)
     failover.resetFailures()
@@ -262,7 +268,7 @@ class Broker(_id: String = "0") {
     syslog = node("syslog").asInstanceOf[Boolean]
 
     if (node.contains("constraints")) constraints = Strings.parseMap(node("constraints").asInstanceOf[String])
-                                                    .mapValues(new Constraint(_)).view.force
+      .mapValues(new Constraint(_)).view.force
     if (node.contains("options")) options = Strings.parseMap(node("options").asInstanceOf[String])
     if (node.contains("log4jOptions")) log4jOptions = Strings.parseMap(node("log4jOptions").asInstanceOf[String])
     if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
@@ -334,6 +340,7 @@ class Broker(_id: String = "0") {
 
 object Broker {
   def nextTaskId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
+
   def nextExecutorId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
 
   def idFromTaskId(taskId: String): String = taskId.dropRight(37).replace(Config.frameworkName + "-", "")
@@ -444,13 +451,13 @@ object Broker {
   }
 
   class Task(
-    _id: String = null,
-    _slaveId: String = null,
-    _executorId: String = null,
-    _hostname: String = null,
-    _attributes: util.Map[String, String] = Collections.emptyMap(),
-    _state: String = State.STARTING
-  ) {
+              _id: String = null,
+              _slaveId: String = null,
+              _executorId: String = null,
+              _hostname: String = null,
+              _attributes: util.Map[String, String] = Collections.emptyMap(),
+              _state: String = State.STARTING
+              ) {
     var id: String = _id
     var slaveId: String = _slaveId
     var executorId: String = _executorId
@@ -462,8 +469,11 @@ object Broker {
     @volatile var state: String = _state
 
     def starting: Boolean = state == State.STARTING
+
     def running: Boolean = state == State.RUNNING
+
     def stopping: Boolean = state == State.STOPPING
+
     def reconciling: Boolean = state == State.RECONCILING
 
     def fromJson(node: Map[String, Object]): Unit = {
@@ -521,31 +531,23 @@ object Broker {
 
     override def toString: String = hostname + ":" + port
   }
-  
-  class Reservation(
-     _role: String = null,
-     _sharedCpus: Double = 0.0, _roleCpus: Double = 0.0,
-     _sharedMem: Long = 0, _roleMem: Long = 0,
-     _sharedPort: Long = -1, _rolePort: Long = -1,
-     _volume: String = null, _volumeSize: Double = 0.0, _volumePrincipal: String = null
-  ) {
-    val role: String = _role
 
-    val sharedCpus: Double = _sharedCpus
-    val roleCpus: Double = _roleCpus
+  class Reservation( val role: String = null,
+                     val sharedCpus: Double = 0.0,
+                     val roleCpus: Double = 0.0,
+                     val sharedMem: Long = 0,
+                     val roleMem: Long = 0,
+                     val sharedPort: Long = -1,
+                     val rolePort: Long = -1,
+                     val volume: String = null,
+                     val volumeSize: Double = 0.0,
+                     val volumePrincipal: String = null,
+                     val diskSource: Source = null
+                     ) {
+
     def cpus: Double = sharedCpus + roleCpus
-
-    val sharedMem: Long = _sharedMem
-    val roleMem: Long = _roleMem
-    def mem: Long = sharedMem + roleMem
-
-    val sharedPort: Long = _sharedPort
-    val rolePort: Long = _rolePort
-    def port: Long = if (rolePort != -1) rolePort else sharedPort
-
-    val volume: String = _volume
-    val volumeSize: Double = _volumeSize
-    val volumePrincipal: String = _volumePrincipal
+    val mem: Long = sharedMem + roleMem
+    val port: Long = if (rolePort != -1) rolePort else sharedPort
 
     def toResources: util.List[Resource] = {
       def cpus(value: Double, role: String): Resource = {
@@ -556,7 +558,7 @@ object Broker {
           .setRole(role)
           .build()
       }
-      
+
       def mem(value: Long, role: String): Resource = {
         Resource.newBuilder
           .setName("mem")
@@ -565,27 +567,30 @@ object Broker {
           .setRole(role)
           .build()
       }
-      
+
       def port(value: Long, role: String): Resource = {
         Resource.newBuilder
-            .setName("ports")
-            .setType(Value.Type.RANGES)
-            .setRanges(Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(value).setEnd(value)))
-            .setRole(role)
-            .build()
+          .setName("ports")
+          .setType(Value.Type.RANGES)
+          .setRanges(Value.Ranges.newBuilder.addRange(Value.Range.newBuilder().setBegin(value).setEnd(value)))
+          .setRole(role)
+          .build()
       }
 
-      def volumeDisk(id: String, value: Double, role: String, principal: String): Resource = {
+      def volumeDisk(id: String, value: Double, role: String, principal: String, diskSource: Source): Resource = {
+        // TODO: add support for changing container path
         val volume = Volume.newBuilder.setMode(Mode.RW).setContainerPath("data").build()
         val persistence = Persistence.newBuilder.setId(id).build()
-        
-        val disk = DiskInfo.newBuilder
+
+        val diskBuilder = DiskInfo.newBuilder
           .setPersistence(persistence)
           .setVolume(volume)
-          .build()
+        if (diskSource != null && diskSource.hasType)
+          diskBuilder.setSource(diskSource)
+
+        val disk = diskBuilder.build()
 
         val reservation = ReservationInfo.newBuilder.setPrincipal(principal).build()
-        
         Resource.newBuilder
           .setName("disk")
           .setType(Value.Type.SCALAR)
@@ -595,7 +600,7 @@ object Broker {
           .setReservation(reservation)
           .build()
       }
-      
+
       val resources: util.List[Resource] = new util.ArrayList[Resource]()
 
       if (sharedCpus > 0) resources.add(cpus(sharedCpus, "*"))
@@ -607,7 +612,7 @@ object Broker {
       if (sharedPort != -1) resources.add(port(sharedPort, "*"))
       if (rolePort != -1) resources.add(port(rolePort, role))
 
-      if (volume != null) resources.add(volumeDisk(volume, volumeSize, role, volumePrincipal))
+      if (volume != null) resources.add(volumeDisk(volume, volumeSize, role, volumePrincipal, diskSource))
       resources
     }
   }
@@ -642,6 +647,7 @@ object Broker {
   }
 
   type OtherAttributes = (String) => util.Collection[String]
+
   def NoAttributes: OtherAttributes = _ => Collections.emptyList()
 
   private def dateTimeFormat: SimpleDateFormat = {
