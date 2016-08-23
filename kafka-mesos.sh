@@ -16,4 +16,4 @@ check_jar() {
 }
 
 check_jar
-java -jar $jar "$@"
+exec java -jar $jar "$@"
