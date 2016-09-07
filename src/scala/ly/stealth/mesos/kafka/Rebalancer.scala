@@ -17,18 +17,17 @@
 
 package ly.stealth.mesos.kafka
 
+import java.lang.reflect.InvocationTargetException
 import java.util
 
 import scala.Some
 import scala.collection.JavaConversions._
-import scala.collection.{mutable, Seq, Map}
-
+import scala.collection.{Map, Seq, mutable}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
-
 import kafka.admin._
 import kafka.common.TopicAndPartition
-import kafka.utils.{ZkUtils, ZKStringSerializer}
+import kafka.utils.ZkUtils
 import net.elodina.mesos.util.Period
 import org.apache.log4j.Logger
 
@@ -52,10 +51,10 @@ class Rebalancer {
     logger.info(s"Starting rebalance for topics ${topics.mkString(",")} on brokers ${brokers.mkString(",")} with ${if (replicas == -1) "<default>" else replicas} replicas")
     val zkClient = newZkClient
     try {
-      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getReplicaAssignmentForTopics(zkClient, topics)
+      val assignment: Map[TopicAndPartition, Seq[Int]] = ZkUtilsWrapper().getReplicaAssignmentForTopics(topics)
       val reassignment: Map[TopicAndPartition, Seq[Int]] = getReassignments(brokers.map(Integer.parseInt), topics, assignment, replicas, fixedStartIndex, startPartitionId)
 
-      reassignPartitions(zkClient, reassignment)
+      reassignPartitions(reassignment)
       this.reassignment = reassignment
       this.assignment = assignment
     } finally {
@@ -81,7 +80,7 @@ class Rebalancer {
           s += "  " + topicAndPartition.partition + ": " + brokers.mkString(",")
           s += " -> "
           s += reassignment.getOrElse(topicAndPartition, null).mkString(",")
-          s += " - " + getReassignmentState(zkClient, topicAndPartition, reassigning)
+          s += " - " + getReassignmentState(topicAndPartition, reassigning)
           s += "\n"
         }
       }
@@ -121,25 +120,26 @@ class Rebalancer {
     reassignment.toMap
   }
 
-  private def getReassignmentState(zkClient: ZkClient, topicAndPartition: TopicAndPartition, reassigning: Map[TopicAndPartition, Seq[Int]]): String = {
+  private def getReassignmentState(topicAndPartition: TopicAndPartition, reassigning: Map[TopicAndPartition, Seq[Int]]): String = {
     reassigning.get(topicAndPartition) match {
       case Some(partition) => "running"
       case None =>
         // check if the current replica assignment matches the expected one after reassignment
         val assignedBrokers = reassignment(topicAndPartition)
-        val brokers = ZkUtils.getReplicasForPartition(zkClient, topicAndPartition.topic, topicAndPartition.partition)
+        val brokers = ZkUtilsWrapper().getReplicasForPartition(topicAndPartition.topic, topicAndPartition.partition)
 
         if(brokers.sorted == assignedBrokers.sorted) "done"
         else "error"
     }
   }
 
-  private def reassignPartitions(zkClient: ZkClient, partitions: Map[TopicAndPartition, Seq[Int]]): Unit = {
+  private def reassignPartitions(partitions: Map[TopicAndPartition, Seq[Int]]): Unit = {
     try {
-      val json = ZkUtils.getPartitionReassignmentZkData(partitions)
-      ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, json)
+      val json = ZkUtilsWrapper().getPartitionReassignmentZkData(partitions)
+      ZkUtilsWrapper().createPersistentPath(ZkUtils.ReassignPartitionsPath, json)
     } catch {
-      case ze: ZkNodeExistsException => throw new Rebalancer.Exception("rebalance is in progress")
+      case e: InvocationTargetException if e.getCause.isInstanceOf[ZkNodeExistsException]
+        => throw new Rebalancer.Exception("rebalance is in progress")
     }
   }
 }

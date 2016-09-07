@@ -25,7 +25,6 @@ import scala.collection.mutable.ListBuffer
 import java.util.Collections
 import java.io.{FileWriter, File}
 import org.I0Itec.zkclient.ZkClient
-import kafka.utils.ZKStringSerializer
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import net.elodina.mesos.util.Version
 

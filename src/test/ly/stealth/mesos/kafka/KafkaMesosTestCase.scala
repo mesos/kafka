@@ -61,6 +61,7 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     Executor.server.stop()
     Executor.server = new KafkaServer()
     BasicConfigurator.resetConfiguration()
+    ZkUtilsWrapper.reset()
   }
 
   def startZkServer() {

@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import org.junit.{Test, After, Before}
 import org.junit.Assert._
 import org.I0Itec.zkclient.ZkClient
-import kafka.utils.{ZKStringSerializer, ZkUtils}
+import kafka.utils.ZkUtils
 import scala.collection.JavaConversions._
 import java.util
 
@@ -64,9 +64,11 @@ class RebalancerTest extends KafkaMesosTestCase {
   @Test
   def start_in_progress {
     Scheduler.cluster.topics.addTopic("topic", Map(0 -> util.Arrays.asList(0), 1 -> util.Arrays.asList(0)))
-    ZkUtils.createPersistentPath(zkClient, ZkUtils.ReassignPartitionsPath, "")
+    ZkUtilsWrapper().createPersistentPath(ZkUtils.ReassignPartitionsPath, "")
 
     try { rebalancer.start(util.Arrays.asList("t1"), util.Arrays.asList("0", "1")); fail() }
-    catch { case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("in progress")) }
+    catch {
+      case e: Rebalancer.Exception => assertTrue(e.getMessage, e.getMessage.contains("in progress"))
+    }
   }
 }

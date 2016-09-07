@@ -27,85 +27,65 @@ import kafka.controller.LeaderIsrAndControllerEpoch
 import scala.collection.JavaConversions._
 import scala.collection.{mutable, Seq, Map}
 
-import org.I0Itec.zkclient.ZkClient
-
 import kafka.admin._
-import kafka.utils.{ZkUtils, ZKStringSerializer}
 import scala.util.parsing.json.JSONObject
 import ly.stealth.mesos.kafka.Topics.Topic
 import kafka.log.LogConfig
 
 class Topics {
-  private def newZkClient: ZkClient = new ZkClient(Config.zk, 30000, 30000, ZKStringSerializer)
-
   def getTopic(name: String): Topics.Topic = {
     if (name == null) return null
     val topics: util.List[Topic] = getTopics.filter(_.name == name)
-    if (topics.length > 0) topics(0) else null
+    if (topics.nonEmpty) topics(0) else null
   }
 
   def getTopics: util.List[Topics.Topic] = {
-    val zkClient = newZkClient
+    val names = ZkUtilsWrapper().getAllTopics()
 
-    try {
-      val names = ZkUtils.getAllTopics(zkClient)
+    val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtilsWrapper().getPartitionAssignmentForTopics(names)
+    val configs = ZkUtilsWrapper().fetchAllTopicConfigs()
 
-      val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtils.getPartitionAssignmentForTopics(zkClient, names)
-      val configs = AdminUtils.fetchAllTopicConfigs(zkClient)
+    val topics = new util.ArrayList[Topics.Topic]
+    for (name <- names.sorted)
+      topics.add(new Topics.Topic(
+        name,
+        assignments.getOrElse(name, null).mapValues(brokers => new util.ArrayList[Int](brokers)),
+        new util.TreeMap[String, String](propertiesAsScalaMap(configs.getOrElse(name, null)))
+      ))
 
-      val topics = new util.ArrayList[Topics.Topic]
-      for (name <- names.sorted)
-        topics.add(new Topics.Topic(
-          name,
-          assignments.getOrElse(name, null).mapValues(brokers => new util.ArrayList[Int](brokers)),
-          new util.TreeMap[String, String](propertiesAsScalaMap(configs.getOrElse(name, null)))
-        ))
-
-      topics
-    } finally {
-      zkClient.close()
-    }
+    topics
   }
 
   private val NoLeader = LeaderIsrAndControllerEpoch(LeaderAndIsr(LeaderAndIsr.NoLeader, -1, List(), -1), -1)
 
   def getPartitions(topics: util.List[String]): Map[String, Set[Topics.Partition]] = {
-    val zkClient = newZkClient
+    // returns topic name -> (partition -> brokers)
+    val assignments = ZkUtilsWrapper().getPartitionAssignmentForTopics(topics)
+    val topicAndPartitions = assignments.flatMap {
+      case (topic, partitions) => partitions.map {
+        case (partition, _)  => TopicAndPartition(topic, partition)
+      }
+    }.toSet
+    val leaderAndisr = ZkUtilsWrapper().getPartitionLeaderAndIsrForTopics(topicAndPartitions)
 
-    try {
-      // returns topic name -> (partition -> brokers)
-      val assignments = ZkUtils.getPartitionAssignmentForTopics(zkClient, topics)
-      val topicAndPartitions = assignments.flatMap {
-        case (topic, partitions) => partitions.map {
-          case (partition, _)  => TopicAndPartition(topic, partition)
-        }
-      }.toSet
-      val leaderAndisr =  ZkUtils.getPartitionLeaderAndIsrForTopics(zkClient, topicAndPartitions)
-
-      topicAndPartitions.map(tap => {
-        val replicas = assignments(tap.topic).getOrElse(tap.partition, Seq())
-        val partitionLeader = leaderAndisr.getOrElse(tap, NoLeader)
-        tap.topic -> new Topics.Partition(
-          tap.partition,
-          replicas,
-          partitionLeader.leaderAndIsr.isr,
-          partitionLeader.leaderAndIsr.leader,
-          replicas.headOption.getOrElse(-1)
-        )
-      }).groupBy(_._1).mapValues(v => v.map(_._2))
-    }
-    finally {
-      zkClient.close()
-    }
+    topicAndPartitions.map(tap => {
+      val replicas = assignments(tap.topic).getOrElse(tap.partition, Seq())
+      val partitionLeader = leaderAndisr.getOrElse(tap, NoLeader)
+      tap.topic -> new Topics.Partition(
+        tap.partition,
+        replicas,
+        partitionLeader.leaderAndIsr.isr,
+        partitionLeader.leaderAndIsr.leader,
+        replicas.headOption.getOrElse(-1)
+      )
+    }).groupBy(_._1).mapValues(v => v.map(_._2))
   }
 
   def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: util.List[Int] = null, fixedStartIndex: Int = -1, startPartitionId: Int = -1): util.Map[Int, util.List[Int]] = {
     var brokers_ = brokers
 
     if (brokers_ == null) {
-      val zkClient = newZkClient
-      try { brokers_ = ZkUtils.getSortedBrokerList(zkClient)}
-      finally { zkClient.close() }
+      brokers_ = ZkUtilsWrapper().getSortedBrokerList()
     }
 
     AdminUtils.assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId).mapValues(new util.ArrayList[Int](_))
@@ -119,10 +99,7 @@ class Topics {
     if (options != null)
       for ((k, v) <- options) config.setProperty(k, v)
 
-    val zkClient = newZkClient
-    try { AdminUtils.createOrUpdateTopicPartitionAssignmentPathInZK(zkClient, name, assignment_.mapValues(_.toList), config) }
-    finally { zkClient.close() }
-
+    ZkUtilsWrapper().createOrUpdateTopicPartitionAssignmentPathInZK(name, assignment_.mapValues(_.toList), config)
     getTopic(name)
   }
 
@@ -130,9 +107,7 @@ class Topics {
     val config: Properties = new Properties()
     for ((k, v) <- options) config.setProperty(k, v)
 
-    val zkClient = newZkClient
-    try { AdminUtils.changeTopicConfig(zkClient, topic.name, config) }
-    finally { zkClient.close() }
+    ZkUtilsWrapper().changeTopicConfig(topic.name, config)
   }
 
   def validateOptions(options: util.Map[String, String]): String = {
