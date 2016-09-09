@@ -636,6 +636,8 @@ object Broker {
       obj("timestamp") = timestamp
       new JSONObject(obj.toMap)
     }
+
+    def getData = Map() ++ data
   }
 
   object State {

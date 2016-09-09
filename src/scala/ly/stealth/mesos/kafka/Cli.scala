@@ -17,16 +17,22 @@
 
 package ly.stealth.mesos.kafka
 
-import joptsimple.{BuiltinHelpFormatter, OptionException, OptionSet, OptionParser}
-import java.net.{HttpURLConnection, URLEncoder, URL}
+import joptsimple.{BuiltinHelpFormatter, OptionException, OptionParser, OptionSet}
+import java.net.{HttpURLConnection, URL, URLEncoder}
+
 import scala.io.Source
 import java.io._
 import java.util
+
 import scala.collection.JavaConversions._
-import java.util.{Date, Properties, Collections}
-import ly.stealth.mesos.kafka.Util.{BindAddress}
-import net.elodina.mesos.util.{Strings, Period, Repr}
+import scala.collection.JavaConverters._
+import java.util.{Collections, Date, Properties}
+
+import ly.stealth.mesos.kafka.Util.BindAddress
+import net.elodina.mesos.util.{Period, Repr, Strings}
 import ly.stealth.mesos.kafka.Topics.{Partition, Topic}
+
+import scala.util.parsing.json.JSONObject
 
 object Cli {
   var api: String = null
@@ -105,14 +111,7 @@ object Cli {
       return args
     }
 
-    var options: OptionSet = null
-    try { options = parser.parse(args: _*) }
-    catch {
-      case e: OptionException =>
-        parser.printHelpOn(out)
-        printLine()
-        throw new Error(e.getMessage)
-    }
+    val options = parseOptions(parser, args)
 
     resolveApi(options.valueOf("api").asInstanceOf[String])
     options.nonOptionArguments().toArray(new Array[String](0))
@@ -137,6 +136,17 @@ object Cli {
     val parser: OptionParser = new OptionParser()
     parser.formatHelpWith(new BuiltinHelpFormatter(Util.terminalWidth, 2))
     parser
+  }
+
+  private def parseOptions(parser: OptionParser, args: Array[String]): OptionSet = {
+    try {
+      parser.parse(args:_*)
+    } catch {
+      case e: OptionException =>
+        parser.printHelpOn(out)
+        printLine()
+        throw new Error(e.getMessage)
+    }
   }
 
   private def printCmds(): Unit = {
@@ -293,14 +303,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
+      val options = parseOptions(parser, args)
 
       var configFile = if (options.valueOf(configArg) != null) new File(options.valueOf(configArg)) else null
       if (configFile != null && !configFile.exists()) throw new Error(s"config-file $configFile not found")
@@ -392,7 +395,8 @@ object Cli {
       }
 
       cmd match {
-        case "list" => handleList(arg)
+        case "list" => handleList(arg, args)
+        case "metrics" => handleMetrics(arg, args)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
         case "remove" => handleRemove(arg)
         case "clone" => handleClone(arg, args)
@@ -412,7 +416,9 @@ object Cli {
           printLine()
           printLine("Run `help broker <command>` to see details of specific command")
         case "list" =>
-          handleList(null, help = true)
+          handleList(null, null, help = true)
+        case "metrics" =>
+          handleMetrics(null, null, help = true)
         case "add" | "update" =>
           handleAddUpdate(null, null, cmd == "add", help = true)
         case "remove" =>
@@ -430,17 +436,7 @@ object Cli {
       }
     }
 
-    private def handleList(expr: String, help: Boolean = false): Unit = {
-      if (help) {
-        printLine("List brokers\nUsage: broker list [<broker-expr>] [options]\n")
-        handleGenericOptions(null, help = true)
-
-        printLine()
-        Expr.printBrokerExprExamples(out)
-
-        return
-      }
-
+    private def getBrokers(expr: String): Seq[Broker] = {
       val params = new util.HashMap[String, String]()
       if (expr != null) params.put("broker", expr)
 
@@ -448,16 +444,83 @@ object Cli {
       try { json = sendRequest("/broker/list", params) }
       catch { case e: IOException => throw new Error("" + e) }
 
-      val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
-      val title = if (brokerNodes.isEmpty) "no brokers" else "broker" + (if (brokerNodes.size > 1) "s" else "") + ":"
+      val brokers = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      brokers.map(b => {
+        val broker = new Broker()
+        broker.fromJson(b)
+        broker
+      })
+    }
+
+    private def handleList(expr: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      val quietSpec = parser.accepts("quiet").withOptionalArg().ofType(classOf[Boolean])
+
+      if (help) {
+        printLine("List brokers\nUsage: broker list [<broker-expr>] [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printBrokerExprExamples(out)
+        return
+      }
+
+      val brokers = getBrokers(expr)
+      val title = if (brokers.isEmpty) "no brokers" else "broker" + (if (brokers.size > 1) "s" else "") + ":"
       printLine(title)
 
-      for (brokerNode <- brokerNodes) {
-        val broker = new Broker()
-        broker.fromJson(brokerNode)
-
-        printBroker(broker, 1)
+      val options = parseOptions(parser, args)
+      val quiet = options.has(quietSpec)
+      for (broker <- brokers) {
+        printBroker(broker, 1, quiet)
         printLine()
+      }
+    }
+
+    private def handleMetrics(expr: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+      val filterSpec = parser.accepts("filter", "metric filter regex").withOptionalArg().ofType(classOf[String])
+      val jsonSpec = parser.accepts("json", "output json").withOptionalArg().ofType(classOf[Boolean])
+
+      if (help) {
+        printLine("Show broker metrics\nUsage: broker metrics <broker-expr> [options]\n")
+        parser.printHelpOn(out)
+
+        printLine()
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        Expr.printBrokerExprExamples(out)
+        return
+      }
+
+      val options = parseOptions(parser, args)
+      val filterRegex = if (options.has(filterSpec)) {
+        Some(options.valuesOf[String](filterSpec).asScala)
+      } else {
+        None
+      }
+
+      val brokers = getBrokers(expr)
+      if (options.has(jsonSpec)) {
+        out.println(JSONObject(brokers.map(b => b.id -> b.metrics.toJson).toMap).toString())
+      } else {
+        for (b <- brokers.sortBy(_.id)) {
+          out.println(s"broker ${b.id}")
+          val metrics = b.metrics.getData.toSeq.filter({
+            case (name, value) =>
+              filterRegex match {
+                case Some(r) => r.forall(name.matches(_))
+                case None => true
+              }
+          }).sortBy(_._1)
+          for ((name, value) <- metrics) {
+            out.println(s"   $name => $value")
+          }
+        }
       }
     }
 
@@ -499,15 +562,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
-
+      val options = parseOptions(parser, args)
       val cpus = options.valueOf("cpus").asInstanceOf[java.lang.Double]
       val mem = options.valueOf("mem").asInstanceOf[java.lang.Long]
       val heap = options.valueOf("heap").asInstanceOf[java.lang.Long]
@@ -601,15 +656,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
-
+      val options = parseOptions(parser, args)
       val sourceBrokerId = options.valueOf("source").asInstanceOf[String]
       var json: Map[String, Object] = null
       try { json = sendRequest("/broker/clone", Map("broker" -> expr, "source" -> sourceBrokerId)) }
@@ -645,15 +692,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
-
+      val options = parseOptions(parser, args)
       val cmd: String = if (start) "start" else "stop"
       val timeout: String = options.valueOf("timeout").asInstanceOf[String]
       val force: Boolean = options.has("force")
@@ -703,15 +742,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
-
+      val options = parseOptions(parser, args)
       val timeout: String = options.valueOf("timeout").asInstanceOf[String]
 
       val params = new util.LinkedHashMap[String, String]()
@@ -757,15 +788,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
-
+      val options = parseOptions(parser, args)
       val timeout: String = options.valueOf("timeout").asInstanceOf[String]
       val name: String = options.valueOf("name").asInstanceOf[String]
       val lines: Integer = options.valueOf("lines").asInstanceOf[java.lang.Integer]
@@ -792,6 +815,7 @@ object Cli {
     private def printCmds(): Unit = {
       printLine("Commands:")
       printLine("list       - list brokers", 1)
+      printLine("metrics    - dump broker metrics", 1)
       printLine("add        - add broker", 1)
       printLine("update     - update broker", 1)
       printLine("remove     - remove broker", 1)
@@ -802,7 +826,7 @@ object Cli {
       printLine("log        - retrieve broker log", 1)
     }
 
-    private def printBroker(broker: Broker, indent: Int): Unit = {
+    private def printBroker(broker: Broker, indent: Int, quiet: Boolean = false): Unit = {
       printLine("id: " + broker.id, indent)
       printLine("active: " + broker.active, indent)
       printLine("state: " + broker.state() + (if (broker.needsRestart) " (modified, needs restart)" else ""), indent)
@@ -811,10 +835,11 @@ object Cli {
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
       if (broker.syslog) printLine("syslog: " + broker.syslog, indent)
       if (!broker.constraints.isEmpty) printLine("constraints: " + Strings.formatMap(broker.constraints), indent)
-      if (!broker.options.isEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
-      if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)
-      if (broker.jvmOptions != null) printLine("jvm-options: " + broker.jvmOptions, indent)
-
+      if (!quiet) {
+        if (!broker.options.isEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
+        if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)
+        if (broker.jvmOptions != null) printLine("jvm-options: " + broker.jvmOptions, indent)
+      }
       var failover = "failover:"
       failover += " delay:" + broker.failover.delay
       failover += ", max-delay:" + broker.failover.maxDelay
@@ -1010,14 +1035,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
+      val options = parseOptions(parser, args)
 
       val broker = options.valueOf("broker").asInstanceOf[String]
       val partitions = options.valueOf("partitions").asInstanceOf[Integer]
@@ -1077,14 +1095,7 @@ object Cli {
         return
       }
 
-      var options: OptionSet = null
-      try { options = parser.parse(args: _*) }
-      catch {
-        case e: OptionException =>
-          parser.printHelpOn(out)
-          printLine()
-          throw new Error(e.getMessage)
-      }
+      val options = parseOptions(parser, args)
 
       val broker: String = options.valueOf("broker").asInstanceOf[String]
       val replicas: Integer = options.valueOf("replicas").asInstanceOf[Integer]
