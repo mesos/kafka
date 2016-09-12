@@ -56,7 +56,7 @@ class Broker(_id: String = "0") {
   var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
 
-  var metrics: Metrics = null
+  var metrics: Metrics = new Metrics()
 
   // broker has been modified while being in non stopped state, once stopped or before task launch becomes false
   var needsRestart: Boolean = false

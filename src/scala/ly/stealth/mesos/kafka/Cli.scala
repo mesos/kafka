@@ -729,6 +729,7 @@ object Cli {
     private def handleRestart(expr: String, args: Array[String], help: Boolean = false): Unit = {
       val parser = newParser()
       parser.accepts("timeout", "time to wait until broker restarts (30s, 1m, 1h). Default - 2m").withRequiredArg().ofType(classOf[String])
+      parser.accepts("noWaitForReplication", "don't wait for replication to catch up before proceeding to the next broker").withOptionalArg().ofType(classOf[Boolean])
 
       if (help) {
         printLine(s"Restart broker\nUsage: broker restart <broker-expr> [options]\n")
@@ -748,6 +749,7 @@ object Cli {
       val params = new util.LinkedHashMap[String, String]()
       params.put("broker", expr)
       if (timeout != null) params.put("timeout", timeout)
+      if (options.has("noWaitForReplication")) params.put("noWaitForReplication", "true")
 
       var json: Map[String, Object] = null
       try { json = sendRequest("/broker/restart", params) }

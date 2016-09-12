@@ -249,9 +249,6 @@ class SchedulerTest extends KafkaMesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
     broker1.active = true
 
-    assertNull(broker0.metrics)
-    assertNull(broker1.metrics)
-
     val metrics0 = new Broker.Metrics()
     metrics0.fromJson(Map[String, Object](
       "underReplicatedPartitions" -> 2.asInstanceOf[Object],
@@ -266,7 +263,6 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     // metrics updated for corresponding broker
     assertNotNull(broker0.metrics)
-    assertNull(broker1.metrics)
 
     def assertMetricsEquals(expected: Broker.Metrics, actual: Broker.Metrics): Unit = {
       assertEquals(expected("underReplicatedPartitions"), actual("underReplicatedPartitions"))
@@ -289,8 +285,6 @@ class SchedulerTest extends KafkaMesosTestCase {
     val data1 = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics1.toJson)).toString().getBytes
 
     Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker1)), slaveId(), data1)
-
-    assertNull(broker1.metrics)
   }
 
   @Test

@@ -388,17 +388,18 @@ object HttpServer {
 
     def handleRestartBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val cluster: Cluster = Scheduler.cluster
+      val shouldWaitForReplication = request.getParameter("noWaitForReplication") == null
 
-      var timeout: Period = new Period("2m")
-      if (request.getParameter("timeout") != null)
-        try { timeout = new Period(request.getParameter("timeout")) }
+      val timeout = if (request.getParameter("timeout") != null)
+        try { new Period(request.getParameter("timeout")) }
         catch { case ignore: IllegalArgumentException => response.sendError(400, "invalid timeout"); return }
+      else
+        new Period(if (shouldWaitForReplication) "5m" else "2m")
 
       val expr: String = request.getParameter("broker")
       if (expr == null) { response.sendError(400, "broker required"); return }
 
-      var ids: util.List[String] = null
-      try { ids = Expr.expandBrokers(cluster, expr) }
+      val ids: util.List[String] = try { Expr.expandBrokers(cluster, expr) }
       catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
       val brokers = new util.ArrayList[Broker]()
@@ -410,7 +411,7 @@ object HttpServer {
       }
 
       def timeoutJson(broker: Broker, stage: String): JSONObject =
-        new JSONObject(Map("status" -> "timeout", "message" -> s"broker ${broker.id} timeout on $stage"))
+        JSONObject(Map("status" -> "timeout", "message" -> s"broker ${broker.id} timeout on $stage"))
 
       for (broker <- brokers) {
         if (!broker.active || broker.task == null || !broker.task.running) { response.sendError(400, s"broker ${broker.id} is not running"); return }
@@ -421,7 +422,10 @@ object HttpServer {
         val begin = System.currentTimeMillis()
         cluster.save()
 
-        if (!broker.waitFor(null, timeout)) { response.getWriter.println("" + timeoutJson(broker, "stop")); return }
+        if (!broker.waitFor(null, timeout)) {
+          response.getWriter.println("" + timeoutJson(broker, "stop"))
+          return
+        }
 
         val startTimeout = new Period(Math.max(timeout.ms - (System.currentTimeMillis() - begin), 0L) + "ms")
 
@@ -429,10 +433,51 @@ object HttpServer {
         broker.active = true
         cluster.save()
 
-        if (!broker.waitFor(State.RUNNING, startTimeout)) { response.getWriter.println("" + timeoutJson(broker, "start")); return }
+        val startBegin = System.currentTimeMillis()
+        if (!broker.waitFor(State.RUNNING, startTimeout)) {
+          response.getWriter.println("" + timeoutJson(broker, "start"))
+          return
+        }
+
+        if (shouldWaitForReplication) {
+          val replicationTimeout = new Period(Math.max(timeout.ms - (System.currentTimeMillis() - startBegin), 0L) + "ms")
+          if (!waitForReplication(replicationTimeout)) {
+            response.getWriter.println("" + timeoutJson(broker, "replication"))
+            return
+          }
+        }
       }
 
-      response.getWriter.println(JSONObject(Map("status" -> "restarted", "brokers" -> new JSONArray(brokers.map(_.toJson()).toList))))
+      response.getWriter.println(JSONObject(
+        Map("status" -> "restarted", "brokers" -> JSONArray(brokers.map(_.toJson()).toList)))
+      )
+    }
+
+    private def waitForReplication(timeout: Period): Boolean = {
+      var t = timeout.ms
+      logger.info("Starting poll for replication catch-up")
+
+      val topics = ZkUtilsWrapper().getAllTopics()
+      def getOutOfSyncReplicas() = {
+        Scheduler.cluster.topics.getPartitions(topics).flatMap({
+          case (_, partitions) => partitions.flatMap(p => Set(p.replicas: _*) &~ Set(p.isr: _*))
+        }).toSet
+      }
+
+      while (t > 0) {
+        val oos = getOutOfSyncReplicas()
+        if (oos.nonEmpty) {
+          logger.info(s"Waiting for brokers $oos to become in sync.")
+        } else {
+          logger.info("All replicas in sync")
+          return true
+        }
+
+        val delay = Math.min(5000, t)
+        Thread.sleep(delay)
+        t -= delay
+      }
+      false
     }
 
     def handleBrokerLog(request: HttpServletRequest, response: HttpServletResponse): Unit = {
