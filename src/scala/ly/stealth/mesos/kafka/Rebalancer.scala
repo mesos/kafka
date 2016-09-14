@@ -68,7 +68,7 @@ class Rebalancer {
 
     val zkClient = newZkClient
     try {
-      val reassigning: Map[TopicAndPartition, Seq[Int]] = ZkUtils.getPartitionsBeingReassigned(zkClient).mapValues(_.newReplicas)
+      val reassigning: Map[TopicAndPartition, Seq[Int]] = ZkUtilsWrapper().getPartitionsBeingReassigned().mapValues(_.newReplicas)
 
       val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
       for (topic <- byTopic.keys.to[List].sorted) {
