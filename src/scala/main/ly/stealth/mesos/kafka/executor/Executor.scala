@@ -50,7 +50,7 @@ object Executor extends org.apache.mesos.Executor {
 
   def killTask(driver: ExecutorDriver, id: TaskID): Unit = {
     logger.info("[killTask] " + id.getValue)
-    stopExecutor(driver, async = true)
+    killExecutor(driver, id)
   }
 
   def frameworkMessage(driver: ExecutorDriver, data: Array[Byte]): Unit = {
@@ -114,21 +114,33 @@ object Executor extends org.apache.mesos.Executor {
     }.start()
   }
 
-  private[kafka] def stopExecutor(driver: ExecutorDriver, async: Boolean = false): Unit = {
-    def stop0 {
-      if (server.isStarted) server.stop()
-      driver.stop()
-    }
+  private def killExecutor(driver: ExecutorDriver, taskId: TaskID): Unit = {
+    new Thread() {
+      override def run(): Unit = {
+        setName("ExecutorStopper")
 
-    if (async)
-      new Thread() {
-        override def run(): Unit = {
-          setName("ExecutorStopper")
-          stop0
-        }
-      }.start()
-    else
-      stop0
+        driver.sendStatusUpdate(TaskStatus.newBuilder
+          .setTaskId(taskId)
+          .setState(TaskState.TASK_KILLING)
+          .build)
+
+        if (server.isStarted)
+          server.stop()
+
+        driver.sendStatusUpdate(TaskStatus.newBuilder
+          .setTaskId(taskId)
+          .setState(TaskState.TASK_KILLED)
+          .build)
+
+        stopExecutor(driver)
+      }
+    }.start()
+  }
+
+  private[kafka] def stopExecutor(driver: ExecutorDriver): Unit = {
+    if (server.isStarted)
+      server.stop()
+    driver.stop()
   }
 
   private[kafka] def handleMessage(driver: ExecutorDriver, message: String): Unit = {
