@@ -32,6 +32,7 @@ class Cluster {
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
   private[kafka] var rebalancer: Rebalancer = new Rebalancer()
   private[kafka] var topics: Topics = new Topics()
+  private[kafka] var quotas: Quotas = new Quotas()
   private[kafka] var frameworkId: String = null
 
   def getBrokers:util.List[Broker] = Collections.unmodifiableList(brokers)

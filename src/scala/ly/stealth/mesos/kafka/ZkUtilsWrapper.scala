@@ -69,6 +69,9 @@ abstract class ZkUtilsWrapper(cls: Class[_]) {
   private val createOrUpdateTopicPartitionAssignmentPathInZKMethod = adminClass.getMethod(
     "createOrUpdateTopicPartitionAssignmentPathInZK", getAdminZkClass, classOf[String], classOf[Map[Int, Seq[Int]]], classOf[Properties], classOf[Boolean])
   private val changeTopicConfigMethod = adminClass.getMethod("changeTopicConfig", getAdminZkClass, classOf[String], classOf[Properties])
+  private val fetchEntityConfigMethod = adminClass.getMethod("fetchEntityConfig", getAdminZkClass, classOf[String], classOf[String])
+  private val changeClientIdConfigMethod = adminClass.getMethod("changeClientIdConfig", getAdminZkClass, classOf[String], classOf[Properties])
+  private val fetchAllEntityConfigsMethod = adminClass.getMethod("fetchAllEntityConfigs", getAdminZkClass, classOf[String])
 
   // ZkUtils methods
   def getAllTopics(): Seq[String] = callMethod(getAllTopicsMethod)
@@ -99,6 +102,16 @@ abstract class ZkUtilsWrapper(cls: Class[_]) {
 
   def changeTopicConfig(topic: String, configs: Properties)
     = callUnitAdminMethod(changeTopicConfigMethod, topic, configs)
+
+  def fetchEntityConfig(entityType: String, entity: String): Properties
+    = callAdminMethod(fetchEntityConfigMethod, entityType, entity)
+
+  def changeClientIdConfig(clientId: String, configs: Properties)
+    = callUnitAdminMethod(changeClientIdConfigMethod, clientId, configs)
+
+  def fetchAllEntityConfigs(entityType: String): Map[String, Properties]
+    = callAdminMethod(fetchAllEntityConfigsMethod, entityType)
+
 }
 
 object ZkUtilsWrapper {

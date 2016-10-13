@@ -126,6 +126,7 @@ object HttpServer {
       else if (uri.startsWith("/api/broker")) handleBrokerApi(request, response)
       else if (uri.startsWith("/api/topic")) handleTopicApi(request, response)
       else if (uri.startsWith("/api/partition")) handlePartitionApi(request, response)
+      else if (uri.startsWith("/api/quota")) handleQuotaApi(request, response)
       else if (uri.startsWith("/health")) handleHealth(response)
       else if (uri.startsWith("/quitquitquit")) handleQuit(request, response)
       else if (uri.startsWith("/abortabortabort")) handleAbort(request, response)
@@ -741,12 +742,69 @@ object HttpServer {
 
       val topicsAndPartitions = Scheduler.cluster.topics.getPartitions(topics)
       response.getWriter.println(
-        new JSONObject(
+        JSONObject(
           topicsAndPartitions.mapValues(
-            v => new JSONArray(v.map(_.toJson).toList)
+            v => JSONArray(v.map(_.toJson).toList)
           ).toMap
         )
       )
+    }
+
+    def handleQuotaApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      request.setAttribute("jsonResponse", true)
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api/quota".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "list") handleListQuotas(request, response)
+      else if (uri == "set") handleSetQuotas(request, response)
+      else response.sendError(404, "uri not found")
+    }
+
+    def handleListQuotas(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val quotas = Scheduler.cluster.quotas.getClientQuotas()
+      response.getWriter.println(
+        JSONObject(
+          quotas.mapValues(
+            v => JSONObject(Map(
+              "producer_byte_rate" -> v.producerByteRate,
+              "consumer_byte_rate" -> v.consumerByteRate
+            ).filter({
+              case (_, Some(_)) => true
+              case _ => false
+            }).mapValues(v => v.get))
+          )
+        )
+      )
+    }
+
+    def handleSetQuotas(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+      val entityType = request.getParameter("entityType")
+      val entityName = request.getParameter("entity")
+
+      if (entityType == null || entityType != "clients") {
+        response.sendError(400, "invalid entity type")
+      }
+      else if (entityName == null) {
+        response.sendError(400, "invalid entity")
+      }
+      else {
+        val producerQuota = request.getParameter("producerByteRate")
+        val consumerQuota = request.getParameter("consumerByteRate")
+        if (producerQuota == null && consumerQuota == null) {
+          response.sendError(400, "invalid quotas")
+        }
+        else {
+          val existingConfig = Scheduler.cluster.quotas.getClientConfig(entityName)
+          if (producerQuota != null) {
+            existingConfig.setProperty(Quotas.PRODUCER_BYTE_RATE, producerQuota.toInt.toString)
+          }
+          if (consumerQuota != null) {
+            existingConfig.setProperty(Quotas.CONSUMER_BYTE_RATE, consumerQuota.toInt.toString)
+          }
+          Scheduler.cluster.quotas.setClientConfig(entityName, existingConfig)
+        }
+      }
     }
 
     def handleQuit(request: HttpServletRequest, response: HttpServletResponse): Unit = {

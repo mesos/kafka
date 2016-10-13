@@ -18,15 +18,18 @@
 package ly.stealth.mesos.kafka
 
 import org.apache.mesos.Protos.TaskState
-import org.junit.{Test, After, Before}
+import org.junit.{After, Before, Test}
 import org.junit.Assert._
-import java.io.{IOException, FileOutputStream, File}
+import java.io.{File, FileOutputStream, IOException}
 import java.net.{HttpURLConnection, URL}
-import net.elodina.mesos.util.{Period, IO}
-import net.elodina.mesos.util.Strings.{parseMap, formatMap}
+
+import net.elodina.mesos.util.{IO, Period}
+import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 import Cli.sendRequest
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
+import java.util.Properties
+
 import scala.collection.JavaConversions._
 
 class HttpServerTest extends KafkaMesosTestCase {
@@ -349,6 +352,40 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertEquals("started", json("status"))
     assertFalse(json.contains("error"))
     assertEquals(rebalancer.state, json("state").asInstanceOf[String])
+  }
+
+  @Test
+  def quota_list: Unit = {
+    val cluster = Scheduler.cluster
+    val configs = new Properties()
+    configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
+    configs.setProperty(Quotas.CONSUMER_BYTE_RATE, "200")
+    cluster.quotas.setClientConfig("test", configs)
+
+    val json = sendRequest("/quota/list", parseMap(""))
+    assertEquals(json("test").asInstanceOf[Map[String, String]]("producer_byte_rate"), 100)
+    assertEquals(json("test").asInstanceOf[Map[String, String]]("consumer_byte_rate"), 200)
+  }
+
+  @Test
+  def quota_list_partial: Unit = {
+    val cluster = Scheduler.cluster
+    val configs = new Properties()
+    configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
+    cluster.quotas.setClientConfig("test", configs)
+
+    val json = sendRequest("/quota/list", parseMap(""))
+    assertEquals(json("test").asInstanceOf[Map[String, String]]("producer_byte_rate"), 100)
+    assertFalse(json("test").asInstanceOf[Map[String, String]].contains("consumer_byte_rate"))
+  }
+
+  @Test
+  def quota_set: Unit = {
+    sendRequest("/quota/set", parseMap("entityType=clients,entity=test,producerByteRate=100,consumerByteRate=200"))
+
+    val quotas = Scheduler.cluster.quotas.getClientQuotas()
+    assertEquals(quotas.size, 1)
+    assertEquals(quotas("test"), Quota(Some(100), Some(200)))
   }
 
   @Test
