@@ -288,7 +288,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
     val t0Node = topicNodes(0)
     assertEquals("t0", t0Node("name"))
-    assertEquals(Map("0" -> "0"), t0Node("partitions"))
+    assertEquals(List(0), t0Node("partitions").asInstanceOf[Map[String, Object]]("0"))
   }
   
   @Test
@@ -299,7 +299,7 @@ class HttpServerTest extends KafkaMesosTestCase {
     var json = sendRequest("/topic/add", parseMap("topic=t0"))
     val t0Node = json("topics").asInstanceOf[List[Map[String, Object]]](0)
     assertEquals("t0", t0Node("name"))
-    assertEquals(Map("0" -> "0"), t0Node("partitions"))
+    assertEquals(Map("0" -> List(0)), t0Node("partitions"))
 
     assertEquals("t0", topics.getTopic("t0").name)
 

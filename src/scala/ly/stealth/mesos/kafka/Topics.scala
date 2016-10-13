@@ -25,10 +25,10 @@ import kafka.common.TopicAndPartition
 import kafka.controller.LeaderIsrAndControllerEpoch
 
 import scala.collection.JavaConversions._
-import scala.collection.{mutable, Seq, Map}
-
+import scala.collection.{Map, Seq, mutable}
 import kafka.admin._
-import scala.util.parsing.json.JSONObject
+
+import scala.util.parsing.json.{JSONArray, JSONObject}
 import ly.stealth.mesos.kafka.Topics.Topic
 import kafka.log.LogConfig
 
@@ -178,24 +178,25 @@ object Topics {
     def fromJson(node: Map[String, Object]): Unit = {
       name = node("name").asInstanceOf[String]
 
-      val partitionsObj: Map[String, String] = node("partitions").asInstanceOf[Map[String, String]]
+      val partitionsObj: Map[String, List[Int]] = node("partitions").asInstanceOf[Map[String, List[Int]]]
       for ((k, v) <- partitionsObj)
-        partitions.put(Integer.parseInt(k), v.split(", ").toList.map(Integer.parseInt))
+        partitions.put(Integer.parseInt(k), v.toList)
 
       options = node("options").asInstanceOf[Map[String, String]]
     }
 
     def toJson: JSONObject = {
-      val obj = new collection.mutable.LinkedHashMap[String, Any]()
-      obj("name") = name
-
-      val partitionsObj = new collection.mutable.LinkedHashMap[String, Any]()
-      for ((partition, brokers) <- partitions)
-        partitionsObj.put("" + partition, brokers.mkString(", "))
-      obj("partitions") = new JSONObject(partitionsObj.toMap)
-
-      obj.put("options", new JSONObject(options.toMap))
-      new JSONObject(obj.toMap)
+      JSONObject(
+        Map(
+          "name" -> name,
+          "partitions" -> JSONObject(
+            partitions.map({
+              case (id, brokers) => id.toString -> JSONArray(brokers.toList)
+            }).toMap
+          ),
+          "options" -> JSONObject(options.toMap)
+        ).toMap
+      )
     }
   }
 }
