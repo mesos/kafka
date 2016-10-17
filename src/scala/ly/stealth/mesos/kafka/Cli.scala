@@ -276,6 +276,13 @@ object Cli {
         .withRequiredArg().ofType(classOf[String])
 
 
+      parser.accepts("reconciliation-timeout", "Reconciliation timeout (5m, 1h). Default - " + Config.reconciliationTimeout)
+        .withRequiredArg().ofType(classOf[String])
+
+      parser.accepts("reconciliation-attempts", "Number of reconciliation attempts before giving up. Default - " + Config.reconciliationAttempts)
+        .withRequiredArg().ofType(classOf[Integer])
+
+
       parser.accepts("api", "Api url. Example: http://master:7000")
         .withRequiredArg().ofType(classOf[String])
 
@@ -348,6 +355,13 @@ object Cli {
         try { Config.frameworkTimeout = new Period(frameworkTimeout) }
         catch { case e: IllegalArgumentException => throw new Error("Invalid framework-timeout") }
 
+      val reconciliationTimeout = options.valueOf("reconciliation-timeout").asInstanceOf[String]
+      if (reconciliationTimeout != null)
+        try { Config.reconciliationTimeout = new Period(reconciliationTimeout)  }
+        catch { case e: IllegalArgumentException => throw new Error("Invalid reconciliation-timeout") }
+
+      val reconciliationAttempts = options.valueOf("reconciliation-attempts").asInstanceOf[Integer]
+      if (reconciliationAttempts != null) Config.reconciliationAttempts = reconciliationAttempts
 
       val api = options.valueOf("api").asInstanceOf[String]
       if (api != null) Config.api = api

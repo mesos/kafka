@@ -334,24 +334,21 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private[kafka] val RECONCILE_DELAY = new Period("10s")
-  private[kafka] val RECONCILE_MAX_TRIES = 3
-
   private[kafka] var reconciles: Int = 0
   private[kafka] var reconcileTime: Date = null
 
   private[kafka] def reconcileTasksIfRequired(force: Boolean = false, now: Date = new Date()): Boolean = {
     var didSomething = false
-    if (reconcileTime != null && now.getTime - reconcileTime.getTime < RECONCILE_DELAY.ms)
+    if (reconcileTime != null && now.getTime - reconcileTime.getTime < Config.reconciliationTimeout.ms)
       return false
 
     if (!isReconciling) reconciles = 0
     reconciles += 1
     reconcileTime = now
 
-    if (reconciles > RECONCILE_MAX_TRIES) {
+    if (reconciles > Config.reconciliationAttempts) {
       for (broker <- cluster.getBrokers.filter(b => b.task != null && b.task.reconciling)) {
-        logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for broker ${broker.id}, sending killTask for task ${broker.task.id}")
+        logger.info(s"Reconciling exceeded ${Config.reconciliationAttempts} tries for broker ${broker.id}, sending killTask for task ${broker.task.id}")
         driver.killTask(TaskID.newBuilder().setValue(broker.task.id).build())
         broker.task = null
         didSomething = true
@@ -365,7 +362,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     for (broker <- cluster.getBrokers.filter(_.task != null))
       if (force || broker.task.reconciling) {
         broker.task.state = Broker.State.RECONCILING
-        logger.info(s"Reconciling $reconciles/$RECONCILE_MAX_TRIES state of broker ${broker.id}, task ${broker.task.id}")
+        logger.info(s"Reconciling $reconciles/${Config.reconciliationAttempts} state of broker ${broker.id}, task ${broker.task.id}")
 
         statuses.add(TaskStatus.newBuilder()
           .setTaskId(TaskID.newBuilder().setValue(broker.task.id))

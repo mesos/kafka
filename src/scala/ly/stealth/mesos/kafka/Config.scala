@@ -38,6 +38,9 @@ object Config {
   var frameworkRole: String = "*"
   var frameworkTimeout: Period = new Period("30d")
 
+  var reconciliationTimeout = new Period("5m")
+  var reconciliationAttempts = 6
+
   var jre: File = null
   var log: File = null
   var api: String = null
@@ -76,6 +79,9 @@ object Config {
     if (props.containsKey("framework-name")) frameworkName = props.getProperty("framework-name")
     if (props.containsKey("framework-role")) frameworkRole = props.getProperty("framework-role")
     if (props.containsKey("framework-timeout")) frameworkTimeout = new Period(props.getProperty("framework-timeout"))
+
+    if (props.containsKey("reconciliation-timeout")) reconciliationTimeout = new Period(props.getProperty("reconciliation-timeout"))
+    if (props.containsKey("reconciliation-attempts")) reconciliationAttempts = Integer.valueOf("reconciliation-attempts")
 
     if (props.containsKey("jre")) jre = new File(props.getProperty("jre"))
     if (props.containsKey("log")) log = new File(props.getProperty("log"))

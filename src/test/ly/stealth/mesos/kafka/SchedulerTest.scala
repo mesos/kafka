@@ -216,15 +216,15 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertEquals(Broker.State.RECONCILING, broker1.task.state)
     assertEquals(Broker.State.RECONCILING, broker2.task.state)
 
-    for (i <- 2 until Scheduler.RECONCILE_MAX_TRIES + 1) {
-      Scheduler.reconcileTasksIfRequired(now = new Date(Scheduler.RECONCILE_DELAY.ms * i))
+    for (i <- 2 until Config.reconciliationAttempts + 1) {
+      Scheduler.reconcileTasksIfRequired(now = new Date(Config.reconciliationTimeout.ms * i))
       assertEquals(i, Scheduler.reconciles)
       assertEquals(Broker.State.RECONCILING, broker1.task.state)
     }
     assertEquals(0, schedulerDriver.killedTasks.size())
 
     // last reconcile should stop broker
-    Scheduler.reconcileTasksIfRequired(now = new Date(Scheduler.RECONCILE_DELAY.ms * (Scheduler.RECONCILE_MAX_TRIES + 1)))
+    Scheduler.reconcileTasksIfRequired(now = new Date(Config.reconciliationTimeout.ms * (Config.reconciliationAttempts + 1)))
     assertNull(broker1.task)
     assertEquals(2, schedulerDriver.killedTasks.size())
   }
