@@ -1,19 +1,30 @@
 package ly.stealth.mesos.kafka
 
-import java.io.{FileWriter, File}
-import org.I0Itec.zkclient.{ZkClient, IDefaultNameSpace, ZkServer}
+import java.io.{File, FileWriter}
+
+import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
 import org.apache.log4j.BasicConfigurator
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import net.elodina.mesos.util.{IO, Net, Version}
-import org.junit.{Ignore, Before, After}
+import org.junit.{After, Before, Ignore}
+
 import scala.concurrent.duration.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util
+
+import net.elodina.mesos.test.TestSchedulerDriver
+import org.apache.mesos.Protos.Status
 
 @Ignore
 class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
   var zkDir: File = null
   var zkServer: ZkServer = null
+
+  schedulerDriver = new TestSchedulerDriver() {
+    override def suppressOffers() = Status.DRIVER_RUNNING
+    override def reviveOffers(): Status = Status.DRIVER_RUNNING
+  }
+
 
   @Before
   def before {

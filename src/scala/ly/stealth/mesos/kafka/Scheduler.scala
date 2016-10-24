@@ -17,18 +17,38 @@
 
 package ly.stealth.mesos.kafka
 
-import net.elodina.mesos.util.{Strings, Period, Version, Repr}
+import net.elodina.mesos.util.{Period, Repr, Strings, Version}
 import java.util.concurrent.ConcurrentHashMap
+
 import org.apache.mesos.Protos._
+import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
+
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
+
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import org.apache.log4j._
-import scala.Some
-import org.apache.mesos.Protos.Environment.Variable
+
 import scala.collection.mutable
+import scala.util.Random
+
+abstract class OfferResult
+object OfferResult {
+  case class Decline(reason: String, duration: Int = 5) extends OfferResult {
+    def +(other: Decline) =
+      Decline(
+        Seq(reason, other.reason).filter(r => r != null && r.nonEmpty).mkString("\n"),
+        duration.min(other.duration)
+      )
+  }
+  case class Accept() extends OfferResult
+
+  def neverMatch(reason: String) = Decline(reason, 60 * 60)
+  def eventuallyMatch(reason: String, howLong: Int) = Decline(reason, howLong)
+}
 
 
 object Scheduler extends org.apache.mesos.Scheduler {
@@ -39,6 +59,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private var driver: SchedulerDriver = null
 
   val logs = new ConcurrentHashMap[Long, Option[String]]()
+
+  private var canSuppressOffers = false
+  private var offersAreSuppressed = false
 
   private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
     var cmd = "java -cp " + HttpServer.jar.getName
@@ -143,7 +166,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
-    logger.debug("[frameworkMessage] executor:" + Repr.id(executorId.getValue) + " slave:" + Repr.id(slaveId.getValue) + " data: " + new String(data))
+    if (logger.isTraceEnabled)
+      logger.trace("[frameworkMessage] executor:" + Repr.id(executorId.getValue) + " slave:" + Repr.id(slaveId.getValue) + " data: " + new String(data))
+    else if (logger.isDebugEnabled)
+      logger.debug(s"[frameworkMessage] executor: ${Repr.id(executorId.getValue)} slave: ${Repr.id(slaveId.getValue)}")
 
     val broker = cluster.getBroker(Broker.idFromExecutorId(executorId.getValue))
 
@@ -190,22 +216,43 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("[error] " + message)
   }
 
+  def activateBroker(broker: Broker): Unit = {
+    broker.active = true
+    pauseOrResumeOffers()
+  }
+
   private[kafka] def syncBrokers(offers: util.List[Offer]): Unit = {
-    val declineReasons = new util.ArrayList[String]()
-    var didSomething = false
-    for (offer <- offers) {
-      val declineReason = acceptOffer(offer)
-
-      if (declineReason != null) {
-        driver.declineOffer(offer.getId)
-        if (!declineReason.isEmpty) declineReasons.add(offer.getHostname + Repr.id(offer.getId.getValue) + " - " + declineReason)
-      } else {
-        didSomething = true
-      }
+    var didSomething = tryLaunchBrokers(offers)
+    didSomething |= tryStopInactiveBrokers()
+    didSomething |= reconcileTasksIfRequired()
+    if (didSomething) {
+      cluster.save()
+      logger.info("Saving cluster state")
     }
-    
-    if (!declineReasons.isEmpty) logger.info("Declined offers:\n" + declineReasons.mkString("\n"))
+  }
 
+  private def tryLaunchBrokers(offers: Seq[Offer]): Boolean = {
+    val results = offers.map(o => o -> tryAcceptOffer(o))
+    // Decline unmatched offers
+    results.foreach({
+      case (offer, decline: OfferResult.Decline) =>
+        val jitter = (decline.duration / 3) * (Random.nextDouble() - .5)
+        val fb = Filters.newBuilder().setRefuseSeconds(decline.duration + jitter)
+        driver.declineOffer(offer.getId, fb.build())
+      case _ =>
+    })
+
+    if (logger.isDebugEnabled)
+      logger.debug(results.map(r => s"${r._1.getId.getValue} -> ${r._2}").mkString("\n"))
+
+    results.exists({
+      case (_, _: OfferResult.Accept) => true
+      case _ => false
+    })
+  }
+
+  def tryStopInactiveBrokers(): Boolean = {
+    var didSomething = false
     for (broker <- cluster.getBrokers) {
       if (broker.shouldStop) {
         logger.info(s"Stopping broker ${broker.id}: killing task ${broker.task.id}")
@@ -214,32 +261,25 @@ object Scheduler extends org.apache.mesos.Scheduler {
         didSomething = true
       }
     }
-
-    didSomething |= reconcileTasksIfRequired()
-    if (didSomething) {
-      cluster.save()
-      logger.info("Saving cluster state")
-    }
+    didSomething
   }
 
-  private[kafka] def acceptOffer(offer: Offer): String = {
-    if (isReconciling) return "reconciling"
+  private[kafka] def tryAcceptOffer(offer: Offer): OfferResult = {
+    if (isReconciling) return OfferResult.Decline("reconciling", 5)
     val now = new Date()
+    var declineInfo = OfferResult.neverMatch("")
 
-    var reason = ""
     for (broker <- cluster.getBrokers.filter(_.shouldStart(offer.getHostname))) {
-      val diff = broker.matches(offer, now, otherTasksAttributes)
-
-      if (diff == null) {
-        launchTask(broker, offer)
-        return null
-      } else {
-        if (!reason.isEmpty) reason += ", "
-        reason += s"broker ${broker.id}: $diff"
+      broker.matches(offer, now, otherTasksAttributes) match {
+        case _: OfferResult.Accept =>
+          launchTask(broker, offer)
+          return OfferResult.Accept()
+        case reason: OfferResult.Decline => declineInfo +=
+          OfferResult.Decline(s"broker ${broker.id}: ${reason.reason}", reason.duration)
       }
     }
 
-    reason
+    declineInfo
   }
 
   private[kafka] def onBrokerStatus(status: TaskStatus): Unit = {
@@ -256,6 +296,36 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     cluster.save()
+    pauseOrResumeOffers()
+  }
+
+  private def pauseOrResumeOffers(): Unit = {
+    val clusterIsSteadyState = cluster.getBrokers.asScala.forall(_.isSteadyState)
+    // If all brokers are steady state we can request mesos to stop sending offers.
+    if (!this.offersAreSuppressed && clusterIsSteadyState) {
+      if (canSuppressOffers) {
+        // Our version of mesos supports suppressOffers, so use it.
+        val result = driver.suppressOffers()
+        if (result == Status.DRIVER_RUNNING) {
+          logger.info("Cluster is now stable, offers are suppressed")
+          this.offersAreSuppressed = true
+        }
+        else {
+          logger.error(s"Error suppressing offers, driver returned '$result'")
+        }
+      }
+      else {
+        // No support for suppress offers, noop it.
+        this.offersAreSuppressed = true
+      }
+    }
+    // Else, if offers are suppressed, and we are no longer steady-state, resume offers.
+    else if (!clusterIsSteadyState && offersAreSuppressed) {
+      if (driver.reviveOffers() == Status.DRIVER_RUNNING) {
+        logger.info("Cluster is no longer stable, resuming offers.")
+        this.offersAreSuppressed = false
+      }
+    }
   }
 
   private[kafka] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
@@ -305,7 +375,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def isReconciling: Boolean = cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
 
-  private[kafka] def launchTask(broker: Broker, offer: Offer): Unit = {
+  private[kafka] def launchTask(broker: Broker, offer: Offer): TaskID = {
     broker.needsRestart = false
 
     val reservation = broker.getReservation(offer)
@@ -318,8 +388,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
     broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, attributes)
-
     logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${offer.getHostname + Repr.id(offer.getId.getValue)}\n ${Repr.task(task_)}")
+    TaskID.newBuilder().setValue(id).build()
   }
 
   def forciblyStopBroker(broker: Broker): Unit = {
@@ -379,15 +449,17 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private def checkMesosVersion(master: MasterInfo): Unit = {
-    if (master == null) return
+    val version = if (master.getVersion != null)
+      new Version(master.getVersion)
+    else {
+      logger.warn("Unable to detect mesos version, mesos < 0.23 is unsupported, proceed with caution.")
+      new Version("0.22.1")
+    }
 
-    val minVersion: Version = new Version("0.23.0")
-    var version: Version = if (master.getVersion != null) new Version(master.getVersion) else null
-
-    if (version == null || version.compareTo(minVersion) < 0) {
-      val versionStr: String = if (version == null) "?(<0.23.0)" else "" + version
-      logger.fatal("Unsupported Mesos version " + versionStr + ", expected version " + minVersion + "+")
-      driver.stop
+    val hasSuppressOffers = new Version("0.25.0")
+    if (version.compareTo(hasSuppressOffers) >= 0) {
+      logger.info("Enabling offer suppression")
+      canSuppressOffers = true
     }
   }
 

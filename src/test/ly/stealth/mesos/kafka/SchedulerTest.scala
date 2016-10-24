@@ -104,16 +104,24 @@ class SchedulerTest extends KafkaMesosTestCase {
     broker.active = true
 
     broker.task = new Broker.Task(_state = Broker.State.RECONCILING)
-    assertEquals("reconciling", Scheduler.acceptOffer(null))
+    assertEquals(
+      OfferResult.eventuallyMatch("reconciling", 5),
+      Scheduler.tryAcceptOffer(null))
 
     broker.task = null
-    assertEquals(s"broker ${broker.id}: cpus < ${broker.cpus}", Scheduler.acceptOffer(offer(s"cpus:0.4; mem:${broker.mem}")))
-    assertEquals(s"broker ${broker.id}: mem < ${broker.mem}", Scheduler.acceptOffer(offer(s"cpus:${broker.cpus}; mem:99")))
+    assertEquals(
+      OfferResult.neverMatch(s"broker ${broker.id}: cpus < ${broker.cpus}"),
+      Scheduler.tryAcceptOffer(offer(s"cpus:0.4; mem:${broker.mem}")))
+    assertEquals(
+      OfferResult.neverMatch(s"broker ${broker.id}: mem < ${broker.mem}"),
+      Scheduler.tryAcceptOffer(offer(s"cpus:${broker.cpus}; mem:99")))
 
-    assertNull(Scheduler.acceptOffer(offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")))
+    BrokerTest.assertAccept(Scheduler.tryAcceptOffer(offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
-    assertEquals("", Scheduler.acceptOffer(offer(s"cpus:${broker.cpus}; mem:${broker.mem}")))
+    assertEquals(
+      OfferResult.neverMatch(""),
+      Scheduler.tryAcceptOffer(offer(s"cpus:${broker.cpus}; mem:${broker.mem}")))
   }
 
   @Test

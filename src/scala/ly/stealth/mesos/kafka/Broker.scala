@@ -82,16 +82,16 @@ class Broker(_id: String = "0") {
 
   @volatile var task: Broker.Task = null
 
-  def matches(offer: Offer, now: Date = new Date(), otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): String = {
+  def matches(offer: Offer, now: Date = new Date(), otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): OfferResult = {
     // check resources
-    val reservation: Broker.Reservation = getReservation(offer)
-    if (reservation.cpus < cpus) return s"cpus < $cpus"
-    if (reservation.mem < mem) return s"mem < $mem"
-    if (reservation.port == -1) return "no suitable port"
+    val reservation = getReservation(offer)
+    if (reservation.cpus < cpus) return OfferResult.neverMatch(s"cpus < $cpus")
+    if (reservation.mem < mem) return OfferResult.neverMatch(s"mem < $mem")
+    if (reservation.port == -1) return OfferResult.neverMatch("no suitable port")
 
-    // check stickiness
-    if (!stickiness.allowsHostname(offer.getHostname, now))
-      return "hostname != stickiness host"
+    // check volume
+    if (volume != null && reservation.volume == null)
+      return OfferResult.neverMatch(s"offer missing volume: $volume")
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -100,17 +100,21 @@ class Broker(_id: String = "0") {
     for (attribute <- offer.getAttributesList)
       if (attribute.hasText) offerAttributes.put(attribute.getName, attribute.getText.getValue)
 
-    // check volume
-    if (volume != null && reservation.volume == null)
-      return s"offer missing volume: $volume"
-
     // check constraints
     for ((name, constraint) <- constraints) {
-      if (!offerAttributes.containsKey(name)) return s"no $name"
-      if (!constraint.matches(offerAttributes.get(name), otherAttributes(name))) return s"$name doesn't match $constraint"
+      if (!offerAttributes.containsKey(name)) return OfferResult.neverMatch(s"no $name")
+      if (!constraint.matches(offerAttributes.get(name), otherAttributes(name)))
+        return OfferResult.neverMatch(s"$name doesn't match $constraint")
     }
 
-    null
+    // check stickiness
+    val stickyTimeLeft = stickiness.stickyTimeLeft(now)
+    if (stickyTimeLeft > 0)
+      if (!stickiness.matchesHostname(offer.getHostname))
+        return OfferResult.eventuallyMatch("hostname != stickiness host", stickyTimeLeft)
+
+    // Accept it
+    OfferResult.Accept()
   }
 
   def getReservation(offer: Offer): Broker.Reservation = {
@@ -198,6 +202,14 @@ class Broker(_id: String = "0") {
     }
 
     -1
+  }
+
+  /*
+  An "steady state" broker is a broker that is either running happily,
+  or stopped and won't be started.
+   */
+  def isSteadyState: Boolean = {
+    (active && task != null && task.running) || !active
   }
 
   def shouldStart(hostname: String, now: Date = new Date()): Boolean =
@@ -365,11 +377,17 @@ object Broker {
       this.stopTime = now
     }
 
-    def allowsHostname(hostname: String, now: Date = new Date()): Boolean = {
-      if (this.hostname == null) return true
-      if (stopTime == null || now.getTime - stopTime.getTime >= period.ms) return true
-      this.hostname == hostname
-    }
+    def stickyTimeLeft(now: Date = new Date()): Int =
+      if (stopTime == null || hostname == null)
+        0
+      else
+        (((stopTime.getTime - now.getTime) + period.ms) / 1000).toInt
+
+    def allowsHostname(hostname: String, now: Date = new Date()): Boolean =
+      stickyTimeLeft(now) <= 0 || matchesHostname(hostname)
+
+    def matchesHostname(hostname: String) =
+      this.hostname == null || this.hostname == hostname
 
     def fromJson(node: Map[String, Object]): Unit = {
       period = new Period(node("period").asInstanceOf[String])
