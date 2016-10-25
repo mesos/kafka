@@ -22,7 +22,10 @@ import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.TaskState
 import java.util.Date
+import ly.stealth.mesos.kafka.json.JsonUtil
 import net.elodina.mesos.util.Strings.parseMap
+
+import scala.collection.JavaConversions._
 
 class SchedulerTest extends KafkaMesosTestCase {
   @Test
@@ -44,8 +47,8 @@ class SchedulerTest extends KafkaMesosTestCase {
   @Test
   def newTask {
     val broker = new Broker("1")
-    broker.options = parseMap("a=1")
-    broker.log4jOptions = parseMap("b=2")
+    broker.options = parseMap("a=1").toMap
+    broker.log4jOptions = parseMap("b=2").toMap
     broker.cpus = 0.5
     broker.mem = 256
 
@@ -60,19 +63,19 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertEquals(resources(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000"), task.getResourcesList)
 
     // data
-    val data: util.Map[String, String] = parseMap(task.getData.toStringUtf8)
-    
-    val readBroker: Broker = new Broker()
-    readBroker.fromJson(Util.parseJson(data.get("broker")))
-    BrokerTest.assertBrokerEquals(broker, readBroker)
+    val launchConfig = JsonUtil.fromJson[LaunchConfig](task.getData.toByteArray)
 
-    val defaults = parseMap(data.get("defaults"))
-    assertEquals(broker.id, defaults.get("broker.id"))
-    assertEquals("" + 1000, defaults.get("port"))
-    assertEquals(Config.zk, defaults.get("zookeeper.connect"))
+    assertEquals(broker.id, launchConfig.id)
+    assertEquals(broker.options.toMap, launchConfig.options)
+    assertEquals(broker.log4jOptions.toMap, launchConfig.log4jOptions)
 
-    assertEquals("kafka-logs", defaults.get("log.dirs"))
-    assertEquals(offer.getHostname, defaults.get("host.name"))
+    val defaults = launchConfig.interpolatedOptions
+    assertEquals(broker.id, defaults("broker.id"))
+    assertEquals("" + 1000, defaults("port"))
+    assertEquals(Config.zk, defaults("zookeeper.connect"))
+
+    assertEquals("kafka-logs", defaults("log.dirs"))
+    assertEquals(offer.getHostname, defaults("host.name"))
   }
 
   @Test
@@ -199,7 +202,7 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     assertNotNull(broker.task)
     assertEquals(Broker.State.STARTING, broker.task.state)
-    assertEquals(parseMap("a=1,b=2"), broker.task.attributes)
+    assertEquals(parseMap("a=1,b=2").toMap, broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
@@ -211,10 +214,10 @@ class SchedulerTest extends KafkaMesosTestCase {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
 
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
-    broker1.task = new Broker.Task(_id = "1", _state = Broker.State.RUNNING)
+    broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
 
     val broker2 = Scheduler.cluster.addBroker(new Broker("2"))
-    broker2.task = new Broker.Task(_id = "2", _state = Broker.State.STARTING)
+    broker2.task = new Broker.Task(id = "2", _state = Broker.State.STARTING)
 
     Scheduler.reconcileTasksIfRequired(force = true, now = new Date(0))
     assertEquals(1, Scheduler.reconciles)
@@ -240,10 +243,10 @@ class SchedulerTest extends KafkaMesosTestCase {
   @Test
   def otherTasksAttributes {
     val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
-    broker0.task = new Broker.Task(_hostname = "host0", _attributes = parseMap("a=1,b=2"))
+    broker0.task = new Broker.Task(hostname = "host0", attributes = parseMap("a=1,b=2").toMap)
 
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
-    broker1.task = new Broker.Task(_hostname = "host1", _attributes = parseMap("b=3"))
+    broker1.task = new Broker.Task(hostname = "host1", attributes = parseMap("b=3").toMap)
 
     assertEquals(util.Arrays.asList("host0", "host1"), Scheduler.otherTasksAttributes("hostname"))
     assertEquals(util.Arrays.asList("1"), Scheduler.otherTasksAttributes("a"))
@@ -257,16 +260,13 @@ class SchedulerTest extends KafkaMesosTestCase {
     val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
     broker1.active = true
 
-    val metrics0 = new Broker.Metrics()
-    metrics0.fromJson(Map[String, Object](
-      "underReplicatedPartitions" -> 2.asInstanceOf[Object],
-      "offlinePartitionsCount" -> 3.asInstanceOf[Object],
-      "activeControllerCount" -> 1.asInstanceOf[Object],
-      "timestamp" -> System.currentTimeMillis().asInstanceOf[Object]
-    ))
+    val metrics0 = new Broker.Metrics(Map[String, Number](
+      "underReplicatedPartitions" -> 2,
+      "offlinePartitionsCount" -> 3,
+      "activeControllerCount" -> 1
+    ), System.currentTimeMillis())
 
-    val data = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics0.toJson)).toString().getBytes
-
+    val data = JsonUtil.toJsonBytes(FrameworkMessage(metrics = Some(metrics0)))
     Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker0)), slaveId(), data)
 
     // metrics updated for corresponding broker
@@ -284,14 +284,11 @@ class SchedulerTest extends KafkaMesosTestCase {
     // metrics updated only for active brokers
     broker1.active = false
 
-    val metrics1 = new Broker.Metrics()
-    metrics1.fromJson(Map(
-      "offlinePartitionsCount" -> 1.asInstanceOf[Object],
-      "timestamp" -> System.currentTimeMillis().asInstanceOf[Object]
-    ))
-
-    val data1 = scala.util.parsing.json.JSONObject(Map("metrics" -> metrics1.toJson)).toString().getBytes
-
+    val metrics1 = new Broker.Metrics(Map(
+      "offlinePartitionsCount" -> 1),
+      System.currentTimeMillis()
+    )
+    val data1 = JsonUtil.toJsonBytes(FrameworkMessage(metrics=Some(metrics1)))
     Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker1)), slaveId(), data1)
   }
 
@@ -309,7 +306,7 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertEquals(LogRequest(requestId, 111, "stdout").toString, new String(message.data))
 
     val content = "1\n2\n3\n"
-    val data = LogResponse(requestId, content).toJson.toString().getBytes
+    val data = JsonUtil.toJsonBytes(FrameworkMessage(log = Some(LogResponse(requestId, content))))
 
     // skip log response when broker is null
     Scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(new Broker("100"))), slaveId(), data)

@@ -18,23 +18,15 @@
 package ly.stealth.mesos.kafka
 
 import java.util
-import org.apache.mesos.Protos.Resource.DiskInfo.Source.Mount
-import org.apache.mesos.Protos.Resource.{ReservationInfo, DiskInfo}
-import org.apache.mesos.Protos.Resource.DiskInfo.{Source, Persistence}
+import java.util.{Date, UUID}
+import org.apache.mesos.Protos.Resource.{DiskInfo, ReservationInfo}
+import org.apache.mesos.Protos.Resource.DiskInfo.{Persistence, Source}
 import org.apache.mesos.Protos.Volume.Mode
-import org.apache.mesos.Protos.Resource.DiskInfo.Source.Type
-
 import scala.collection.JavaConversions._
-import scala.collection
-import org.apache.mesos.Protos.{Volume, Value, Resource, Offer}
-import java.util._
-import ly.stealth.mesos.kafka.Broker.{Metrics, Stickiness, Failover}
+import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
+import ly.stealth.mesos.kafka.Broker.{Failover, Metrics, Stickiness}
 import ly.stealth.mesos.kafka.Util.BindAddress
-import net.elodina.mesos.util.{Strings, Period, Range, Repr, Constraint}
-import java.text.SimpleDateFormat
-import scala.List
-import scala.collection.Map
-import scala.util.parsing.json.JSONObject
+import net.elodina.mesos.util.{Constraint, Period, Range, Repr}
 
 class Broker(_id: String = "0") {
   var id: String = _id
@@ -48,37 +40,18 @@ class Broker(_id: String = "0") {
   var bindAddress: BindAddress = null
   var syslog: Boolean = false
 
-  var constraints: util.Map[String, Constraint] = new util.LinkedHashMap()
-  var options: util.Map[String, String] = new util.LinkedHashMap()
-  var log4jOptions: util.Map[String, String] = new util.LinkedHashMap()
+  var constraints: Map[String, Constraint] = Map()
+  var options: Map[String, String] = Map()
+  var log4jOptions: Map[String, String] = Map()
   var jvmOptions: String = null
 
   var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
 
-  var metrics: Metrics = new Metrics()
+  var metrics: Metrics = Metrics()
 
   // broker has been modified while being in non stopped state, once stopped or before task launch becomes false
   var needsRestart: Boolean = false
-
-  def options(defaults: util.Map[String, String] = null): util.Map[String, String] = {
-    val result = new util.LinkedHashMap[String, String]()
-    if (defaults != null) result.putAll(defaults)
-
-    result.putAll(options)
-
-    if (bindAddress != null)
-      result.put("host.name", bindAddress.resolve())
-
-    for ((k, v) <- result)
-      result.put(k, v.replace("$id", id))
-
-    result
-  }
-
-  def interpolatedLog4jOptions(): Map[String, String] = {
-    log4jOptions.mapValues(v => v.replace("$id", id))
-  }
 
   @volatile var task: Broker.Task = null
 
@@ -267,67 +240,6 @@ class Broker(_id: String = "0") {
     matches
   }
 
-  def fromJson(node: Map[String, Object]): Unit = {
-    id = node("id").asInstanceOf[String]
-    active = node("active").asInstanceOf[Boolean]
-
-    cpus = node("cpus").asInstanceOf[Number].doubleValue()
-    mem = node("mem").asInstanceOf[Number].longValue()
-    heap = node("heap").asInstanceOf[Number].longValue()
-    if (node.contains("port")) port = new Range(node("port").asInstanceOf[String])
-    if (node.contains("volume")) volume = node("volume").asInstanceOf[String]
-    if (node.contains("bindAddress")) bindAddress = new BindAddress(node("bindAddress").asInstanceOf[String])
-    syslog = node("syslog").asInstanceOf[Boolean]
-
-    if (node.contains("constraints")) constraints = Strings.parseMap(node("constraints").asInstanceOf[String])
-      .mapValues(new Constraint(_)).view.force
-    if (node.contains("options")) options = Strings.parseMap(node("options").asInstanceOf[String])
-    if (node.contains("log4jOptions")) log4jOptions = Strings.parseMap(node("log4jOptions").asInstanceOf[String])
-    if (node.contains("jvmOptions")) jvmOptions = node("jvmOptions").asInstanceOf[String]
-
-    stickiness.fromJson(node("stickiness").asInstanceOf[Map[String, Object]])
-    failover.fromJson(node("failover").asInstanceOf[Map[String, Object]])
-
-    if (node.contains("task")) {
-      task = new Broker.Task()
-      task.fromJson(node("task").asInstanceOf[Map[String, Object]])
-    }
-
-    if (node.contains("metrics")) {
-      metrics = new Broker.Metrics()
-      metrics.fromJson(node("metrics").asInstanceOf[Map[String, Object]])
-    }
-
-    if (node.contains("needsRestart")) needsRestart = node("needsRestart").asInstanceOf[Boolean]
-  }
-
-  def toJson(includeMetrics: Boolean = true): JSONObject = {
-    val obj = new collection.mutable.LinkedHashMap[String, Any]()
-    obj("id") = id
-    obj("active") = active
-
-    obj("cpus") = cpus
-    obj("mem") = mem
-    obj("heap") = heap
-    if (port != null) obj("port") = "" + port
-    if (volume != null) obj("volume") = volume
-    if (bindAddress != null) obj("bindAddress") = "" + bindAddress
-    obj("syslog") = syslog
-
-    if (!constraints.isEmpty) obj("constraints") = Strings.formatMap(constraints)
-    if (!options.isEmpty) obj("options") = Strings.formatMap(options)
-    if (!log4jOptions.isEmpty) obj("log4jOptions") = Strings.formatMap(log4jOptions)
-    if (jvmOptions != null) obj("jvmOptions") = jvmOptions
-
-    obj("stickiness") = stickiness.toJson
-    obj("failover") = failover.toJson
-    if (task != null) obj("task") = task.toJson
-    if (metrics != null && includeMetrics) obj("metrics") = metrics.toJson
-    if (needsRestart) obj("needsRestart") = needsRestart
-
-    new JSONObject(obj.toMap)
-  }
-
   def clone(newId: String): Broker = {
     val nb = new Broker(newId)
     nb.cpus = cpus
@@ -338,9 +250,9 @@ class Broker(_id: String = "0") {
     nb.bindAddress = bindAddress
     nb.syslog = syslog
     nb.stickiness.period = stickiness.period
-    nb.constraints = new util.LinkedHashMap[String, Constraint]() ++= constraints
-    nb.options = new util.LinkedHashMap[String, String]() ++= options
-    nb.log4jOptions = new util.LinkedHashMap[String, String]() ++= log4jOptions
+    nb.constraints = Map() ++ constraints
+    nb.options = Map() ++ options
+    nb.log4jOptions = Map() ++ log4jOptions
     nb.jvmOptions = jvmOptions
     nb.failover.delay = failover.delay
     nb.failover.maxDelay = failover.maxDelay
@@ -359,7 +271,7 @@ object Broker {
 
   def idFromExecutorId(executorId: String): String = idFromTaskId(executorId)
 
-  def isOptionOverridable(name: String): Boolean = !List("broker.id", "port", "zookeeper.connect").contains(name)
+  def isOptionOverridable(name: String): Boolean = !Set("broker.id", "port", "zookeeper.connect").contains(name)
 
   class Stickiness(_period: Period = new Period("10m")) {
     var period: Period = _period
@@ -389,20 +301,10 @@ object Broker {
     def matchesHostname(hostname: String) =
       this.hostname == null || this.hostname == hostname
 
-    def fromJson(node: Map[String, Object]): Unit = {
-      period = new Period(node("period").asInstanceOf[String])
-      if (node.contains("stopTime")) stopTime = dateTimeFormat.parse(node("stopTime").asInstanceOf[String])
-      if (node.contains("hostname")) hostname = node("hostname").asInstanceOf[String]
-    }
-
-    def toJson: JSONObject = {
-      val obj = new collection.mutable.LinkedHashMap[String, Any]()
-
-      obj("period") = "" + period
-      if (stopTime != null) obj("stopTime") = dateTimeFormat.format(stopTime)
-      if (hostname != null) obj("hostname") = hostname
-
-      new JSONObject(obj.toMap)
+    override def equals(obj: scala.Any): Boolean = {
+      if (!obj.isInstanceOf[Stickiness]) return false
+      val other = obj.asInstanceOf[Stickiness]
+      period == other.period && stopTime == other.stopTime && hostname == other.hostname
     }
   }
 
@@ -445,46 +347,29 @@ object Broker {
       failureTime = null
     }
 
-    def fromJson(node: Map[String, Object]): Unit = {
-      delay = new Period(node("delay").asInstanceOf[String])
-      maxDelay = new Period(node("maxDelay").asInstanceOf[String])
-      if (node.contains("maxTries")) maxTries = node("maxTries").asInstanceOf[Number].intValue()
+    override def equals(obj: scala.Any): Boolean = {
+      if (!obj.isInstanceOf[Failover])
+        return false
+      val other = obj.asInstanceOf[Failover]
 
-      if (node.contains("failures")) failures = node("failures").asInstanceOf[Number].intValue()
-      if (node.contains("failureTime")) failureTime = dateTimeFormat.parse(node("failureTime").asInstanceOf[String])
-    }
-
-    def toJson: JSONObject = {
-      val obj = new collection.mutable.LinkedHashMap[String, Any]()
-
-      obj("delay") = "" + delay
-      obj("maxDelay") = "" + maxDelay
-      if (maxTries != null) obj("maxTries") = maxTries
-
-      if (failures != 0) obj("failures") = failures
-      if (failureTime != null) obj("failureTime") = dateTimeFormat.format(failureTime)
-
-      new JSONObject(obj.toMap)
+      (delay == other.delay
+        && maxDelay == other.maxDelay
+        && maxTries == other.maxTries
+        && failures == other.failures
+        && failureTime == other.failureTime)
     }
   }
 
-  class Task(
-              _id: String = null,
-              _slaveId: String = null,
-              _executorId: String = null,
-              _hostname: String = null,
-              _attributes: util.Map[String, String] = Collections.emptyMap(),
-              _state: String = State.STARTING
-              ) {
-    var id: String = _id
-    var slaveId: String = _slaveId
-    var executorId: String = _executorId
-
-    var hostname: String = _hostname
-    var endpoint: Broker.Endpoint = null
-    var attributes: util.Map[String, String] = _attributes
-
+  case class Task(
+    id: String = null,
+    slaveId: String = null,
+    executorId: String = null,
+    hostname: String = null,
+    attributes: Map[String, String] = Map(),
+    _state: String = State.STARTING
+  ) {
     @volatile var state: String = _state
+    var endpoint: Endpoint = null
 
     def starting: Boolean = state == State.STARTING
 
@@ -494,34 +379,15 @@ object Broker {
 
     def reconciling: Boolean = state == State.RECONCILING
 
-    def fromJson(node: Map[String, Object]): Unit = {
-      id = node("id").asInstanceOf[String]
-      slaveId = node("slaveId").asInstanceOf[String]
-      executorId = node("executorId").asInstanceOf[String]
-
-      hostname = node("hostname").asInstanceOf[String]
-      if (node.contains("endpoint")) endpoint = new Endpoint(node("endpoint").asInstanceOf[String])
-      if (endpoint == null && node.contains("port")) // bc
-        endpoint = new Endpoint(hostname, node("port").asInstanceOf[Number].intValue())
-
-      attributes = node("attributes").asInstanceOf[Map[String, String]]
-      state = node("state").asInstanceOf[String]
-    }
-
-    def toJson: JSONObject = {
-      val obj = new collection.mutable.LinkedHashMap[String, Any]()
-
-      obj("id") = id
-      obj("slaveId") = slaveId
-      obj("executorId") = executorId
-
-      obj("hostname") = hostname
-      if (endpoint != null) obj("endpoint") = "" + endpoint
-
-      obj("attributes") = new JSONObject(attributes.toMap)
-      obj("state") = state
-
-      new JSONObject(obj.toMap)
+    override def equals(obj: scala.Any): Boolean = {
+      if (!obj.isInstanceOf[Task]) return false
+      val other = obj.asInstanceOf[Task]
+      (id == other.id
+        && executorId == other.executorId
+        && slaveId == other.slaveId
+        && hostname == other.hostname
+        && endpoint == other.endpoint
+        && attributes == other.attributes)
     }
   }
 
@@ -635,27 +501,8 @@ object Broker {
     }
   }
 
-  class Metrics(_data: Map[String, Number] = Map(), _timestamp: Long = 0) {
-    private var data = _data
-    var timestamp: Long = _timestamp
-
+  case class Metrics(data: Map[String, Number] = Map(), timestamp: Long = 0) {
     def apply(metric: String) = data.get(metric)
-
-    def fromJson(node: Map[String, Object]): Unit = {
-      data = node.filter {
-        case ("timestamp", _) => false
-        case _ => true
-      }.mapValues(v => v.asInstanceOf[Number])
-      timestamp = node("timestamp").asInstanceOf[Number].longValue()
-    }
-
-    def toJson: JSONObject = {
-      val obj = new collection.mutable.LinkedHashMap[String, Any]() ++ data
-      obj("timestamp") = timestamp
-      new JSONObject(obj.toMap)
-    }
-
-    def getData = Map() ++ data
   }
 
   object State {
@@ -668,11 +515,5 @@ object Broker {
 
   type OtherAttributes = (String) => util.Collection[String]
 
-  def NoAttributes: OtherAttributes = _ => Collections.emptyList()
-
-  private def dateTimeFormat: SimpleDateFormat = {
-    val format: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-    format.setTimeZone(TimeZone.getTimeZone("UTC-0"))
-    format
-  }
+  def NoAttributes: OtherAttributes = _ => Seq()
 }

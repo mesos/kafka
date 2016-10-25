@@ -21,8 +21,8 @@ import java.io._
 import org.apache.log4j.{Level, Logger}
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import org.eclipse.jetty.servlet.{ServletHolder, ServletContextHandler}
-import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
+import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
+import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 import java.util
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
@@ -30,9 +30,8 @@ import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util._
 import org.eclipse.jetty.server.Request
 import ly.stealth.mesos.kafka.Broker.State
-import scala.util.{Try, Failure}
-import scala.util.parsing.json.JSONArray
-import scala.util.parsing.json.JSONObject
+import ly.stealth.mesos.kafka.json.JsonUtil
+import scala.util.Try
 
 object HttpServer {
   var jar: File = null
@@ -172,13 +171,10 @@ object HttpServer {
       try { ids = Expr.expandBrokers(cluster, expr) }
       catch { case e: IllegalArgumentException => response.sendError(400, "invalid broker-expr"); return }
 
-      val brokerNodes = new ListBuffer[JSONObject]()
-      for (id <- ids) {
-        val broker = cluster.getBroker(id)
-        if (broker != null) brokerNodes.add(cluster.getBroker(id).toJson())
-      }
+      val brokerNodes = ids.map(cluster.getBroker).filter(b => b != null)
+      val resp = BrokerStatusResponse(brokerNodes.toList)
 
-      response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
+      response.getWriter.println(JsonUtil.toJson(resp))
     }
 
     def handleAddUpdateBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -237,11 +233,15 @@ object HttpServer {
 
       val jvmOptions: String = request.getParameter("jvmOptions")
 
-      var constraints: util.Map[String, Constraint] = null
-      if (request.getParameter("constraints") != null)
-        try { constraints = Strings.parseMap(request.getParameter("constraints")).mapValues(new Constraint(_)).view.force }
-        catch { case e: IllegalArgumentException => errors.add("Invalid constraints: " + e.getMessage) }
-
+      val constraints: Map[String, Constraint] =
+        if (request.getParameter("constraints") != null)
+          try { Strings.parseMap(request.getParameter("constraints")).toMap.mapValues(new Constraint(_)) }
+          catch { case e: IllegalArgumentException =>
+            errors.add("Invalid constraints: " + e.getMessage)
+            Map()
+          }
+        else
+          Map()
 
       var failoverDelay: Period = null
       if (request.getParameter("failoverDelay") != null)
@@ -292,8 +292,8 @@ object HttpServer {
         if (stickinessPeriod != null) broker.stickiness.period = stickinessPeriod
 
         if (constraints != null) broker.constraints = constraints
-        if (options != null) broker.options = options
-        if (log4jOptions != null) broker.log4jOptions = log4jOptions
+        if (options != null) broker.options = options.toMap
+        if (log4jOptions != null) broker.log4jOptions = log4jOptions.toMap
         if (jvmOptions != null) broker.jvmOptions = if (jvmOptions != "") jvmOptions else null
 
         if (failoverDelay != null) broker.failover.delay = failoverDelay
@@ -305,10 +305,8 @@ object HttpServer {
       }
       cluster.save()
 
-      val brokerNodes = new ListBuffer[JSONObject]()
-      for (broker <- brokers) brokerNodes.add(broker.toJson())
-
-      response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
+      val resp = BrokerStatusResponse(brokers)
+      response.getWriter.println(JsonUtil.toJson(resp))
     }
 
     def handleRemoveBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -332,10 +330,8 @@ object HttpServer {
       brokers.foreach(cluster.removeBroker)
       cluster.save()
 
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("ids") = ids.mkString(",")
-
-      response.getWriter.println(JSONObject(result.toMap))
+      val result = BrokerRemoveResponse(ids.toList)
+      response.getWriter.println(JsonUtil.toJson(result))
     }
 
     def handleStartStopBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -387,10 +383,8 @@ object HttpServer {
       }
 
       val status = waitForBrokers()
-      val brokerNodes = new ListBuffer[JSONObject]()
-
-      for (broker <- brokers) brokerNodes.add(broker.toJson())
-      response.getWriter.println(JSONObject(Map("status" -> status, "brokers" -> new JSONArray(brokerNodes.toList))))
+      val resp = BrokerStartResponse(brokers, status)
+      response.getWriter.println(JsonUtil.toJson(resp))
     }
 
     def handleRestartBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -417,8 +411,8 @@ object HttpServer {
         brokers.add(broker)
       }
 
-      def timeoutJson(broker: Broker, stage: String): JSONObject =
-        JSONObject(Map("status" -> "timeout", "message" -> s"broker ${broker.id} timeout on $stage"))
+      def timeoutJson(broker: Broker, stage: String) =
+        JsonUtil.toJson(BrokerStartResponse(Seq(), "timeout", Some(s"broker ${broker.id} timeout on $stage")))
 
       for (broker <- brokers) {
         if (!broker.active || broker.task == null || !broker.task.running) { response.sendError(400, s"broker ${broker.id} is not running"); return }
@@ -456,9 +450,8 @@ object HttpServer {
         }
       }
 
-      response.getWriter.println(JSONObject(
-        Map("status" -> "restarted", "brokers" -> JSONArray(brokers.map(_.toJson()).toList)))
-      )
+      val resp = BrokerStartResponse(brokers, "restarted")
+      response.getWriter.println(JsonUtil.toJson(resp))
     }
 
     private def waitForReplication(timeout: Period): Boolean = {
@@ -535,7 +528,7 @@ object HttpServer {
 
       Scheduler.removeLog(requestId)
 
-      response.getWriter.println(JSONObject(Map("status" -> status, "content" -> content)))
+      response.getWriter.println(JsonUtil.toJson(HttpLogResponse(status, content)))
     }
 
     def handleCloneBroker(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -554,16 +547,17 @@ object HttpServer {
       val sourceBroker = cluster.getBroker(sourceBrokerId)
       if (sourceBroker == null) { response.sendError(400, s"broker $sourceBrokerId not found"); return }
 
-      val brokerNodes = new ListBuffer[JSONObject]()
+      val newBrokers = new ListBuffer[Broker]()
       for (id <- ids) {
         val newBroker = sourceBroker.clone(id)
         cluster.addBroker(newBroker)
 
-        brokerNodes.add(newBroker.toJson())
+        newBrokers.add(newBroker)
       }
       cluster.save()
 
-      response.getWriter.println("" + new JSONObject(Map("brokers" -> new JSONArray(brokerNodes.toList))))
+      val resp = BrokerStatusResponse(newBrokers)
+      response.getWriter.println(JsonUtil.toJson(resp))
     }
 
     def handleTopicApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -585,12 +579,9 @@ object HttpServer {
       if (expr == null) expr = "*"
       val names: util.List[String] = Expr.expandTopics(expr)
 
-      val topicNodes = new ListBuffer[JSONObject]()
-      for (topic <- topics.getTopics)
-        if (names.contains(topic.name))
-          topicNodes.add(topic.toJson)
-
-      response.getWriter.println("" + new JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
+      val ret = ListTopicsResponse(
+        topics.getTopics.filter(t => names.contains(t.name)))
+      response.getWriter.println(JsonUtil.toJson(ret))
     }
 
     def handleAddUpdateTopic(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -646,7 +637,6 @@ object HttpServer {
 
       if (!errors.isEmpty) { response.sendError(400, errors.mkString("; ")); return }
 
-      val topicNodes= new ListBuffer[JSONObject]
       for (name <- topicNames) {
         if (add)
           topics.addTopic(
@@ -655,11 +645,10 @@ object HttpServer {
             options
           )
         else topics.updateTopic(topics.getTopic(name), options)
-
-        topicNodes.add(topics.getTopic(name).toJson)
       }
 
-      response.getWriter.println(JSONObject(Map("topics" -> new JSONArray(topicNodes.toList))))
+      val retTopics = topicNames.map(topics.getTopic)
+      response.getWriter.println(JsonUtil.toJson(ListTopicsResponse(retTopics)))
     }
 
     def handleTopicRebalance(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -710,35 +699,26 @@ object HttpServer {
         }
       }
 
-      def startRebalance: (String, String) = {
+      def startRebalance: (String, Option[String]) = {
         try { rebalancer.start(topics, brokers, replicas, fixedStartIndex, startPartitionId, realign) }
-        catch { case e: Rebalancer.Exception => return ("failed", e.getMessage) }
+        catch { case e: Rebalancer.Exception => return ("failed", Some(e.getMessage)) }
 
         if (timeout.ms > 0)
-          if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", null)
-          else return ("completed", null)
+          if (!rebalancer.waitFor(running = false, timeout)) return ("timeout", None)
+          else return ("completed", None)
 
         if (realign && !rebalancer.running)
-          return ("idle (no-op)", null)
-        ("started", null)
+          return ("idle (no-op)", None)
+        ("started", None)
       }
 
-      var status: String = null
-      var error: String = null
+      val (status, error) =
+        if (topics != null)
+          startRebalance
+        else
+          (if (rebalancer.running) "running" else "idle") -> None
 
-      if (topics != null) {
-        val result: (String, String) = startRebalance
-        status = result._1
-        error = result._2
-      } else
-        status = if (rebalancer.running) "running" else "idle"
-
-      val result = new collection.mutable.LinkedHashMap[String, Any]()
-      result("status") = status
-      if (error != null) result("error") = error
-      result("state") = rebalancer.state
-
-      response.getWriter.println(JSONObject(result.toMap))
+      response.getWriter.println(JsonUtil.toJson(RebalanceStartResponse(status, rebalancer.state, error)))
     }
 
     def handlePartitionApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -759,13 +739,7 @@ object HttpServer {
         catch { case e: IllegalArgumentException => response.sendError(400, "invalid topics"); return }
 
       val topicsAndPartitions = Scheduler.cluster.topics.getPartitions(topics)
-      response.getWriter.println(
-        JSONObject(
-          topicsAndPartitions.mapValues(
-            v => JSONArray(v.map(_.toJson).toList)
-          ).toMap
-        )
-      )
+      response.getWriter.println(JsonUtil.toJson(topicsAndPartitions))
     }
 
     def handleQuotaApi(request: HttpServletRequest, response: HttpServletResponse): Unit = {
@@ -782,15 +756,15 @@ object HttpServer {
     def handleListQuotas(request: HttpServletRequest, response: HttpServletResponse): Unit = {
       val quotas = Scheduler.cluster.quotas.getClientQuotas()
       response.getWriter.println(
-        JSONObject(
+        JsonUtil.toJson(
           quotas.mapValues(
-            v => JSONObject(Map(
+            v => Map(
               "producer_byte_rate" -> v.producerByteRate,
               "consumer_byte_rate" -> v.consumerByteRate
             ).filter({
               case (_, Some(_)) => true
               case _ => false
-            }).mapValues(v => v.get))
+            }).mapValues(v => v.get)
           )
         )
       )
@@ -852,7 +826,7 @@ object HttpServer {
 
       if (request.getAttribute("jsonResponse") != null) {
         response.setContentType("application/json; charset=utf-8")
-        writer.println("" + new JSONObject(Map("code" -> code, "error" -> error)))
+        writer.println(JsonUtil.toJson(HttpErrorResponse(code, error)))
       } else {
         response.setContentType("text/plain; charset=utf-8")
         writer.println(code + " - " + error)

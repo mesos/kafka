@@ -105,7 +105,7 @@ class CliTest extends KafkaMesosTestCase {
 
     assertEquals(new Period("10s"), broker.failover.delay)
     assertEquals(new Period("20s"), broker.failover.maxDelay)
-    assertEquals(Strings.parseMap("log.dirs=/tmp/kafka-logs"), broker.options)
+    assertEquals(Strings.parseMap("log.dirs=/tmp/kafka-logs").toMap, broker.options)
   }
 
   @Test
@@ -318,6 +318,17 @@ class CliTest extends KafkaMesosTestCase {
     assertOutContains("topic:")
     assertOutContains("name: t1")
     assertOutContains("partitions: 0:[0], 1:[0]")
+  }
+
+  @Test
+  def topic_partitions {
+    exec("topic partitions t0")
+    assertOutContains("topic not found")
+
+    Scheduler.cluster.topics.addTopic("t0")
+    exec("topic partitions t0")
+    assertOutContains("t0:")
+    assertOutContains("[*0]")
   }
 
   @Test

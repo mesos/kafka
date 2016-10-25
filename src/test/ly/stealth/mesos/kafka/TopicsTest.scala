@@ -1,10 +1,13 @@
 package ly.stealth.mesos.kafka
 
+import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
-import net.elodina.mesos.util.Strings.{parseMap, formatMap}
+import ly.stealth.mesos.kafka.json.JsonUtil
+import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 
 class TopicsTest extends KafkaMesosTestCase {
   var topics: Topics = null
@@ -60,9 +63,9 @@ class TopicsTest extends KafkaMesosTestCase {
     assertEquals("t0", t0.name)
     assertEquals("flush.ms=1000", formatMap(t0.options))
 
-    assertEquals(2, t0.partitions.size())
-    assertEquals(util.Arrays.asList(0), t0.partitions.get(0))
-    assertEquals(util.Arrays.asList(0), t0.partitions.get(1))
+    assertEquals(2, t0.partitions.size)
+    assertEquals(Seq(0), t0.partitions(0))
+    assertEquals(Seq(0), t0.partitions(1))
   }
 
   @Test
@@ -83,17 +86,19 @@ class TopicsTest extends KafkaMesosTestCase {
   // Topic
   @Test
   def Topic_toJson_fromJson() {
-    val topic: Topic = new Topics.Topic("name")
-    topic.partitions.put(0, util.Arrays.asList(0, 1))
-    topic.partitions.put(1, util.Arrays.asList(1, 2))
-    topic.partitions.put(2, util.Arrays.asList(0, 2))
-    topic.options = parseMap("a=1,b=2")
+    val topic = Topics.Topic(
+      "name",
+      Map(
+        0 -> Seq(0, 1),
+        1 -> Seq(1, 2),
+        2 -> Seq(0, 2)
+      ),
+      parseMap("a=1,b=2")
+    )
 
-    val read: Topic = new Topic()
-    read.fromJson(Util.parseJson("" + topic.toJson))
-
+    val read = JsonUtil.fromJson[Topic](JsonUtil.toJson(topic))
     assertEquals(topic.name, read.name)
-    assertEquals(topic.partitions, read.partitions)
+    assertEquals(topic.partitions(0), read.partitions(0))
     assertEquals(topic.options, read.options)
   }
 }

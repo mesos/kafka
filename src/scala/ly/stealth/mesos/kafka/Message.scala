@@ -18,8 +18,6 @@
 
 package ly.stealth.mesos.kafka
 
-import scala.util.parsing.json.JSONObject
-
 class Message {  }
 
 case class LogRequest(requestId: Long, lines: Int, name: String) {
@@ -36,16 +34,4 @@ object LogRequest {
   }
 }
 
-case class LogResponse(requestId: Long, content: String) {
-  def toJson: JSONObject =
-    scala.util.parsing.json.JSONObject(Map("log" -> JSONObject(Map("content" -> content, "requestId" -> requestId))))
-}
-
-object LogResponse {
-  def fromJson(node: Map[String, Object]): LogResponse = {
-    val logNode = node("log").asInstanceOf[Map[String, Any]]
-    val requestId = logNode("requestId").asInstanceOf[Long]
-    val content = logNode("content").asInstanceOf[String]
-    LogResponse(requestId, content)
-  }
-}
+case class LogResponse(requestId: Long, content: String)

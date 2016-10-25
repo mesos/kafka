@@ -42,7 +42,6 @@ object Migration {
 
       for (brokerJson <- brokersJson) {
         if (!brokerJson.contains("syslog")) brokerJson("syslog") = Boolean.box(x = false)
-        if (!brokerJson.contains("stickiness")) brokerJson("stickiness") = new Broker.Stickiness().toJson.obj
       }
 
       json("brokers") = brokersJson.map(_.toMap)

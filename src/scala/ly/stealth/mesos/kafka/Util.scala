@@ -19,34 +19,17 @@ package ly.stealth.mesos.kafka
 
 import java.util
 import scala.collection.JavaConversions._
-import scala.util.parsing.json.JSON
 import java.io.{File, IOException}
 import java.net.{Inet4Address, InetAddress, NetworkInterface}
 
 object Util {
-  Class.forName(kafka.utils.Json.getClass.getName) // init class
-  private def parseNumber(s: String): Number =
-    if (s.contains(".")) {
-      s.toDouble
-    } else {
-      try { java.lang.Integer.parseInt(s) }
-      catch { case e: java.lang.NumberFormatException => s.toLong }
-    }
-
-  JSON.globalNumberParser = parseNumber
-  JSON.perThreadNumberParser = parseNumber
-  private val jsonLock = new Object
-
-  def parseJson(json: String): Map[String, Object] = {
-    jsonLock synchronized {
-      val node: Map[String, Object] = JSON.parseFull(json).getOrElse(null).asInstanceOf[Map[String, Object]]
-      if (node == null) throw new IllegalArgumentException("Failed to parse json: " + json)
-      node
-    }
-  }
-
   var terminalWidth: Int = getTerminalWidth
   private def getTerminalWidth: Int = {
+    // No tty, don't bother trying to find the terminal width
+    if (System.console() == null) {
+      return 80
+    }
+
     val file: File = File.createTempFile("getTerminalWidth", null)
     file.delete()
 

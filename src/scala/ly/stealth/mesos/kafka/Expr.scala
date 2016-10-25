@@ -61,7 +61,7 @@ object Expr {
       if (broker == null || broker.task == null) return null
 
       val task: Task = broker.task
-      if (name != "hostname") task.attributes.get(name) else task.hostname
+      if (name != "hostname") task.attributes.get(name).orNull else task.hostname
     }
 
     def brokerMatches(broker: Broker): Boolean = {

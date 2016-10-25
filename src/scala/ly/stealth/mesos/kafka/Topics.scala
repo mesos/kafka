@@ -24,8 +24,6 @@ import kafka.common.TopicAndPartition
 import kafka.controller.LeaderIsrAndControllerEpoch
 import scala.collection.JavaConversions._
 import scala.collection.{Map, Seq, mutable}
-import kafka.admin._
-import scala.util.parsing.json.{JSONArray, JSONObject}
 import ly.stealth.mesos.kafka.Topics.Topic
 import kafka.log.LogConfig
 import org.apache.kafka.common.KafkaException
@@ -45,10 +43,10 @@ class Topics {
 
     val topics = new util.ArrayList[Topics.Topic]
     for (name <- names.sorted)
-      topics.add(new Topics.Topic(
+      topics.add(Topics.Topic(
         name,
-        assignments.getOrElse(name, null).mapValues(brokers => new util.ArrayList[Int](brokers)),
-        new util.TreeMap[String, String](propertiesAsScalaMap(configs.getOrElse(name, null)))
+        assignments.getOrElse(name, null),
+        propertiesAsScalaMap(configs.getOrElse(name, null))
       ))
 
     topics
@@ -124,80 +122,25 @@ class Topics {
 object Topics {
   class Exception(message: String) extends java.lang.Exception(message)
 
-  class Partition(
-      _id: Int = 0,
-      _replicas: util.List[Int] = null,
-      _isr: util.List[Int] = null,
-      _leader: Int = 0,
-      _expectedLeader: Int = 0) {
-    var id = _id
-    var replicas = _replicas
-    var isr = _isr
-    var leader = _leader
-    var expectedLeader = _expectedLeader
+  case class Partition(
+      id: Int = 0,
+      replicas: Seq[Int] = null,
+      isr: Seq[Int] = null,
+      leader: Int = 0,
+      expectedLeader: Int = 0)
 
-    def fromJson(node: Map[String, Object]): Topics.Partition = {
-      id = node("id").asInstanceOf[Int]
-      replicas = node("replicas").asInstanceOf[List[Int]]
-      isr = node("isr").asInstanceOf[List[Int]]
-      leader = node("leader").asInstanceOf[Int]
-      expectedLeader = node("expectedLeader").asInstanceOf[Int]
-
-      this
-    }
-
-    def toJson: JSONObject = {
-      val obj = new mutable.LinkedHashMap[String, Any]()
-      obj("id") = id
-      obj("replicas") = replicas
-      obj("isr") = isr
-      obj("leader") = leader
-      obj("expectedLeader") = expectedLeader
-
-      new JSONObject(obj.toMap)
-    }
-  }
-
-  class Topic(
-    _name: String = null,
-    _partitions: util.Map[Int, util.List[Int]] = new util.HashMap[Int, util.List[Int]](),
-    _options: util.Map[String, String] = new util.HashMap[String, String]()
+  case class Topic(
+    name: String = null,
+    partitions: Map[Int, Seq[Int]] = Map(),
+    options: Map[String, String] = Map()
   ) {
-    var name: String = _name
-    var partitions: util.Map[Int, util.List[Int]] = _partitions
-    var options: util.Map[String, String] = _options
-
     def partitionsState: String = {
       var s: String = ""
-      for ((partition, brokers) <- partitions) {
+      for ((partition, brokers) <- partitions.toSeq.sortBy(_._1)) {
         if (!s.isEmpty) s += ", "
         s += partition + ":[" + brokers.mkString(",") + "]"
       }
       s
-    }
-
-    def fromJson(node: Map[String, Object]): Unit = {
-      name = node("name").asInstanceOf[String]
-
-      val partitionsObj: Map[String, List[Int]] = node("partitions").asInstanceOf[Map[String, List[Int]]]
-      for ((k, v) <- partitionsObj)
-        partitions.put(Integer.parseInt(k), v.toList)
-
-      options = node("options").asInstanceOf[Map[String, String]]
-    }
-
-    def toJson: JSONObject = {
-      JSONObject(
-        Map(
-          "name" -> name,
-          "partitions" -> JSONObject(
-            partitions.map({
-              case (id, brokers) => id.toString -> JSONArray(brokers.toList)
-            }).toMap
-          ),
-          "options" -> JSONObject(options.toMap)
-        ).toMap
-      )
     }
   }
 }

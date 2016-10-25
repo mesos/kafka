@@ -18,17 +18,17 @@
 package ly.stealth.mesos.kafka
 
 import java.util
-import scala.util.parsing.json.{JSONArray, JSONObject}
+
 import scala.collection.JavaConversions._
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import java.util.Collections
-import java.io.{FileWriter, File}
+import java.io.{File, FileWriter}
+
+import ly.stealth.mesos.kafka.json.JsonUtil
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
-import net.elodina.mesos.util.Version
 
 class Cluster {
+  val version: String = Scheduler.version.toString
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
   private[kafka] var rebalancer: Rebalancer = new Rebalancer()
   private[kafka] var topics: Topics = new Topics()
@@ -51,40 +51,12 @@ class Cluster {
   def removeBroker(broker: Broker): Unit = brokers.remove(broker)
 
   def clear(): Unit = brokers.clear()
-  def load() = Cluster.storage.load(this)
   def save() = Cluster.storage.save(this)
-
-  def fromJson(root: Map[String, Object]): Unit = {
-    if (root.contains("brokers")) {
-      for (brokerNode <- root("brokers").asInstanceOf[List[Map[String, Object]]]) {
-        val broker: Broker = new Broker()
-        broker.fromJson(brokerNode)
-        brokers.add(broker)
-      }
-    }
-
-    if (root.contains("frameworkId"))
-      frameworkId = root("frameworkId").asInstanceOf[String]
-  }
-
-  def toJson: JSONObject = {
-    val obj = new mutable.LinkedHashMap[String, Object]()
-    obj("version") = "" + Scheduler.version
-
-    if (!brokers.isEmpty) {
-      val brokerNodes = new ListBuffer[JSONObject]()
-      for (broker <- brokers)
-        brokerNodes.add(broker.toJson(false))
-      obj("brokers") = new JSONArray(brokerNodes.toList)
-    }
-
-    if (frameworkId != null) obj("frameworkId") = frameworkId
-    new JSONObject(obj.toMap)
-  }
 }
 
 object Cluster {
   var storage: Storage = newStorage(Config.storage)
+  def load() = storage.load()
 
   def newStorage(s: String): Storage = {
     if (s.startsWith("file:")) return new FsStorage(new File(s.substring("file:".length)))
@@ -93,22 +65,18 @@ object Cluster {
   }
 
   abstract class Storage {
-    def load(cluster: Cluster): Unit = {
+    def load(): Cluster = {
       val json: String = loadJson
-      if (json == null) return
+      if (json == null) return new Cluster()
       
-      var node: Map[String, Object] = Util.parseJson(json)
-      val fromVersion: Version = new Version(if (node.contains("version")) node("version").asInstanceOf[String] else "0.9.5.0")
-      node = Migration.apply(fromVersion, Scheduler.version, node)
-
-      cluster.brokers.clear()
-      cluster.fromJson(node)
-
+      val cluster = JsonUtil.fromJson[Cluster](json)
       save(cluster)
+
+      cluster
     }
     
     def save(cluster: Cluster): Unit = {
-      saveJson("" + cluster.toJson)
+      saveJson(JsonUtil.toJson(cluster))
     }
     
     protected def loadJson: String

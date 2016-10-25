@@ -18,19 +18,45 @@
 package ly.stealth.mesos.kafka
 
 import java.util.concurrent.TimeUnit
-
 import org.apache.log4j.Logger
-import java.io.{FileInputStream, File}
+import java.io.{File, FileInputStream}
 import java.net.{URL, URLClassLoader}
 import java.util.Properties
 import java.util
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.BrokerServer.Distro
+import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{IO, Version}
+
+case class LaunchConfig(
+  id: String,
+  options: Map[String, String] = Map(),
+  syslog: Boolean = false,
+  log4jOptions: Map[String, String] = Map(),
+  bindAddress: BindAddress = null,
+  defaults: Map[String, String] = Map()) {
+
+  def interpolatedOptions: Map[String, String] = {
+    var result = Map[String, String]()
+    if (defaults != null)
+      result ++= defaults
+
+    result ++= options
+
+    if (bindAddress != null)
+      result += ("host.name" -> bindAddress.resolve())
+
+    result.mapValues(v => v.replace("$id", id))
+  }
+
+  def interpolatedLog4jOptions: Map[String, String] = {
+    log4jOptions.mapValues(v => v.replace("$id", id))
+  }
+}
+
 
 abstract class BrokerServer {
   def isStarted: Boolean
-  def start(broker: Broker, send: Broker.Metrics => Unit, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint
+  def start(launchInfo: LaunchConfig, send: Broker.Metrics => Unit): Broker.Endpoint
   def stop(): Unit
   def waitFor(): Unit
   def getClassLoader: ClassLoader
@@ -43,20 +69,20 @@ class KafkaServer extends BrokerServer {
 
   def isStarted: Boolean = server != null
 
-  def start(broker: Broker, send: Broker.Metrics => Unit, defaults: util.Map[String, String] = new util.HashMap()): Broker.Endpoint = {
+  def start(config: LaunchConfig, send: Broker.Metrics => Unit): Broker.Endpoint = {
     if (isStarted) throw new IllegalStateException("started")
 
-    BrokerServer.Distro.configureLog4j(broker)
-    val options = broker.options(defaults)
-    BrokerServer.Distro.startReporters(options)
+    BrokerServer.distro.configureLog4j(config)
+    val options = config.interpolatedOptions
+    BrokerServer.distro.startReporters(options)
 
     logger.info("Starting KafkaServer")
-    server = BrokerServer.Distro.newServer(options)
+    server = BrokerServer.distro.newServer(options)
     server.getClass.getMethod("startup").invoke(server)
 
-    collector = BrokerServer.Distro.startCollector(send)
+    collector = BrokerServer.distro.startCollector(send)
 
-    new Broker.Endpoint(options.get("host.name"), Integer.parseInt(options.get("port")))
+    new Broker.Endpoint(options("host.name"), Integer.parseInt(options("port")))
   }
 
   def stop(): Unit = {
@@ -76,16 +102,71 @@ class KafkaServer extends BrokerServer {
       server.getClass.getMethod("awaitShutdown").invoke(server)
   }
 
-  def getClassLoader: ClassLoader = Distro.loader
+  def getClassLoader: ClassLoader = KafkaServer.Distro.loader
 }
 
-object BrokerServer {
-  object Distro {
-    var dir: File = null
-    var loader: URLClassLoader = null
-    init()
+trait BaseDistro {
+  def newServer(options: Map[String, String]): Object
+  def startReporters(options: Map[String, String]): Object
+  def startCollector(send: Broker.Metrics => Unit): MetricsCollector
+  def configureLog4j(config: LaunchConfig): Unit
+  val dir: File
+}
 
-    def newServer(options: util.Map[String, String]): Object = {
+object KafkaServer {
+  object Distro extends BaseDistro {
+    val (dir, loader) = init()
+
+    // Loader that loads classes in reverse order: 1. from self, 2. from parent.
+    // This is required, because current jar have classes incompatible with classes from kafka distro.
+    class Loader(urls: Array[URL]) extends URLClassLoader(urls) {
+      private[this] val snappyHackedClasses = Array[String]("org.xerial.snappy.SnappyNativeAPI", "org.xerial.snappy.SnappyNative", "org.xerial.snappy.SnappyErrorCode")
+      private[this] val snappyHackEnabled = checkSnappyVersion
+
+      private def checkSnappyVersion: Boolean = {
+        urls
+          .map(u => new File(u.getFile).getName)
+          .find(_.matches("snappy.*jar"))
+          .exists(j => {
+          val hIdx = j.lastIndexOf("-")
+          val extIdx = j.lastIndexOf(".jar")
+          if (hIdx == -1 || extIdx == -1) return false
+
+          val version = new Version(j.substring(hIdx + 1, extIdx))
+          version.compareTo(new Version(1,1,0)) <= 0
+        })
+      }
+
+      override protected def loadClass(name: String, resolve: Boolean): Class[_] = {
+        getClassLoadingLock(name) synchronized {
+          // Handle Snappy class loading hack:
+          // Snappy injects 3 classes and native lib to root ClassLoader
+          // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
+          if (snappyHackEnabled && snappyHackedClasses.contains(name))
+            return super.loadClass(name, true)
+          // Always load com.yammer.metrics from the root ClassLoader.
+          // This ensures that both our MetricsCollector and Kafka see the same
+          // MetricsRegistry.
+          if (name.startsWith("com.yammer.metrics"))
+            return super.loadClass(name, true)
+
+          // Check class is loaded
+          var c: Class[_] = findLoadedClass(name)
+
+          // Load from self
+          try { if (c == null) c = findClass(name) }
+          catch { case e: ClassNotFoundException => }
+
+          // Load from parent
+          if (c == null) c = super.loadClass(name, true)
+
+          if (resolve) resolveClass(c)
+          c
+        }
+      }
+    }
+
+    def newServer(options: Map[String, String]): Object = {
       val serverClass = loader.loadClass("kafka.server.KafkaServerStartable")
       val configClass = loader.loadClass("kafka.server.KafkaConfig")
 
@@ -95,7 +176,7 @@ object BrokerServer {
       server
     }
 
-    def startReporters(options: util.Map[String, String]): Object = {
+    def startReporters(options: Map[String, String]): Object = {
       val metricsReporter = loader.loadClass("kafka.metrics.KafkaMetricsReporter$").getField("MODULE$").get(null)
       val metricsReporterClass = metricsReporter.getClass
 
@@ -134,26 +215,26 @@ object BrokerServer {
       config
     }
 
-    def configureLog4j(broker: Broker): Unit = {
-      if (broker.syslog) {
+    def configureLog4j(config: LaunchConfig): Unit = {
+      if (config.syslog) {
         val pattern = System.getenv("MESOS_SYSLOG_TAG") + ": [%t] %-5p %c %x - %m%n"
 
-        IO.replaceInFile(new File(Distro.dir + "/config/log4j.properties"), Map[String, String](
+        IO.replaceInFile(new File(dir + "/config/log4j.properties"), Map[String, String](
           "log4j.rootLogger=INFO, stdout" ->
-          s"""
-            |log4j.rootLogger=INFO, stdout, syslog
-            |
+            s"""
+               |log4j.rootLogger=INFO, stdout, syslog
+               |
             |log4j.appender.syslog=org.apache.log4j.net.SyslogAppender
-            |log4j.appender.syslog.syslogHost=localhost
-            |log4j.appender.syslog.header=true
-            |log4j.appender.syslog.layout=org.apache.log4j.PatternLayout
-            |log4j.appender.syslog.layout.conversionPattern=$pattern
+               |log4j.appender.syslog.syslogHost=localhost
+               |log4j.appender.syslog.header=true
+               |log4j.appender.syslog.layout=org.apache.log4j.PatternLayout
+               |log4j.appender.syslog.layout.conversionPattern=$pattern
           """.stripMargin
         ))
       }
 
-      System.setProperty("kafka.logs.dir", "" + new File(Distro.dir, "log"))
-      val props: Properties = this.props(broker.interpolatedLog4jOptions(), "log4j.properties")
+      System.setProperty("kafka.logs.dir", "" + new File(dir, "log"))
+      val props: Properties = this.props(config.interpolatedLog4jOptions, "log4j.properties")
 
       val configurator: Class[_] = loader.loadClass("org.apache.log4j.PropertyConfigurator")
       configurator.getMethod("configure", classOf[Properties]).invoke(null, props)
@@ -173,8 +254,9 @@ object BrokerServer {
       p
     }
 
-    private def init(): Unit = {
+    private def init(): (File, Loader) = {
       // find kafka dir
+      var dir: File = null
       for (file <- new File(".").listFiles())
         if (file.isDirectory && file.getName.startsWith("kafka"))
           dir = file
@@ -186,59 +268,11 @@ object BrokerServer {
       for (file <- new File(dir, "libs").listFiles())
         classpath.add(new URL("" + file.toURI))
 
-      loader = new Loader(classpath.toArray(Array()))
+      dir -> new Loader(classpath.toArray(Array()))
     }
   }
+}
 
-  // Loader that loads classes in reverse order: 1. from self, 2. from parent.
-  // This is required, because current jar have classes incompatible with classes from kafka distro.
-  class Loader(urls: Array[URL]) extends URLClassLoader(urls) {
-    val snappyHackedClasses = Array[String]("org.xerial.snappy.SnappyNativeAPI", "org.xerial.snappy.SnappyNative", "org.xerial.snappy.SnappyErrorCode")
-    var snappyHackEnabled = false
-    checkSnappyVersion
-
-    def checkSnappyVersion {
-      var jarName: String = null
-      for (url <- urls) {
-        val fileName = new File(url.getFile).getName
-        if (fileName.matches("snappy.*jar")) jarName = fileName
-      }
-
-      if (jarName == null) return
-      val hIdx = jarName.lastIndexOf("-")
-      val extIdx = jarName.lastIndexOf(".jar")
-      if (hIdx == -1 || extIdx == -1) return
-
-      val version = new Version(jarName.substring(hIdx + 1, extIdx))
-      snappyHackEnabled = version.compareTo(new Version(1,1,0)) <= 0
-    }
-
-    override protected def loadClass(name: String, resolve: Boolean): Class[_] = {
-      getClassLoadingLock(name) synchronized {
-        // Handle Snappy class loading hack:
-        // Snappy injects 3 classes and native lib to root ClassLoader
-        // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
-        if (snappyHackEnabled && snappyHackedClasses.contains(name))
-          return super.loadClass(name, true)
-        // Always load com.yammer.metrics from the root ClassLoader.
-        // This ensures that both our MetricsCollector and Kafka see the same
-        // MetricsRegistry.
-        if (name.startsWith("com.yammer.metrics"))
-          return super.loadClass(name, true)
-
-        // Check class is loaded
-        var c: Class[_] = findLoadedClass(name)
-
-        // Load from self
-        try { if (c == null) c = findClass(name) }
-        catch { case e: ClassNotFoundException => }
-
-        // Load from parent
-        if (c == null) c = super.loadClass(name, true)
-
-        if (resolve) resolveClass(c)
-        c
-      }
-    }
-  }
+object BrokerServer {
+  var distro: BaseDistro = KafkaServer.Distro
 }

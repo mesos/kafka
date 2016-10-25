@@ -4,6 +4,8 @@ import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import java.util
 import net.elodina.mesos.util.Strings.parseMap
+import scala.collection.JavaConversions._
+
 
 class ExprTest extends KafkaMesosTestCase {
   @Before
@@ -56,9 +58,9 @@ class ExprTest extends KafkaMesosTestCase {
     val b2 = cluster.addBroker(new Broker("2"))
     cluster.addBroker(new Broker("3"))
 
-    b0.task = new Broker.Task(_hostname = "master", _attributes = parseMap("a=1"))
-    b1.task = new Broker.Task(_hostname = "slave0", _attributes = parseMap("a=2,b=2"))
-    b2.task = new Broker.Task(_hostname = "slave1", _attributes = parseMap("b=2"))
+    b0.task = new Broker.Task(hostname = "master", attributes = parseMap("a=1").toMap)
+    b1.task = new Broker.Task(hostname = "slave0", attributes = parseMap("a=2,b=2").toMap)
+    b2.task = new Broker.Task(hostname = "slave1", attributes = parseMap("b=2").toMap)
 
     // exact match
     assertEquals(util.Arrays.asList("0", "1", "2", "3"), Expr.expandBrokers(cluster, "*"))
@@ -88,12 +90,12 @@ class ExprTest extends KafkaMesosTestCase {
     val b4 = cluster.addBroker(new Broker("4"))
     val b5 = cluster.addBroker(new Broker("5"))
 
-    b0.task = new Broker.Task(_attributes = parseMap("r=2,a=1"))
-    b1.task = new Broker.Task(_attributes = parseMap("r=0,a=1"))
-    b2.task = new Broker.Task(_attributes = parseMap("r=1,a=1"))
-    b3.task = new Broker.Task(_attributes = parseMap("r=1,a=2"))
-    b4.task = new Broker.Task(_attributes = parseMap("r=0,a=2"))
-    b5.task = new Broker.Task(_attributes = parseMap("r=0,a=2"))
+    b0.task = new Broker.Task(attributes = parseMap("r=2,a=1").toMap)
+    b1.task = new Broker.Task(attributes = parseMap("r=0,a=1").toMap)
+    b2.task = new Broker.Task(attributes = parseMap("r=1,a=1").toMap)
+    b3.task = new Broker.Task(attributes = parseMap("r=1,a=2").toMap)
+    b4.task = new Broker.Task(attributes = parseMap("r=0,a=2").toMap)
+    b5.task = new Broker.Task(attributes = parseMap("r=0,a=2").toMap)
 
     assertEquals(util.Arrays.asList("0", "1", "2", "3", "4", "5"), Expr.expandBrokers(cluster, "*", sortByAttrs = true))
     assertEquals(util.Arrays.asList("1", "2", "0", "4", "3", "5"), Expr.expandBrokers(cluster, "*[r]", sortByAttrs = true))

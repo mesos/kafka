@@ -42,7 +42,7 @@ class MetricsCollector(send: Broker.Metrics => Unit)
   installCollectors()
 
   private val logger = Logger.getLogger(classOf[MetricsCollector])
-  private val scopeLevelMetrics = Set("BrokerTopicMetrics", "RequestMetrics", "Log", "Partition")
+  private val scopeLevelMetricExcludes = Set("FetcherLagMetrics", "FetcherStats")
 
   private def buildName(name: MetricName, prefix: String = ""): String = {
     if (name.hasScope) {
@@ -54,7 +54,7 @@ class MetricsCollector(send: Broker.Metrics => Unit)
   }
 
   private def addMetric(name: MetricName, value: Number, metrics: mutable.Map[String, Number], prefix: String = ""): Unit = {
-    if (name.hasScope && !scopeLevelMetrics.contains(name.getType)) {
+    if (name.hasScope && scopeLevelMetricExcludes.contains(name.getType)) {
       return
     }
     val displayName = buildName(name, prefix)
@@ -117,7 +117,7 @@ class MetricsCollector(send: Broker.Metrics => Unit)
           case NonFatal(e) => logger.error("Error processing metrics:", e)
         }
       }
-      send(new Broker.Metrics(metrics ++ collectJvmMetrics, System.currentTimeMillis()))
+      send(Broker.Metrics((metrics ++ collectJvmMetrics).toMap, System.currentTimeMillis()))
     }
     catch {
       case NonFatal(e) => logger.error("Error collecting metrics", e)

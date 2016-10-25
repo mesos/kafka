@@ -22,14 +22,13 @@ import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import java.io.{File, FileOutputStream, IOException}
 import java.net.{HttpURLConnection, URL}
-
 import net.elodina.mesos.util.{IO, Period}
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
-import Cli.sendRequest
+import Cli.{sendRequest, sendRequestObj}
 import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import java.util.Properties
-
+import ly.stealth.mesos.kafka.json.JsonUtil
 import scala.collection.JavaConversions._
 
 class HttpServerTest extends KafkaMesosTestCase {
@@ -51,12 +50,8 @@ class HttpServerTest extends KafkaMesosTestCase {
   
   @Test
   def broker_add {
-    val json = sendRequest("/broker/add", parseMap("broker=0,cpus=0.1,mem=128"))
-    val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
-
-    assertEquals(1, brokerNodes.size)
-    val responseBroker = new Broker()
-    responseBroker.fromJson(brokerNodes(0))
+    val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add", parseMap("broker=0,cpus=0.1,mem=128"))
+    assertEquals(1, brokers.brokers.size)
 
     assertEquals(1, Scheduler.cluster.getBrokers.size())
     val broker = Scheduler.cluster.getBrokers.get(0)
@@ -64,27 +59,23 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertEquals(0.1, broker.cpus, 0.001)
     assertEquals(128, broker.mem)
 
-    BrokerTest.assertBrokerEquals(broker, responseBroker)
+    BrokerTest.assertBrokerEquals(broker, brokers.brokers(0))
   }
 
   @Test
   def broker_add_range {
-    val json = sendRequest("/broker/add", parseMap("broker=0..4"))
-    val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
-
-    assertEquals(5, brokerNodes.size)
+    val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add", parseMap("broker=0..4"))
+    assertEquals(5, brokers.brokers.size)
     assertEquals(5, Scheduler.cluster.getBrokers.size)
   }
 
   @Test
   def broker_update {
     sendRequest("/broker/add", parseMap("broker=0"))
-    var json = sendRequest("/broker/update", parseMap("broker=0,cpus=1,heap=128,failoverDelay=5s"))
-    val brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
+    var resp = sendRequestObj[BrokerStatusResponse]("/broker/update", parseMap("broker=0,cpus=1,heap=128,failoverDelay=5s"))
 
-    assertEquals(1, brokerNodes.size)
-    val responseBroker = new Broker()
-    responseBroker.fromJson(brokerNodes(0))
+    assertEquals(1, resp.brokers.size)
+    val responseBroker = resp.brokers.head
 
     val broker = Scheduler.cluster.getBroker("0")
     assertEquals(1, broker.cpus, 0.001)
@@ -96,7 +87,7 @@ class HttpServerTest extends KafkaMesosTestCase {
     // needsRestart flag
     assertFalse(broker.needsRestart)
     // needsRestart is false despite update when broker stopped
-    json = sendRequest("/broker/update", parseMap("broker=0,mem=2048"))
+    resp = sendRequestObj[BrokerStatusResponse]("/broker/update", parseMap("broker=0,mem=2048"))
     assertFalse(broker.needsRestart)
 
     // when broker starting
@@ -129,18 +120,17 @@ class HttpServerTest extends KafkaMesosTestCase {
     cluster.addBroker(new Broker("1"))
     cluster.addBroker(new Broker("2"))
 
-    var json = sendRequest("/broker/list", parseMap(null))
-    var brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
-    assertEquals(3, brokerNodes.size)
+    var json = sendRequestObj[BrokerStatusResponse]("/broker/list", parseMap(null))
+    var brokers = json.brokers
+    assertEquals(3, brokers.size)
 
-    val broker = new Broker()
-    broker.fromJson(brokerNodes(0))
+    val broker = brokers.head
     assertEquals("0", broker.id)
 
     // filtering
-    json = sendRequest("/broker/list", parseMap("broker=1"))
-    brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
-    assertEquals(1, brokerNodes.size)
+    json = sendRequestObj[BrokerStatusResponse]("/broker/list", parseMap("broker=1"))
+    brokers = json.brokers
+    assertEquals(1, brokers.size)
   }
 
   @Test
@@ -148,12 +138,11 @@ class HttpServerTest extends KafkaMesosTestCase {
     val cluster = Scheduler.cluster
     cluster.addBroker(new Broker("0"))
 
-    var json = sendRequest("/broker/clone", Map("broker" -> "1", "source" -> "0"))
-    var brokerNodes = json("brokers").asInstanceOf[List[Map[String, Object]]]
-    assertEquals(1, brokerNodes.size)
+    val json = sendRequestObj[BrokerStatusResponse]("/broker/clone", Map("broker" -> "1", "source" -> "0"))
+    val brokers = json.brokers
+    assertEquals(1, brokers.size)
 
-    val broker = new Broker()
-    broker.fromJson(brokerNodes(0))
+    val broker = brokers.head
 
     assertEquals(broker.id, "1")
   }
@@ -165,13 +154,13 @@ class HttpServerTest extends KafkaMesosTestCase {
     cluster.addBroker(new Broker("1"))
     cluster.addBroker(new Broker("2"))
 
-    var json = sendRequest("/broker/remove", parseMap("broker=1"))
-    assertEquals("1", json("ids"))
+    var json = sendRequestObj[BrokerRemoveResponse]("/broker/remove", parseMap("broker=1"))
+    assertEquals(Seq("1"), json.ids)
     assertEquals(2, cluster.getBrokers.size)
     assertNull(cluster.getBroker("1"))
 
-    json = sendRequest("/broker/remove", parseMap("broker=*"))
-    assertEquals("0,2", json("ids"))
+    json = sendRequestObj[BrokerRemoveResponse]("/broker/remove", parseMap("broker=*"))
+    assertEquals(Seq("0", "2"), json.ids)
     assertTrue(cluster.getBrokers.isEmpty)
   }
 
@@ -181,21 +170,21 @@ class HttpServerTest extends KafkaMesosTestCase {
     val broker0 = cluster.addBroker(new Broker("0"))
     val broker1 = cluster.addBroker(new Broker("1"))
 
-    var json = sendRequest("/broker/start", parseMap("broker=*,timeout=0s"))
-    assertEquals(2, json("brokers").asInstanceOf[List[Map[String, Object]]].size)
-    assertEquals("scheduled", json("status"))
+    var json = sendRequestObj[BrokerStartResponse]("/broker/start", parseMap("broker=*,timeout=0s"))
+    assertEquals(2, json.brokers.size)
+    assertEquals("scheduled", json.status)
     assertTrue(broker0.active)
     assertTrue(broker1.active)
 
-    json = sendRequest("/broker/stop", parseMap("broker=1,timeout=0s"))
-    assertEquals(1, json("brokers").asInstanceOf[List[Map[String, Object]]].size)
-    assertEquals("scheduled", json("status"))
+    json = sendRequestObj[BrokerStartResponse]("/broker/stop", parseMap("broker=1,timeout=0s"))
+    assertEquals(1, json.brokers.size)
+    assertEquals("scheduled", json.status)
     assertTrue(broker0.active)
     assertFalse(broker1.active)
 
-    json = sendRequest("/broker/stop", parseMap("broker=0,timeout=0s"))
-    assertEquals(1, json("brokers").asInstanceOf[List[Map[String, Object]]].size)
-    assertEquals("scheduled", json("status"))
+    json = sendRequestObj[BrokerStartResponse]("/broker/stop", parseMap("broker=0,timeout=0s"))
+    assertEquals(1, json.brokers.size)
+    assertEquals("scheduled", json.status)
     assertFalse(broker0.active)
     assertFalse(broker1.active)
   }
@@ -203,7 +192,7 @@ class HttpServerTest extends KafkaMesosTestCase {
   @Test(timeout = 5000)
   def broker_restart: Unit = {
     def assertErrorContains(params: String, str: String) =
-      try { sendRequest("/broker/restart", parseMap(params)); fail() }
+      try { sendRequestObj[BrokerStartResponse]("/broker/restart", parseMap(params)); fail() }
       catch { case e: IOException => assertTrue(e.getMessage.contains(str))}
 
     assertErrorContains("broker=0,timeout=0s", "broker 0 not found")
@@ -227,23 +216,23 @@ class HttpServerTest extends KafkaMesosTestCase {
       assertNull(broker.task)
     }
 
-    def start(broker: Broker) = sendRequest("/broker/start", parseMap(s"broker=${broker.id},timeout=0s"))
-    def stop(broker: Broker) = sendRequest("/broker/stop", parseMap(s"broker=${broker.id},timeout=0s"))
-    def restart(params: String): Map[String, Object] = sendRequest("/broker/restart", parseMap(params))
+    def start(broker: Broker) = sendRequestObj[BrokerStartResponse]("/broker/start", parseMap(s"broker=${broker.id},timeout=0s"))
+    def stop(broker: Broker) = sendRequestObj[BrokerStartResponse]("/broker/stop", parseMap(s"broker=${broker.id},timeout=0s"))
+    def restart(params: String) = sendRequestObj[BrokerStartResponse]("/broker/restart", parseMap(params))
 
     start(broker0); started(broker0); start(broker1); started(broker1)
 
     // 0 stop timeout
     var json = restart("broker=*,timeout=300ms")
-    assertEquals(Map("status" -> "timeout", "message" -> "broker 0 timeout on stop"), json)
-
+    assertEquals("timeout", json.status)
+    assertEquals(Some("broker 0 timeout on stop"), json.message)
     stopped(broker0); start(broker0); started(broker0)
 
     // 0 start timeout
     delay("150ms") { stopped(broker0) }
     json = restart("broker=*,timeout=300ms")
-    assertEquals(Map("status" -> "timeout", "message" -> "broker 0 timeout on start"), json)
-
+    assertEquals("timeout", json.status)
+    assertEquals(Some("broker 0 timeout on start"), json.message)
     started(broker0)
 
     // 0 start, but 1 isn't running
@@ -258,8 +247,8 @@ class HttpServerTest extends KafkaMesosTestCase {
     delay("150ms") { stopped(broker0) }
     delay("250ms") { started(broker0) }
     json = restart("broker=*,timeout=400ms")
-    assertEquals(Map("status" -> "timeout", "message" -> "broker 1 timeout on stop"), json)
-
+    assertEquals("timeout", json.status)
+    assertEquals(Some("broker 1 timeout on stop"), json.message)
     stopped(broker1); start(broker1); started(broker1)
 
     // restarted
@@ -269,29 +258,27 @@ class HttpServerTest extends KafkaMesosTestCase {
     delay("450ms") { started(broker1) }
     json = restart("broker=*,timeout=1s")
 
-    assertEquals(json("status"), "restarted")
-    for((brokerJson, expectedBroker) <- json("brokers").asInstanceOf[List[Map[String, Object]]].zip(Seq(broker0, broker1))) {
-      val actualBroker = new Broker()
-      actualBroker.fromJson(brokerJson)
+    assertEquals(json.status, "restarted")
+    for((actualBroker, expectedBroker) <- json.brokers.zip(Seq(broker0, broker1))) {
       BrokerTest.assertBrokerEquals(expectedBroker, actualBroker)
     }
   }
 
   @Test
   def topic_list {
-    var json = sendRequest("/topic/list", parseMap(""))
-    assertTrue(json("topics").asInstanceOf[List[Map[String, Object]]].isEmpty)
+    var json = sendRequestObj[ListTopicsResponse]("/topic/list", parseMap(""))
+    assertTrue(json.topics.isEmpty)
 
     Scheduler.cluster.topics.addTopic("t0")
     Scheduler.cluster.topics.addTopic("t1")
 
-    json = sendRequest("/topic/list", parseMap(""))
-    val topicNodes: List[Map[String, Object]] = json("topics").asInstanceOf[List[Map[String, Object]]]
+    json = sendRequestObj[ListTopicsResponse]("/topic/list", parseMap(""))
+    val topicNodes = json.topics
     assertEquals(2, topicNodes.size)
 
-    val t0Node = topicNodes(0)
-    assertEquals("t0", t0Node("name"))
-    assertEquals(List(0), t0Node("partitions").asInstanceOf[Map[String, Object]]("0"))
+    val t0Node = topicNodes.head
+    assertEquals("t0", t0Node.name)
+    assertEquals(Seq(0), t0Node.partitions(0))
   }
   
   @Test
@@ -299,26 +286,26 @@ class HttpServerTest extends KafkaMesosTestCase {
     val topics = Scheduler.cluster.topics
 
     // add t0 topic
-    var json = sendRequest("/topic/add", parseMap("topic=t0"))
-    val t0Node = json("topics").asInstanceOf[List[Map[String, Object]]](0)
-    assertEquals("t0", t0Node("name"))
-    assertEquals(Map("0" -> List(0)), t0Node("partitions"))
+    var json = sendRequestObj[ListTopicsResponse]("/topic/add", parseMap("topic=t0"))
+    val t0Node = json.topics.head
+    assertEquals("t0", t0Node.name)
+    assertEquals(Map(0 -> List(0)), t0Node.partitions)
 
     assertEquals("t0", topics.getTopic("t0").name)
 
     // add t1 topic
-    json = sendRequest("/topic/add", parseMap("topic=t1,partitions=2,options=flush.ms\\=1000"))
-    val topicNode = json("topics").asInstanceOf[List[Map[String, Object]]](0)
-    assertEquals("t1", topicNode("name"))
+    json = sendRequestObj[ListTopicsResponse]("/topic/add", parseMap("topic=t1,partitions=2,options=flush.ms\\=1000"))
+    val topicNode = json.topics.head
+    assertEquals("t1", topicNode.name)
 
     val t1: Topic = topics.getTopic("t1")
     assertNotNull(t1)
     assertEquals("t1", t1.name)
     assertEquals("flush.ms=1000", formatMap(t1.options))
 
-    assertEquals(2, t1.partitions.size())
-    assertEquals(util.Arrays.asList(0), t1.partitions.get(0))
-    assertEquals(util.Arrays.asList(0), t1.partitions.get(1))
+    assertEquals(2, t1.partitions.size)
+    assertEquals(Seq(0), t1.partitions(0))
+    assertEquals(Seq(0), t1.partitions(1))
   }
   
   @Test
@@ -327,9 +314,9 @@ class HttpServerTest extends KafkaMesosTestCase {
     topics.addTopic("t")
 
     // update topic t
-    val json = sendRequest("/topic/update", parseMap("topic=t,options=flush.ms\\=1000"))
-    val topicNode = json("topics").asInstanceOf[List[Map[String, Object]]](0)
-    assertEquals("t", topicNode("name"))
+    val json = sendRequestObj[ListTopicsResponse]("/topic/update", parseMap("topic=t,options=flush.ms\\=1000"))
+    val topicNode = json.topics.head
+    assertEquals("t", topicNode.name)
 
     val t = topics.getTopic("t")
     assertEquals("t", t.name)
@@ -346,12 +333,12 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertFalse(rebalancer.running)
 
     cluster.topics.addTopic("t")
-    val json = sendRequest("/topic/rebalance", parseMap("topic=*"))
+    val json = sendRequestObj[RebalanceStartResponse]("/topic/rebalance", parseMap("topic=*"))
     assertTrue(rebalancer.running)
 
-    assertEquals("started", json("status"))
-    assertFalse(json.contains("error"))
-    assertEquals(rebalancer.state, json("state").asInstanceOf[String])
+    assertEquals("started", json.status)
+    assertFalse(json.error.isDefined)
+    assertEquals(rebalancer.state, json.state)
   }
 
   @Test
@@ -362,9 +349,9 @@ class HttpServerTest extends KafkaMesosTestCase {
     configs.setProperty(Quotas.CONSUMER_BYTE_RATE, "200")
     cluster.quotas.setClientConfig("test", configs)
 
-    val json = sendRequest("/quota/list", parseMap(""))
-    assertEquals(json("test").asInstanceOf[Map[String, String]]("producer_byte_rate"), 100)
-    assertEquals(json("test").asInstanceOf[Map[String, String]]("consumer_byte_rate"), 200)
+    val json = sendRequestObj[Map[String, Map[String, Int]]]("/quota/list", parseMap(""))
+    assertEquals(json("test")("producer_byte_rate"), 100)
+    assertEquals(json("test")("consumer_byte_rate"), 200)
   }
 
   @Test
@@ -374,9 +361,9 @@ class HttpServerTest extends KafkaMesosTestCase {
     configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
     cluster.quotas.setClientConfig("test", configs)
 
-    val json = sendRequest("/quota/list", parseMap(""))
-    assertEquals(json("test").asInstanceOf[Map[String, String]]("producer_byte_rate"), 100)
-    assertFalse(json("test").asInstanceOf[Map[String, String]].contains("consumer_byte_rate"))
+    val json = sendRequestObj[Map[String, Map[String, Int]]]("/quota/list", parseMap(""))
+    assertEquals(json("test")("producer_byte_rate"), 100)
+    assertFalse(json("test").contains("consumer_byte_rate"))
   }
 
   @Test

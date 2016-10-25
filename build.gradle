@@ -47,6 +47,12 @@ dependencies {
     compile "org.eclipse.jetty:jetty-servlet:$jettyVersion"
     compile "org.eclipse.jetty:jetty-util:$jettyVersion"
     compile "javax.servlet:javax.servlet-api:3.0.1"
+
+    compile 'com.fasterxml.jackson.core:jackson-core:2.8.2'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.2'
+    compile 'com.fasterxml.jackson.module:jackson-module-scala_2.10:2.8.2'
+
+
     testCompile 'junit:junit:4.12'
 
     compile ("org.apache.kafka:kafka_$kafkaScalaVersion:$kafkaVersion") {

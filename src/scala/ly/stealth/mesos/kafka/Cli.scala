@@ -19,20 +19,17 @@ package ly.stealth.mesos.kafka
 
 import joptsimple.{BuiltinHelpFormatter, OptionException, OptionParser, OptionSet}
 import java.net.{HttpURLConnection, URL, URLEncoder}
-
 import scala.io.Source
 import java.io._
 import java.util
-
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import java.util.{Collections, Date, Properties}
-
 import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Period, Repr, Strings}
 import ly.stealth.mesos.kafka.Topics.{Partition, Topic}
+import ly.stealth.mesos.kafka.json.JsonUtil
 
-import scala.util.parsing.json.JSONObject
 
 object Cli {
   var api: String = null
@@ -185,7 +182,7 @@ object Cli {
     throw new Error("Undefined api. Provide either cli option or config default value")
   }
 
-  private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Map[String, Object] = {
+  private[kafka] def sendRequestString(uri: String, params: util.Map[String, String]): String = {
     def queryString(params: util.Map[String, String]): String = {
       var s = ""
       for ((name, value) <- params) {
@@ -221,12 +218,21 @@ object Cli {
     }
 
     if (response.trim().isEmpty) return null
+    response
+  }
 
-    var node: Map[String, Object] = null
-    try { node = Util.parseJson(response)}
-    catch { case e: IllegalArgumentException => throw new IOException(e) }
+  private[kafka] def sendRequest(uri: String, params: util.Map[String, String]): Unit = {
+    sendRequestString(uri, params)
+  }
 
-    node
+  private[kafka] def sendRequestObj[T](uri: String, params: util.Map[String, String])(implicit m: Manifest[T]): T = {
+    val response = sendRequestString(uri, params)
+    if (response == null) {
+     throw new NullPointerException()
+    }
+    else {
+      json.JsonUtil.fromJson[T](response)
+    }
   }
 
   class Error(message: String) extends java.lang.Error(message) {}
@@ -454,16 +460,8 @@ object Cli {
       val params = new util.HashMap[String, String]()
       if (expr != null) params.put("broker", expr)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/list", params) }
+      try { sendRequestObj[BrokerStatusResponse]("/broker/list", params).brokers }
       catch { case e: IOException => throw new Error("" + e) }
-
-      val brokers = json("brokers").asInstanceOf[List[Map[String, Object]]]
-      brokers.map(b => {
-        val broker = new Broker()
-        broker.fromJson(b)
-        broker
-      })
     }
 
     private def handleList(expr: String, args: Array[String], help: Boolean = false): Unit = {
@@ -520,14 +518,14 @@ object Cli {
 
       val brokers = getBrokers(expr)
       if (options.has(jsonSpec)) {
-        out.println(JSONObject(brokers.map(b => b.id -> b.metrics.toJson).toMap).toString())
+        out.println(JsonUtil.toJson(brokers.map(b => b.id -> b.metrics).toMap))
       } else {
         for (b <- brokers.sortBy(_.id)) {
           out.println(s"broker ${b.id}")
-          val metrics = b.metrics.getData.toSeq.filter({
+          val metrics = b.metrics.data.toSeq.filter({
             case (name, value) =>
               filterRegex match {
-                case Some(r) => r.forall(name.matches(_))
+                case Some(r) => r.forall(name.matches)
                 case None => true
               }
           }).sortBy(_._1)
@@ -616,19 +614,15 @@ object Cli {
       if (failoverMaxDelay != null) params.put("failoverMaxDelay", failoverMaxDelay)
       if (failoverMaxTries != null) params.put("failoverMaxTries", failoverMaxTries)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/" + (if (add) "add" else "update"), params) }
-      catch { case e: IOException => throw new Error("" + e) }
-      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      val brokers =
+        try { sendRequestObj[BrokerStatusResponse]("/broker/" + (if (add) "add" else "update"), params).brokers }
+        catch { case e: IOException => throw new Error("" + e) }
 
       val addedUpdated = if (add) "added" else "updated"
-      val brokers = "broker" + (if (brokerNodes.length > 1) "s" else "")
+      val numBrokers = "broker" + (if (brokers.length > 1) "s" else "")
 
-      printLine(s"$brokers $addedUpdated:")
-      for (brokerNode <- brokerNodes) {
-        val broker: Broker = new Broker()
-        broker.fromJson(brokerNode)
-
+      printLine(s"$numBrokers $addedUpdated:")
+      for (broker <- brokers) {
         printBroker(broker, 1)
         printLine()
       }
@@ -644,14 +638,14 @@ object Cli {
         return
       }
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/remove", Collections.singletonMap("broker", expr)) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val json =
+        try { sendRequestObj[BrokerRemoveResponse]("/broker/remove", Collections.singletonMap("broker", expr)) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val ids = json("ids").asInstanceOf[String]
-      val brokers = "broker" + (if (ids.contains(",")) "s" else "")
+      val ids = json.ids
+      val brokers = "broker" + (if (ids.length > 1) "s" else "")
 
-      printLine(s"$brokers $ids removed")
+      printLine(s"$brokers ${ids.mkString(",")} removed")
     }
 
     private def handleClone(expr: String, args: Array[String], help: Boolean = false): Unit = {
@@ -672,17 +666,14 @@ object Cli {
 
       val options = parseOptions(parser, args)
       val sourceBrokerId = options.valueOf("source").asInstanceOf[String]
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/clone", Map("broker" -> expr, "source" -> sourceBrokerId)) }
-      catch { case e: IOException => throw new Error("" + e) }
-      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
-      val brokers = "broker" + (if (brokerNodes.length > 1) "s" else "")
 
-      printLine(s"$brokers added:")
-      for (brokerNode <- brokerNodes) {
-        val broker: Broker = new Broker()
-        broker.fromJson(brokerNode)
+      val brokers =
+        try { sendRequestObj[BrokerStatusResponse]("/broker/clone", Map("broker" -> expr, "source" -> sourceBrokerId)).brokers }
+        catch { case e: IOException => throw new Error("" + e) }
+      val numBrokers = "broker" + (if (brokers.length > 1) "s" else "")
 
+      printLine(s"$numBrokers added:")
+      for (broker <- brokers) {
         printBroker(broker, 1)
         printLine()
       }
@@ -716,25 +707,22 @@ object Cli {
       if (timeout != null) params.put("timeout", timeout)
       if (force) params.put("force", null)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/" + cmd, params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val ret =
+        try { sendRequestObj[BrokerStartResponse]("/broker/" + cmd, params) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val status = json("status").asInstanceOf[String]
-      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
+      val status = ret.status
+      val brokers = ret.brokers
 
-      val brokers = "broker" + (if (brokerNodes.size > 1) "s" else "")
+      val numBrokers = "broker" + (if (brokers.size > 1) "s" else "")
       val startStop = if (start) "start" else "stop"
 
       // started|stopped|scheduled|timeout
-      if (status == "timeout") throw new Error(s"$brokers $startStop timeout")
-      else if (status == "scheduled") printLine(s"$brokers scheduled to $startStop:")
-      else printLine(s"$brokers $status:")
+      if (status == "timeout") throw new Error(s"$numBrokers $startStop timeout")
+      else if (status == "scheduled") printLine(s"$numBrokers scheduled to $startStop:")
+      else printLine(s"$numBrokers $status:")
 
-      for (brokerNode <- brokerNodes) {
-        val broker: Broker = new Broker()
-        broker.fromJson(brokerNode)
-
+      for (broker <- brokers) {
         printBroker(broker, 1)
         printLine()
       }
@@ -765,23 +753,20 @@ object Cli {
       if (timeout != null) params.put("timeout", timeout)
       if (options.has("noWaitForReplication")) params.put("noWaitForReplication", "true")
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/restart", params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val ret =
+        try { sendRequestObj[BrokerStartResponse]("/broker/restart", params) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val status = json("status").asInstanceOf[String]
+      val status = ret.status
 
       // restarted|timeout
-      if (status == "timeout") throw new Error(json("message").asInstanceOf[String])
+      if (status == "timeout") throw new Error(ret.message.getOrElse("Unknown error"))
 
-      val brokerNodes: List[Map[String, Object]] = json("brokers").asInstanceOf[List[Map[String, Object]]]
-      val brokers = "broker" + (if (brokerNodes.size > 1) "s" else "")
-      printLine(s"$brokers $status:")
+      val brokers = ret.brokers
+      val numBrokers = "broker" + (if (brokers.size > 1) "s" else "")
+      printLine(s"$numBrokers $status:")
 
-      for (brokerNode <- brokerNodes) {
-        val broker: Broker = new Broker()
-        broker.fromJson(brokerNode)
-
+      for (broker <- brokers) {
         printBroker(broker, 1)
         printLine()
       }
@@ -815,12 +800,12 @@ object Cli {
       if (name != null) params.put("name", name)
       if (lines != null) params.put("lines", "" + lines)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/broker/log", params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val json =
+        try { sendRequestObj[HttpLogResponse]("/broker/log", params) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val status = json("status").asInstanceOf[String]
-      val content = json("content").asInstanceOf[String]
+      val status = json.status
+      val content = json.content
 
       if (status == "timeout") throw new Error(s"broker $brokerId log retrieve timeout")
       else printLine(content)
@@ -1000,19 +985,16 @@ object Cli {
       val params = new util.LinkedHashMap[String, String]
       if (expr != null) params.put("topic", expr)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/topic/list", params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val json =
+        try { sendRequestObj[ListTopicsResponse]("/topic/list", params) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val topicsNodes: List[Map[String, Object]] = json("topics").asInstanceOf[List[Map[String, Object]]]
-      val title: String = if (topicsNodes.isEmpty) "no topics" else "topic" + (if (topicsNodes.size > 1) "s" else "") + ":"
+      val topics = json.topics
+      val title: String = if (topics.isEmpty) "no topics" else "topic" + (if (topics.size > 1) "s" else "") + ":"
       printLine(title)
 
       val quiet = options.has("quiet")
-      for (topicNode <- topicsNodes) {
-        val topic = new Topic()
-        topic.fromJson(topicNode)
-
+      for (topic <- topics) {
         if (quiet) {
           printLine(topic.name, 1)
         }
@@ -1072,20 +1054,16 @@ object Cli {
       if (fixedStartIndex != null) params.put("fixedStartIndex", "" + fixedStartIndex)
       if (startPartitionId != null) params.put("startPartitionId", "" + startPartitionId)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest(s"/topic/$cmd", params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val json =
+        try { sendRequestObj[ListTopicsResponse](s"/topic/$cmd", params) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val topicNodes = json("topics").asInstanceOf[List[Map[String, Object]]]
-
+      val topics = json.topics
       val addedUpdated = if (add) "added" else "updated"
-      val title = s"topic${if (topicNodes.size > 1) "s" else ""} $addedUpdated:"
+      val title = s"topic${if (topics.size > 1) "s" else ""} $addedUpdated:"
       printLine(title)
 
-      for (topicNode <- topicNodes) {
-        val topic = new Topic()
-        topic.fromJson(topicNode)
-
+      for (topic <- topics) {
         printTopic(topic, 1)
         printLine()
       }
@@ -1145,20 +1123,20 @@ object Cli {
       if (startPartitionId != null) params.put("startPartitionId", "" + startPartitionId)
       if (lowercaseVerb == "realign") params.put("realign", "true")
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/topic/rebalance", params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val json =
+        try { sendRequestObj[RebalanceStartResponse]("/topic/rebalance", params) }
+        catch { case e: IOException => throw new Error("" + e) }
 
-      val status = json("status").asInstanceOf[String]
-      val error = if (json.contains("error")) json("error").asInstanceOf[String] else ""
-      val state: String = json("state").asInstanceOf[String]
+      val status = json.status
+      val error = json.error
+      val state = json.state
 
       val is: String = if (status == "idle" || status == "running") "is " else ""
-      val colon: String = if (state.isEmpty &&  error.isEmpty) "" else ":"
+      val colon: String = if (state.isEmpty && error.isEmpty) "" else ":"
 
       // started|completed|failed|running|idle [(no-op)]|timeout
       if (status == "timeout") throw new Error(s"$verb timeout:\n" + state)
-      printLine(s"$verb $is$status$colon $error")
+      printLine(s"$verb $is$status$colon ${error.getOrElse("")}")
       if (error.isEmpty && !state.isEmpty) printLine(state)
     }
 
@@ -1176,15 +1154,19 @@ object Cli {
       val params = new util.LinkedHashMap[String, String]
       if (expr != null) params.put("topic", expr)
 
-      var json: Map[String, Object] = null
-      try { json = sendRequest("/partition/list", params) }
-      catch { case e: IOException => throw new Error("" + e) }
+      val json =
+        try { sendRequestObj[Map[String, Seq[Partition]]]("/partition/list", params) }
+        catch { case e: IOException => throw new Error("" + e) }
+
+      if (json.isEmpty) {
+        printLine("topic not found")
+        return
+      }
 
       printLine("  part | leader | expected | brokers (*not-isr)", 2)
       val topicList = json.toSeq.sortBy(_._1)
-      for ((topic, partitionNode) <- topicList) {
+      for ((topic, partitions) <- topicList) {
         printLine(s"$topic:", 1)
-        val partitions = partitionNode.asInstanceOf[List[Map[String, Object]]].map(p => new Partition().fromJson(p))
         for (p <- partitions.sortBy(_.id)) {
           val isr = p.isr.toSet
           val brokerIsrs = p.replicas.map(b => if (isr.contains(b)) b.toString else s"*$b")

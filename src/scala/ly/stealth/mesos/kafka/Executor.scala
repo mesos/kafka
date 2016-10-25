@@ -17,14 +17,16 @@
 
 package ly.stealth.mesos.kafka
 
-import net.elodina.mesos.util.{Strings, Repr}
+import net.elodina.mesos.util.Repr
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 import org.apache.mesos.Protos._
 import java.io._
+
 import org.apache.log4j._
-import java.util
+
 import com.google.protobuf.ByteString
-import scala.util.parsing.json.JSONObject
+import ly.stealth.mesos.kafka.json.JsonUtil
+
 import org.apache.log4j.net.SyslogAppender
 
 object Executor extends org.apache.mesos.Executor {
@@ -70,14 +72,15 @@ object Executor extends org.apache.mesos.Executor {
   private[kafka] def startBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
     def runBroker0 {
       try {
-        val data: util.Map[String, String] = Strings.parseMap(task.getData.toStringUtf8)
-        val broker = new Broker()
-        broker.fromJson(Util.parseJson(data.get("broker")))
+        if (task.getData == null) {
+          throw new IllegalArgumentException("No task data received")
+        }
+        val config = JsonUtil.fromJson[LaunchConfig](task.getData.toByteArray)
 
         def send(metrics: Broker.Metrics): Unit = {
           try {
             driver.sendFrameworkMessage(
-              JSONObject(Map("metrics" -> metrics.toJson)).toString().getBytes())
+              JsonUtil.toJsonBytes(FrameworkMessage(metrics = Some(metrics))))
           }
           catch {
             case t: Exception =>
@@ -85,8 +88,7 @@ object Executor extends org.apache.mesos.Executor {
           }
         }
 
-        val defaults = Strings.parseMap(data.get("defaults"))
-        val endpoint = server.start(broker, send, defaults)
+        val endpoint = server.start(config, send)
 
         var status = TaskStatus.newBuilder
           .setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
@@ -144,7 +146,7 @@ object Executor extends org.apache.mesos.Executor {
     val path = if (name == "stdout" || name == "stderr") {
       cwd.toPath.resolve(name).toFile
     } else if (name.endsWith(".log")) {
-      new File(BrokerServer.Distro.dir, "log/" + name)
+      new File(BrokerServer.distro.dir, "log/" + name)
     } else {
       null
     }
@@ -158,9 +160,8 @@ object Executor extends org.apache.mesos.Executor {
       s"$name doesn't exist"
     }
 
-    val json = LogResponse(logRequest.requestId, content).toJson
-
-    driver.sendFrameworkMessage(json.toString().getBytes)
+    val response = LogResponse(logRequest.requestId, content)
+    driver.sendFrameworkMessage(JsonUtil.toJsonBytes(FrameworkMessage(log = Some(response))))
   }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {

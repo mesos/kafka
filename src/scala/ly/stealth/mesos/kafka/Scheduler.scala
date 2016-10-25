@@ -19,19 +19,16 @@ package ly.stealth.mesos.kafka
 
 import net.elodina.mesos.util.{Period, Repr, Strings, Version}
 import java.util.concurrent.ConcurrentHashMap
-
 import org.apache.mesos.Protos._
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 import java.util
-
 import com.google.protobuf.ByteString
 import java.util.{Collections, Date}
-
+import ly.stealth.mesos.kafka.json.JsonUtil
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import org.apache.log4j._
-
 import scala.collection.mutable
 import scala.util.Random
 
@@ -55,7 +52,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private val logger: Logger = Logger.getLogger(this.getClass)
   val version: Version = new Version("0.9.5.1")
 
-  val cluster: Cluster = new Cluster()
+  lazy val cluster: Cluster = Cluster.load()
   private var driver: SchedulerDriver = null
 
   val logs = new ConcurrentHashMap[Long, Option[String]]()
@@ -117,10 +114,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
       if (reservation.volume != null)
         defaults += ("log.dirs" -> "data/kafka-logs")
 
-      val data = new util.HashMap[String, String]()
-      data.put("broker", "" + broker.toJson(false))
-      data.put("defaults", Strings.formatMap(defaults))
-      ByteString.copyFromUtf8(Strings.formatMap(data))
+      val launchConfig = LaunchConfig(
+        broker.id,
+        broker.options,
+        broker.syslog,
+        broker.log4jOptions,
+        broker.bindAddress,
+        defaults)
+      ByteString.copyFrom(JsonUtil.toJsonBytes(launchConfig))
     }
 
     val taskBuilder: TaskInfo.Builder = TaskInfo.newBuilder
@@ -174,25 +175,22 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val broker = cluster.getBroker(Broker.idFromExecutorId(executorId.getValue))
 
     try {
-      val node: Map[String, Object] = Util.parseJson(new String(data))
-      if (node.contains("metrics")) {
+      val msg = JsonUtil.fromJson[FrameworkMessage](data)
+      msg.metrics.foreach(metrics => {
         if (broker != null && broker.active) {
-          val metricsNode = node("metrics").asInstanceOf[Map[String, Object]]
-          val metrics = new Broker.Metrics()
-          metrics.fromJson(metricsNode)
-
           broker.metrics = metrics
         }
-      }
+      })
 
-      if (node.contains("log")) {
-        if (broker != null && broker.active && broker.task != null && broker.task.running) {
-          val logResponse = LogResponse.fromJson(node)
-          if (logs.containsKey(logResponse.requestId)) {
-            logs.put(logResponse.requestId, Some(logResponse.content))
-          }
+      msg.log.foreach(logResponse => {
+        if (broker != null
+            && broker.active
+            && broker.task != null
+            && broker.task.running
+            && logs.containsKey(logResponse.requestId)) {
+          logs.put(logResponse.requestId, Some(logResponse.content))
         }
-      }
+      })
     } catch {
       case e: IllegalArgumentException =>
         logger.warn("Unable to parse framework message as JSON", e)
@@ -339,7 +337,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       logger.info(s"Finished reconciling of broker ${broker.id}, task ${broker.task.id}")
 
     broker.task.state = Broker.State.RUNNING
-    if (status.getData.size() > 0) broker.task.endpoint = new Broker.Endpoint(status.getData.toStringUtf8)
+    if (status.getData.size() > 0)
+      broker.task.endpoint = new Broker.Endpoint(status.getData.toStringUtf8)
     broker.registerStart(broker.task.hostname)
   }
 
@@ -382,12 +381,19 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val task_ = newTask(broker, offer, reservation)
     val id = task_.getTaskId.getValue
 
-    val attributes = new util.LinkedHashMap[String, String]()
-    for (attribute <- offer.getAttributesList)
-      if (attribute.hasText) attributes.put(attribute.getName, attribute.getText.getValue)
+    val attributes = offer.getAttributesList
+      .asScala
+      .filter(_.hasText)
+      .map(a => a.getName -> a.getText.getValue)
+      .toMap
 
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task_))
-    broker.task = new Broker.Task(id, task_.getSlaveId.getValue, task_.getExecutor.getExecutorId.getValue, offer.getHostname, attributes)
+    broker.task = Broker.Task(
+      id,
+      task_.getSlaveId.getValue,
+      task_.getExecutor.getExecutorId.getValue,
+      offer.getHostname,
+      attributes)
     logger.info(s"Starting broker ${broker.id}: launching task $id by offer ${offer.getHostname + Repr.id(offer.getId.getValue)}\n ${Repr.task(task_)}")
     TaskID.newBuilder().setValue(id).build()
   }
@@ -466,7 +472,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[kafka] def otherTasksAttributes(name: String): util.Collection[String] = {
     def value(task: Broker.Task, name: String): String = {
       if (name == "hostname") return task.hostname
-      task.attributes.get(name)
+      task.attributes.get(name).orNull
     }
 
     val values = new util.ArrayList[String]()
@@ -483,7 +489,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
     initLogging()
     logger.info(s"Starting ${getClass.getSimpleName}:\n$Config")
 
-    cluster.load()
     HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
