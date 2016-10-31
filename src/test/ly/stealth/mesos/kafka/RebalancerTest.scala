@@ -61,7 +61,8 @@ class RebalancerTest extends KafkaMesosTestCase {
     assertFalse(rebalancer.state.isEmpty)
   }
 
-  @Test
+  // This test no longer applies in kafka 0.10.0
+  //@Test
   def start_in_progress {
     Scheduler.cluster.topics.addTopic("topic", Map(0 -> util.Arrays.asList(0), 1 -> util.Arrays.asList(0)))
     ZkUtilsWrapper().createPersistentPath(ZkUtils.ReassignPartitionsPath, "")

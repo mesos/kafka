@@ -129,8 +129,8 @@ class Rebalancer {
       val topic = entry._1
       val rf: Int = if (replicas != -1) replicas else entry._2.valuesIterator.next().size
       val partitions: Int = entry._2.size
-    
-      val assignedReplicas: Map[Int, Seq[Int]] = AdminUtils.assignReplicasToBrokers(brokerIds, partitions, rf, fixedStartIndex, startPartitionId)
+
+      val assignedReplicas: Map[Int, Seq[Int]] = ZkUtilsWrapper().assignReplicasToBrokers(brokerIds, partitions, rf, fixedStartIndex, startPartitionId)
       reassignment ++= assignedReplicas.map(replicaEntry => TopicAndPartition(topic, replicaEntry._1) -> replicaEntry._2)
     }
 
@@ -200,8 +200,7 @@ class Rebalancer {
 
   private def reassignPartitions(partitions: Map[TopicAndPartition, Seq[Int]]): Unit = {
     try {
-      val json = ZkUtilsWrapper().getPartitionReassignmentZkData(partitions)
-      ZkUtilsWrapper().createPersistentPath(ZkUtils.ReassignPartitionsPath, json)
+      ZkUtilsWrapper().updatePartitionReassignmentData(partitions)
     } catch {
       case ti: InvocationTargetException if ti.getCause.isInstanceOf[ZkNodeExistsException] =>
         throw new Rebalancer.Exception("rebalance is in progress")

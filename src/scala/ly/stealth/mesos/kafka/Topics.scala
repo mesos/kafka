@@ -19,18 +19,16 @@ package ly.stealth.mesos.kafka
 
 import java.util
 import java.util.Properties
-
 import kafka.api.LeaderAndIsr
 import kafka.common.TopicAndPartition
 import kafka.controller.LeaderIsrAndControllerEpoch
-
 import scala.collection.JavaConversions._
 import scala.collection.{Map, Seq, mutable}
 import kafka.admin._
-
 import scala.util.parsing.json.{JSONArray, JSONObject}
 import ly.stealth.mesos.kafka.Topics.Topic
 import kafka.log.LogConfig
+import org.apache.kafka.common.KafkaException
 
 class Topics {
   def getTopic(name: String): Topics.Topic = {
@@ -88,7 +86,7 @@ class Topics {
       brokers_ = ZkUtilsWrapper().getSortedBrokerList()
     }
 
-    AdminUtils.assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId).mapValues(new util.ArrayList[Int](_))
+    ZkUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId).mapValues(new util.ArrayList[Int](_))
   }
 
   def addTopic(name: String, assignment: util.Map[Int, util.List[Int]] = null, options: util.Map[String, String] = null): Topic = {
@@ -115,7 +113,10 @@ class Topics {
     for ((k, v) <- options) config.setProperty(k, v)
 
     try { LogConfig.validate(config) }
-    catch { case e: IllegalArgumentException => return e.getMessage }
+    catch {
+      case e: IllegalArgumentException => return e.getMessage
+      case e: KafkaException => return e.getMessage
+    }
     null
   }
 }
