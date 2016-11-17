@@ -75,7 +75,7 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     ZkUtilsWrapper.reset()
   }
 
-  def startZkServer() {
+  def startZkServer(): ZkClient = {
     val port = Net.findAvailPort
     Config.zk = s"localhost:$port"
 
@@ -89,6 +89,7 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     val zkClient: ZkClient = zkServer.getZkClient
     zkClient.createPersistent("/brokers/ids/0", true)
     zkClient.createPersistent("/config/changes", true)
+    zkClient
   }
 
   def stopZkServer() {

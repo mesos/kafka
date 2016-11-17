@@ -24,8 +24,10 @@ import java.net.{URL, URLClassLoader}
 import java.util.Properties
 import java.util
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{IO, Version}
+
 
 case class LaunchConfig(
   id: String,
@@ -80,7 +82,7 @@ class KafkaServer extends BrokerServer {
     server = BrokerServer.distro.newServer(options)
     server.getClass.getMethod("startup").invoke(server)
 
-    collector = BrokerServer.distro.startCollector(send)
+    collector = BrokerServer.distro.startCollector(server, send)
 
     new Broker.Endpoint(options("host.name"), Integer.parseInt(options("port")))
   }
@@ -108,7 +110,7 @@ class KafkaServer extends BrokerServer {
 trait BaseDistro {
   def newServer(options: Map[String, String]): Object
   def startReporters(options: Map[String, String]): Object
-  def startCollector(send: Broker.Metrics => Unit): MetricsCollector
+  def startCollector(server: AnyRef, send: Broker.Metrics => Unit, interval: Int = 60): MetricsCollector
   def configureLog4j(config: LaunchConfig): Unit
   val dir: File
 }
@@ -150,6 +152,9 @@ object KafkaServer {
           if (name.startsWith("com.yammer.metrics"))
             return super.loadClass(name, true)
 
+          if (name.startsWith("org.apache.kafka.common"))
+            return super.loadClass(name, true)
+
           // Check class is loaded
           var c: Class[_] = findLoadedClass(name)
 
@@ -171,8 +176,12 @@ object KafkaServer {
       val configClass = loader.loadClass("kafka.server.KafkaConfig")
 
       val config: Object = newKafkaConfig(this.props(options, "server.properties"))
-      val server: Object = serverClass.getConstructor(configClass).newInstance(config).asInstanceOf[Object]
+      val serverStartable: Object = serverClass.getConstructor(configClass).newInstance(config)
+        .asInstanceOf[Object]
 
+      val serverField = serverStartable.getClass.getDeclaredField("server")
+      serverField.setAccessible(true)
+      val server: Object = serverField.get(serverStartable)
       server
     }
 
@@ -188,9 +197,9 @@ object KafkaServer {
       metricsReporter
     }
 
-    def startCollector(send: Broker.Metrics => Unit): MetricsCollector = {
-      val collector = new MetricsCollector(send)
-      collector.start(60, TimeUnit.SECONDS)
+    def startCollector(server: AnyRef, send: Broker.Metrics => Unit, interval: Int = 60): MetricsCollector = {
+      val collector = new MetricsCollector(server, send)
+      collector.start(interval, TimeUnit.SECONDS)
       collector.run()
 
       collector

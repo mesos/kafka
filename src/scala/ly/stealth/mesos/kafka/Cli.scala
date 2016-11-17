@@ -521,7 +521,8 @@ object Cli {
         out.println(JsonUtil.toJson(brokers.map(b => b.id -> b.metrics).toMap))
       } else {
         for (b <- brokers.sortBy(_.id)) {
-          out.println(s"broker ${b.id}")
+          val brokerUpdatedOn = new Date(b.metrics.timestamp)
+          out.println(s"broker ${b.id} (updated $brokerUpdatedOn)")
           val metrics = b.metrics.data.toSeq.filter({
             case (name, value) =>
               filterRegex match {

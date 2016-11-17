@@ -19,18 +19,17 @@
 package ly.stealth.mesos.kafka
 
 import java.util.concurrent.TimeUnit
-
 import com.yammer.metrics.Metrics
 import com.yammer.metrics.core._
 import com.yammer.metrics.reporting.AbstractPollingReporter
 import com.yammer.metrics.util.DeathRattleExceptionHandler
+import org.apache.kafka.common.metrics.{Metrics => ApacheMetrics}
 import org.apache.log4j.Logger
-
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
-class MetricsCollector(send: Broker.Metrics => Unit)
+class MetricsCollector(server: AnyRef, send: Broker.Metrics => Unit)
   extends AbstractPollingReporter(Metrics.defaultRegistry(), "kafka-metrics")
     with MetricProcessor[mutable.Map[String, Number]] {
 
@@ -41,8 +40,19 @@ class MetricsCollector(send: Broker.Metrics => Unit)
   }
   installCollectors()
 
+  private def initKafkaServerMetricsAccessor() = {
+    try {
+      val field = server.getClass.getDeclaredField("metrics")
+      field.setAccessible(true)
+      () => Some(field.get(server).asInstanceOf[ApacheMetrics])
+    } catch {
+      case NonFatal(e) => () => None
+    }
+  }
   private val logger = Logger.getLogger(classOf[MetricsCollector])
   private val scopeLevelMetricExcludes = Set("FetcherLagMetrics", "FetcherStats")
+  private val apacheMetricsIncludes = Set("client-id")
+  private val apacheMetricsAccessor = initKafkaServerMetricsAccessor()
 
   private def buildName(name: MetricName, prefix: String = ""): String = {
     if (name.hasScope) {
@@ -107,6 +117,20 @@ class MetricsCollector(send: Broker.Metrics => Unit)
     baseVmMetrics ++ bufferPoolMetrics ++ gcMetrics
   }
 
+  private def collectApacheMetrics: Map[String, Number] = {
+    // TODO: include replication throttling stats as well
+    val allApacheMetrics = apacheMetricsAccessor()
+    val clientMetrics = allApacheMetrics.map(
+      m => m.metrics().filterKeys(k => k.tags().containsKey("client-id"))
+    )
+    clientMetrics.map(_.map({
+      case (name, metric) =>
+        val userId = name.tags.getOrDefault("user-id", "")
+        val clientId = name.tags.get("client-id")
+        s"kafka.metrics,ClientMetrics,${name.name()},${name.group()},$clientId${ if(userId.nonEmpty) "." + userId else "" }" -> metric.value().asInstanceOf[Number]
+    }).toMap).getOrElse(Map())
+  }
+
   override def run(): Unit = {
     try {
       val metrics = new mutable.HashMap[String, Number]()
@@ -117,7 +141,8 @@ class MetricsCollector(send: Broker.Metrics => Unit)
           case NonFatal(e) => logger.error("Error processing metrics:", e)
         }
       }
-      send(Broker.Metrics((metrics ++ collectJvmMetrics).toMap, System.currentTimeMillis()))
+
+      send(Broker.Metrics((metrics ++ collectJvmMetrics ++ collectApacheMetrics).toMap, System.currentTimeMillis()))
     }
     catch {
       case NonFatal(e) => logger.error("Error collecting metrics", e)
