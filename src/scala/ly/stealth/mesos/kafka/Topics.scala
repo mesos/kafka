@@ -35,26 +35,22 @@ class Topics {
     if (topics.nonEmpty) topics(0) else null
   }
 
-  def getTopics: util.List[Topics.Topic] = {
+  def getTopics: Seq[Topics.Topic] = {
     val names = ZkUtilsWrapper().getAllTopics()
 
     val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtilsWrapper().getPartitionAssignmentForTopics(names)
     val configs = ZkUtilsWrapper().fetchAllTopicConfigs()
 
-    val topics = new util.ArrayList[Topics.Topic]
-    for (name <- names.sorted)
-      topics.add(Topics.Topic(
-        name,
-        assignments.getOrElse(name, null),
-        propertiesAsScalaMap(configs.getOrElse(name, null))
-      ))
-
-    topics
+    names.sorted.map(t => Topics.Topic(
+      t,
+      assignments.getOrElse(t, null),
+      propertiesAsScalaMap(configs.getOrElse(t, null)))
+    )
   }
 
   private val NoLeader = LeaderIsrAndControllerEpoch(LeaderAndIsr(LeaderAndIsr.NoLeader, -1, List(), -1), -1)
 
-  def getPartitions(topics: util.List[String]): Map[String, Set[Topics.Partition]] = {
+  def getPartitions(topics: Seq[String]): Map[String, Set[Topics.Partition]] = {
     // returns topic name -> (partition -> brokers)
     val assignments = ZkUtilsWrapper().getPartitionAssignmentForTopics(topics)
     val topicAndPartitions = assignments.flatMap {
@@ -77,7 +73,7 @@ class Topics {
     }).groupBy(_._1).mapValues(v => v.map(_._2))
   }
 
-  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: util.List[Int] = null, fixedStartIndex: Int = -1, startPartitionId: Int = -1): util.Map[Int, util.List[Int]] = {
+  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: Seq[Int] = null, fixedStartIndex: Int = -1, startPartitionId: Int = -1): util.Map[Int, util.List[Int]] = {
     var brokers_ = brokers
 
     if (brokers_ == null) {
@@ -87,7 +83,7 @@ class Topics {
     ZkUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId).mapValues(new util.ArrayList[Int](_))
   }
 
-  def addTopic(name: String, assignment: util.Map[Int, util.List[Int]] = null, options: util.Map[String, String] = null): Topic = {
+  def addTopic(name: String, assignment: util.Map[Int, util.List[Int]] = null, options: Map[String, String] = null): Topic = {
     var assignment_ = assignment
     if (assignment_ == null) assignment_ = fairAssignment(1, 1, null)
 
@@ -99,14 +95,15 @@ class Topics {
     getTopic(name)
   }
 
-  def updateTopic(topic: Topic, options: util.Map[String, String]): Unit = {
+  def updateTopic(topic: Topic, options: util.Map[String, String]): Topic = {
     val config: Properties = new Properties()
     for ((k, v) <- options) config.setProperty(k, v)
 
     ZkUtilsWrapper().changeTopicConfig(topic.name, config)
+    topic
   }
 
-  def validateOptions(options: util.Map[String, String]): String = {
+  def validateOptions(options: Map[String, String]): String = {
     val config: Properties = new Properties()
     for ((k, v) <- options) config.setProperty(k, v)
 

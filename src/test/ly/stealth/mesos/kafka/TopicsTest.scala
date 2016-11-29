@@ -16,7 +16,7 @@ class TopicsTest extends KafkaMesosTestCase {
   override def before {
     super.before
     startZkServer()
-    topics = Scheduler.cluster.topics
+    topics = registry.cluster.topics
   }
 
   @After

@@ -29,6 +29,7 @@ import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Period, Repr, Strings}
 import ly.stealth.mesos.kafka.Topics.{Partition, Topic}
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.mesos.KafkaMesosScheduler
 
 
 object Cli {
@@ -390,7 +391,8 @@ object Cli {
       if (log != null) Config.log = new File(log)
       if (Config.log != null) printLine(s"Logging to ${Config.log}")
 
-      Scheduler.start()
+      val registry = new ProductionRegistry()
+      KafkaMesosScheduler.start(registry)
     }
   }
 
@@ -809,6 +811,7 @@ object Cli {
       val content = json.content
 
       if (status == "timeout") throw new Error(s"broker $brokerId log retrieve timeout")
+      else if (status == "failure") throw new Error(s"broker $brokerId failed")
       else printLine(content)
 
       if (!content.isEmpty && content.last != '\n') printLine()

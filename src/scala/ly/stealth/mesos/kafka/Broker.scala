@@ -26,6 +26,8 @@ import scala.collection.JavaConversions._
 import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
 import ly.stealth.mesos.kafka.Broker.{Failover, Metrics, Stickiness}
 import ly.stealth.mesos.kafka.Util.BindAddress
+import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.mesos.OfferResult
 import net.elodina.mesos.util.{Constraint, Period, Range, Repr}
 
 class Broker(_id: String = "0") {
@@ -58,13 +60,13 @@ class Broker(_id: String = "0") {
   def matches(offer: Offer, now: Date = new Date(), otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): OfferResult = {
     // check resources
     val reservation = getReservation(offer)
-    if (reservation.cpus < cpus) return OfferResult.neverMatch(s"cpus < $cpus")
-    if (reservation.mem < mem) return OfferResult.neverMatch(s"mem < $mem")
-    if (reservation.port == -1) return OfferResult.neverMatch("no suitable port")
+    if (reservation.cpus < cpus) return OfferResult.neverMatch(offer, this, s"cpus < $cpus")
+    if (reservation.mem < mem) return OfferResult.neverMatch(offer, this, s"mem < $mem")
+    if (reservation.port == -1) return OfferResult.neverMatch(offer, this, "no suitable port")
 
     // check volume
     if (volume != null && reservation.volume == null)
-      return OfferResult.neverMatch(s"offer missing volume: $volume")
+      return OfferResult.neverMatch(offer, this, s"offer missing volume: $volume")
 
     // check attributes
     val offerAttributes = new util.HashMap[String, String]()
@@ -75,19 +77,25 @@ class Broker(_id: String = "0") {
 
     // check constraints
     for ((name, constraint) <- constraints) {
-      if (!offerAttributes.containsKey(name)) return OfferResult.neverMatch(s"no $name")
+      if (!offerAttributes.containsKey(name)) return OfferResult.neverMatch(offer, this, s"no $name")
       if (!constraint.matches(offerAttributes.get(name), otherAttributes(name)))
-        return OfferResult.neverMatch(s"$name doesn't match $constraint")
+        return OfferResult.neverMatch(offer, this, s"$name doesn't match $constraint")
     }
 
     // check stickiness
     val stickyTimeLeft = stickiness.stickyTimeLeft(now)
     if (stickyTimeLeft > 0)
       if (!stickiness.matchesHostname(offer.getHostname))
-        return OfferResult.eventuallyMatch("hostname != stickiness host", stickyTimeLeft)
+        return OfferResult.eventuallyMatch(offer, this, "hostname != stickiness host", stickyTimeLeft)
+
+    // check failover delay
+    val failoverDelay = (failover.delayExpires.getTime - now.getTime) / 1000
+    if (failoverDelay > 0) {
+      return OfferResult.eventuallyMatch(offer, this, "waiting to restart", failoverDelay.toInt)
+    }
 
     // Accept it
-    OfferResult.Accept()
+    OfferResult.Accept(offer, this)
   }
 
   def getReservation(offer: Offer): Broker.Reservation = {
@@ -186,7 +194,7 @@ class Broker(_id: String = "0") {
   }
 
   def shouldStart(hostname: String, now: Date = new Date()): Boolean =
-    active && task == null && !failover.isWaitingDelay(now)
+    active && task == null
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
 
@@ -227,12 +235,12 @@ class Broker(_id: String = "0") {
     "stopped"
   }
 
-  def waitFor(state: String, timeout: Period): Boolean = {
+  def waitFor(state: String, timeout: Period, minDelay: Int = 100): Boolean = {
     def matches: Boolean = if (state != null) task != null && task.state == state else task == null
 
     var t = timeout.ms
     while (t > 0 && !matches) {
-      val delay = Math.min(100, t)
+      val delay = Math.min(minDelay, t)
       Thread.sleep(delay)
       t -= delay
     }
@@ -260,6 +268,11 @@ class Broker(_id: String = "0") {
 
     nb
   }
+
+  override def toString: String = {
+    JsonUtil.toJson(this)
+  }
+
 }
 
 object Broker {
@@ -506,7 +519,6 @@ object Broker {
   }
 
   object State {
-    val STOPPED = "stopped"
     val STARTING = "starting"
     val RUNNING = "running"
     val RECONCILING = "reconciling"

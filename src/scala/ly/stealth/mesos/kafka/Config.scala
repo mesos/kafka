@@ -17,11 +17,15 @@
 
 package ly.stealth.mesos.kafka
 
-import java.io.{FileInputStream, File}
+import java.io.{File, FileInputStream}
 import java.util.Properties
 import java.net.URI
 import ly.stealth.mesos.kafka.Util.BindAddress
-import net.elodina.mesos.util.Period
+import net.elodina.mesos.util.{Period, Version}
+
+object SchedulerVersion {
+  val value = new Version("0.9.5.1")
+}
 
 object Config {
   val DEFAULT_FILE = new File("kafka-mesos.properties")

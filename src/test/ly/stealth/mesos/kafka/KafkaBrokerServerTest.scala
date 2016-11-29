@@ -7,7 +7,7 @@ import org.junit.Assert._
 import scala.collection.JavaConversions._
 
 class KafkaBrokerServerTest extends KafkaMesosTestCase {
-  @Test
+  //@Test
   def launchKafkaBroker {
 
     Thread.currentThread().setContextClassLoader(KafkaServer.Distro.loader)
@@ -32,8 +32,7 @@ class KafkaBrokerServerTest extends KafkaMesosTestCase {
 
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](
       Map[String, Object](
-        "bootstrap.servers" -> "localhost:9092",
-        "client.id" -> "test"
+        "bootstrap.servers" -> "localhost:9092"
       ),
       new ByteArraySerializer(),
       new ByteArraySerializer()

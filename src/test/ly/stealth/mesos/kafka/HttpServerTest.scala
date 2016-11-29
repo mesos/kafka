@@ -17,7 +17,7 @@
 
 package ly.stealth.mesos.kafka
 
-import org.apache.mesos.Protos.TaskState
+import org.apache.mesos.Protos.{ExecutorID, SlaveID, TaskState}
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import java.io.{File, FileOutputStream, IOException}
@@ -26,10 +26,10 @@ import net.elodina.mesos.util.{IO, Period}
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 import Cli.{sendRequest, sendRequestObj}
 import ly.stealth.mesos.kafka.Topics.Topic
-import java.util
 import java.util.Properties
 import ly.stealth.mesos.kafka.json.JsonUtil
 import scala.collection.JavaConversions._
+import scala.io.Source
 
 class HttpServerTest extends KafkaMesosTestCase {
   @Before
@@ -47,14 +47,14 @@ class HttpServerTest extends KafkaMesosTestCase {
     super.after
     stopZkServer()
   }
-  
+
   @Test
   def broker_add {
     val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add", parseMap("broker=0,cpus=0.1,mem=128"))
     assertEquals(1, brokers.brokers.size)
 
-    assertEquals(1, Scheduler.cluster.getBrokers.size())
-    val broker = Scheduler.cluster.getBrokers.get(0)
+    assertEquals(1, registry.cluster.getBrokers.size())
+    val broker = registry.cluster.getBrokers.get(0)
     assertEquals("0", broker.id)
     assertEquals(0.1, broker.cpus, 0.001)
     assertEquals(128, broker.mem)
@@ -66,7 +66,7 @@ class HttpServerTest extends KafkaMesosTestCase {
   def broker_add_range {
     val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add", parseMap("broker=0..4"))
     assertEquals(5, brokers.brokers.size)
-    assertEquals(5, Scheduler.cluster.getBrokers.size)
+    assertEquals(5, registry.cluster.getBrokers.size)
   }
 
   @Test
@@ -77,7 +77,7 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertEquals(1, resp.brokers.size)
     val responseBroker = resp.brokers.head
 
-    val broker = Scheduler.cluster.getBroker("0")
+    val broker = registry.cluster.getBroker("0")
     assertEquals(1, broker.cpus, 0.001)
     assertEquals(128, broker.heap)
     assertEquals(new Period("5s"), broker.failover.delay)
@@ -96,26 +96,29 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertTrue(broker.needsRestart)
 
     // modification is made before offer thus when it arrives needsRestart reset to false
-    Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave0", "cpus:2.0;mem:8192;ports:9042..65000")))
+    registry.scheduler.resourceOffers(schedulerDriver, Seq(offer("slave0", "cpus:2.0;mem:8192;ports:9042..65000")))
+    assertTrue(broker.waitFor(Broker.State.STARTING, new Period("1s"), 1))
     assertFalse(broker.needsRestart)
 
     // when running
-    Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave0:9042"))
-    assertEquals(Broker.State.RUNNING, broker.task.state)
+    registry.scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave0:9042"))
+    assertTrue(broker.waitFor(Broker.State.RUNNING, new Period("1s"), 1))
     sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka\\=DEBUG\\\\\\, kafkaAppender"))
     assertTrue(broker.needsRestart)
 
     // once stopped needsRestart flag reset to false
     sendRequest("/broker/stop", parseMap("broker=0,timeout=0s"))
     assertTrue(broker.needsRestart)
-    Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
-    Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
+    registry.scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
+    assertTrue(broker.waitFor(Broker.State.STOPPING, new Period("1s"), 1))
+    registry.scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
+    assertTrue(broker.waitFor(null, new Period("1s"), 1))
     assertFalse(broker.needsRestart)
   }
 
   @Test
   def broker_list {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
     cluster.addBroker(new Broker("2"))
@@ -135,7 +138,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def broker_clone {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     cluster.addBroker(new Broker("0"))
 
     val json = sendRequestObj[BrokerStatusResponse]("/broker/clone", Map("broker" -> "1", "source" -> "0"))
@@ -149,7 +152,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def broker_remove {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
     cluster.addBroker(new Broker("2"))
@@ -166,7 +169,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def broker_start_stop {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     val broker0 = cluster.addBroker(new Broker("0"))
     val broker1 = cluster.addBroker(new Broker("1"))
 
@@ -189,79 +192,145 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertFalse(broker1.active)
   }
 
-  @Test(timeout = 5000)
-  def broker_restart: Unit = {
-    def assertErrorContains(params: String, str: String) =
-      try { sendRequestObj[BrokerStartResponse]("/broker/restart", parseMap(params)); fail() }
-      catch { case e: IOException => assertTrue(e.getMessage.contains(str))}
-
-    assertErrorContains("broker=0,timeout=0s", "broker 0 not found")
-
-    val broker0 = Scheduler.cluster.addBroker(new Broker("0"))
-    val broker1 = Scheduler.cluster.addBroker(new Broker("1"))
-
-    assertErrorContains("broker=0,timeout=0s", "broker 0 is not running")
-
-    // two nodes
-    def started(broker: Broker) {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
-      assertEquals(Broker.State.RUNNING, broker.task.state)
+  def assertErrorContains[R](url: String, params: Map[String, String], str: String)(implicit manifest: Manifest[R]): Unit =
+    try { sendRequestObj[R](url, params); fail() }
+    catch { case e: IOException =>
+      assertTrue(
+        s"String was not found in input\nExpected: $str\nSearched: ${e.getMessage}",
+        e.getMessage.contains(str))
     }
 
-    def stopped(broker: Broker): Unit = {
-      Scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
-      Scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
-      assertFalse(broker.active)
-      assertNull(broker.task)
-    }
+  def start(broker: Broker) = sendRequestObj[BrokerStartResponse]("/broker/start", parseMap(s"broker=${broker.id},timeout=0s"))
+  def stop(broker: Broker) = sendRequestObj[BrokerStartResponse]("/broker/stop", parseMap(s"broker=${broker.id},timeout=0s"))
+  def restart(params: String) = sendRequestObj[BrokerStartResponse]("/broker/restart", parseMap(params))
 
-    def start(broker: Broker) = sendRequestObj[BrokerStartResponse]("/broker/start", parseMap(s"broker=${broker.id},timeout=0s"))
-    def stop(broker: Broker) = sendRequestObj[BrokerStartResponse]("/broker/stop", parseMap(s"broker=${broker.id},timeout=0s"))
-    def restart(params: String) = sendRequestObj[BrokerStartResponse]("/broker/restart", parseMap(params))
-
+  def prepareBrokers = {
+    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker1 = registry.cluster.addBroker(new Broker("1"))
     start(broker0); started(broker0); start(broker1); started(broker1)
+    (broker0, broker1)
+  }
+
+  @Test(timeout = 10000)
+  def broker_start_success: Unit = {
+    assertErrorContains[BrokerStatusResponse](
+      "/broker/restart",
+      Map("broker" -> "0", "timeout" -> "0s"),
+      "broker 0 not found")
+
+    prepareBrokers
+  }
+
+  @Test
+  def broker_restart_stop_timeout: Unit = {
+    val (broker0, broker1) = prepareBrokers
 
     // 0 stop timeout
-    var json = restart("broker=*,timeout=300ms")
+    val json = restart("broker=*,timeout=300ms")
     assertEquals("timeout", json.status)
     assertEquals(Some("broker 0 timeout on stop"), json.message)
     stopped(broker0); start(broker0); started(broker0)
+  }
+
+  @Test
+  def broker_restart_start_timeout: Unit = {
+    val (broker0, broker1) = prepareBrokers
 
     // 0 start timeout
     delay("150ms") { stopped(broker0) }
-    json = restart("broker=*,timeout=300ms")
+    val json = restart("broker=*,timeout=300ms")
     assertEquals("timeout", json.status)
     assertEquals(Some("broker 0 timeout on start"), json.message)
-    started(broker0)
+  }
+
+  @Test
+  def broker_restart_one_broker = {
+    val (broker0, broker1) = prepareBrokers
+    stop(broker1); stopped(broker1)
 
     // 0 start, but 1 isn't running
     delay("150ms") { stopped(broker0) }
-    delay("175ms") { stop(broker1); stopped(broker1) }
     delay("300ms") { started(broker0) }
-    assertErrorContains("broker=*,timeout=500ms", "broker 1 is not running")
+    restart("broker=*,timeout=500ms")
+    assertEquals(true, broker0.active)
+    assertNotNull(broker0.task)
+    assertEquals(true, broker1.active)
 
     start(broker1); started(broker1)
+    assertNotNull(broker1.task)
+  }
 
+  @Test
+  def broker_restart_one_stop_timeout = {
+    val (broker0, broker1) = prepareBrokers
     // 1 stop timeout
     delay("150ms") { stopped(broker0) }
     delay("250ms") { started(broker0) }
-    json = restart("broker=*,timeout=400ms")
+    val json = restart("broker=*,timeout=400ms")
     assertEquals("timeout", json.status)
     assertEquals(Some("broker 1 timeout on stop"), json.message)
-    stopped(broker1); start(broker1); started(broker1)
+  }
 
+  @Test
+  def broker_restart_both_success = {
+    val (broker0, broker1) = prepareBrokers
     // restarted
-    delay("150ms") { stopped(broker0) }
-    delay("250ms") { started(broker0) }
-    delay("350ms") { stopped(broker1) }
-    delay("450ms") { started(broker1) }
-    json = restart("broker=*,timeout=1s")
+    delay("100ms") {
+      for (broker <- Seq(broker0, broker1)) {
+        broker.waitFor(Broker.State.STOPPING, new Period("1s"), 1)
+        stopped(broker)
+        broker.waitFor(null, new Period("1s"), 1)
+        broker.waitFor(Broker.State.STARTING, new Period("1s"), 1)
+        started(broker)
+        broker.waitFor(Broker.State.RUNNING, new Period("1s"), 1)
+      }
+    }
+    val json = restart("broker=*,timeout=2s")
 
-    assertEquals(json.status, "restarted")
+    assertEquals("restarted", json.status)
     for((actualBroker, expectedBroker) <- json.brokers.zip(Seq(broker0, broker1))) {
       BrokerTest.assertBrokerEquals(expectedBroker, actualBroker)
     }
+  }
+
+  @Test
+  def broker_log {
+    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    assertErrorContains[HttpLogResponse]("/broker/log", Map("broker" -> "0"), "broker 0 is not active")
+
+    broker0.active = true
+    broker0.task = Broker.Task(
+      id="t1",
+      executorId=Broker.nextExecutorId(broker0),
+      slaveId="s1",
+      _state=Broker.State.RUNNING)
+
+    val timeoutResponse =
+      sendRequestObj[HttpLogResponse]("/broker/log", Map("broker" -> "0", "timeout" -> "1ms"))
+    assertEquals("timeout", timeoutResponse.status)
+    assertEquals(1, schedulerDriver.sentFrameworkMessages.size())
+    val msg = schedulerDriver.sentFrameworkMessages(0)
+    assertEquals(broker0.task.executorId, msg.executorId)
+    assertEquals("s1", msg.slaveId)
+
+    def setLogContent(content: String, delay: Period = new Period("100ms")) =
+      new Thread {
+        override def run(): Unit = {
+          Thread.sleep(delay.ms)
+          val lastData = schedulerDriver.sentFrameworkMessages.last.data
+          val logRequest = LogRequest.parse(new String(lastData))
+          registry.scheduler.frameworkMessage(
+            schedulerDriver,
+            ExecutorID.newBuilder().setValue(broker0.task.executorId).build(),
+            SlaveID.newBuilder().setValue("s1").build(),
+            JsonUtil.toJsonBytes(FrameworkMessage(log = Some(LogResponse(logRequest.requestId, content))))
+          )
+        }
+      }.start()
+
+    setLogContent("something")
+    val json = sendRequestObj[HttpLogResponse]("/broker/log", Map("broker" -> "0"))
+    assertEquals("something", json.content)
   }
 
   @Test
@@ -269,8 +338,8 @@ class HttpServerTest extends KafkaMesosTestCase {
     var json = sendRequestObj[ListTopicsResponse]("/topic/list", parseMap(""))
     assertTrue(json.topics.isEmpty)
 
-    Scheduler.cluster.topics.addTopic("t0")
-    Scheduler.cluster.topics.addTopic("t1")
+    registry.cluster.topics.addTopic("t0")
+    registry.cluster.topics.addTopic("t1")
 
     json = sendRequestObj[ListTopicsResponse]("/topic/list", parseMap(""))
     val topicNodes = json.topics
@@ -283,7 +352,7 @@ class HttpServerTest extends KafkaMesosTestCase {
   
   @Test
   def topic_add {
-    val topics = Scheduler.cluster.topics
+    val topics = registry.cluster.topics
 
     // add t0 topic
     var json = sendRequestObj[ListTopicsResponse]("/topic/add", parseMap("topic=t0"))
@@ -310,7 +379,7 @@ class HttpServerTest extends KafkaMesosTestCase {
   
   @Test
   def topic_update {
-    val topics = Scheduler.cluster.topics
+    val topics = registry.cluster.topics
     topics.addTopic("t")
 
     // update topic t
@@ -325,7 +394,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def topic_rebalance {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     cluster.addBroker(new Broker("0"))
     cluster.addBroker(new Broker("1"))
 
@@ -343,7 +412,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def quota_list: Unit = {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     val configs = new Properties()
     configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
     configs.setProperty(Quotas.CONSUMER_BYTE_RATE, "200")
@@ -356,7 +425,7 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def quota_list_partial: Unit = {
-    val cluster = Scheduler.cluster
+    val cluster = registry.cluster
     val configs = new Properties()
     configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
     cluster.quotas.setClientConfig("test", configs)
@@ -370,7 +439,7 @@ class HttpServerTest extends KafkaMesosTestCase {
   def quota_set: Unit = {
     sendRequest("/quota/set", parseMap("entityType=clients,entity=test,producerByteRate=100,consumerByteRate=200"))
 
-    val quotas = Scheduler.cluster.quotas.getClientQuotas()
+    val quotas = registry.cluster.quotas.getClientQuotas()
     assertEquals(quotas.size, 1)
     assertEquals(quotas("test"), Quota(Some(100), Some(200)))
   }
@@ -402,5 +471,37 @@ class HttpServerTest extends KafkaMesosTestCase {
     } finally  {
       connection.disconnect()
     }
+  }
+
+  private def makeRequest(url: String, method: String = "GET"): String = {
+    val conn = new URL(Config.api + url).openConnection().asInstanceOf[HttpURLConnection]
+    conn.setRequestMethod(method)
+    Source.fromInputStream(conn.getInputStream).mkString
+  }
+
+  private def getFailsPostSucceeds(url: String) = {
+    for (method <- Seq("GET", "POST"))
+    try {
+      makeRequest(url, method)
+      if (method == "GET")
+        fail("get shouldn't be allowed")
+    } catch {
+      case e: IOException if e.getMessage.startsWith("Server returned HTTP response code: 405") =>
+      case e: Throwable => fail("Wrong exception\n" + e.toString)
+    }
+  }
+
+  @Test
+  def qqq {
+    getFailsPostSucceeds("/quitquitquit")
+  }
+
+  @Test
+  def health {
+    var ret = makeRequest("/health")
+    assertEquals("ok", ret)
+
+    ret = makeRequest("/health", "POST")
+    assertEquals("ok", ret)
   }
 }

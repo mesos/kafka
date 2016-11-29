@@ -21,6 +21,29 @@ import java.util
 import scala.collection.JavaConversions._
 import java.io.{File, IOException}
 import java.net.{Inet4Address, InetAddress, NetworkInterface}
+import java.util.Date
+
+trait Clock {
+  def now(): Date
+}
+
+trait ClockComponent {
+  val clock: Clock
+}
+
+trait WallClockComponent extends ClockComponent {
+  val clock: Clock = new WallClock
+
+  class WallClock extends Clock {
+    def now(): Date = new Date()
+  }
+}
+
+object RunnableConversions {
+  implicit def fnToRunnable[T](fn: () => T): Runnable = new Runnable {
+    override def run(): Unit = fn()
+  }
+}
 
 object Util {
   var terminalWidth: Int = getTerminalWidth

@@ -7,7 +7,7 @@ import ly.stealth.mesos.kafka.Broker.Task
 import net.elodina.mesos.util.Strings
 
 object Expr {
-  def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): util.List[String] = {
+  def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): Seq[String] = {
     var expr: String = _expr
     var attributes: util.Map[String, String] = null
     
@@ -159,21 +159,15 @@ object Expr {
     out.println("  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1")
   }
 
-  def expandTopics(expr: String): util.List[String] = {
-    val topics = new util.TreeSet[String]()
+  def expandTopics(expr: String): Seq[String] = {
+    val allTopics = ZkUtilsWrapper().getAllTopics()
 
-    var allTopics: util.List[String] = null
-    allTopics = ZkUtilsWrapper().getAllTopics()
-
-    for (part <- expr.split(",").map(_.trim).filter(!_.isEmpty)) {
-      if (!part.endsWith("*")) topics.add(part)
+    expr.split(",").map(_.trim).filter(!_.isEmpty).flatMap(part =>
+      if (!part.endsWith("*"))
+        Seq(part)
       else
-        for (topic <- allTopics)
-          if (topic.startsWith(part.substring(0, part.length - 1)))
-            topics.add(topic)
-    }
-
-    topics.toList
+        allTopics.filter(topic => topic.startsWith(part.substring(0, part.length - 1)))
+    )
   }
 
   def printTopicExprExamples(out: PrintStream): Unit = {

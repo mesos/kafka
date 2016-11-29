@@ -18,17 +18,16 @@
 package ly.stealth.mesos.kafka
 
 import java.util
-
 import scala.collection.JavaConversions._
 import java.util.Collections
 import java.io.{File, FileWriter}
-
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.mesos.KafkaMesosScheduler
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 
 class Cluster {
-  val version: String = Scheduler.version.toString
+  val version: String = KafkaMesosScheduler.version.toString
   private val brokers: util.List[Broker] = new util.concurrent.CopyOnWriteArrayList[Broker]()
   private[kafka] var rebalancer: Rebalancer = new Rebalancer()
   private[kafka] var topics: Topics = new Topics()

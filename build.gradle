@@ -5,7 +5,7 @@ plugins {
     id 'de.undercouch.download' version '2.1.0'
 }
 
-version = new File('src/scala/ly/stealth/mesos/kafka/Scheduler.scala').readLines().findResult(
+version = new File('src/scala/ly/stealth/mesos/kafka/Config.scala').readLines().findResult(
         { x -> x.contains("new Version(\"") ? x.substring(x.indexOf("new Version(\"") + 13, x.lastIndexOf("\")")) : null })
 
 jar.archiveName = "kafka-mesos-${version}.jar"
@@ -13,6 +13,9 @@ jar.archiveName = "kafka-mesos-${version}.jar"
 def mesosVersion = "0.28.0"
 def kafkaVersion="0.10.1.0"
 def kafkaScalaVersion="2.10"
+def jettyVersion = "9.0.4.v20130625"
+def jerseyVersion = "2.24"
+def jacksonVersion = "2.8.2"
 
 repositories {
     mavenCentral()
@@ -32,7 +35,7 @@ sourceSets {
     }
 }
 
-def jettyVersion = "9.0.4.v20130625"
+
 dependencies {
     compile "org.scala-lang:scala-library:2.10.6"
     compile "org.apache.mesos:mesos:$mesosVersion"
@@ -46,11 +49,17 @@ dependencies {
     compile "org.eclipse.jetty:jetty-server:$jettyVersion"
     compile "org.eclipse.jetty:jetty-servlet:$jettyVersion"
     compile "org.eclipse.jetty:jetty-util:$jettyVersion"
+    compile "org.glassfish.jersey.core:jersey-server:$jerseyVersion"
+    compile "com.google.guava:guava:14.0.1"
+    compile "org.glassfish.jersey.containers:jersey-container-servlet:$jerseyVersion"
+    compile "org.glassfish.jersey.containers:jersey-container-servlet-core:$jerseyVersion"
+    compile "org.glassfish.jersey.containers:jersey-container-jetty-http:$jerseyVersion"
+    compile "org.glassfish.jersey.media:jersey-media-json-jackson:$jerseyVersion"
     compile "javax.servlet:javax.servlet-api:3.0.1"
 
-    compile 'com.fasterxml.jackson.core:jackson-core:2.8.2'
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.2'
-    compile 'com.fasterxml.jackson.module:jackson-module-scala_2.10:2.8.2'
+    compile "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
+    compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+    compile "com.fasterxml.jackson.module:jackson-module-scala_$kafkaScalaVersion:$jacksonVersion"
 
 
     testCompile 'junit:junit:4.12'

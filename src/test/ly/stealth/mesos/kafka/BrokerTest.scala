@@ -31,6 +31,7 @@ import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, State, Stickiness, Task}
 import java.util
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.mesos.OfferResult
 import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
 
 class BrokerTest extends KafkaMesosTestCase {
@@ -73,25 +74,34 @@ class BrokerTest extends KafkaMesosTestCase {
   def matches {
     // cpus
     broker.cpus = 0.5
-    BrokerTest.assertAccept(broker.matches(offer("cpus:0.2; cpus(role):0.3; ports:1000")))
+    var theOffer = offer("cpus:0.2; cpus(role):0.3; ports:1000")
+    BrokerTest.assertAccept(broker.matches(theOffer))
+
+    theOffer = offer("cpus:0.2; cpus(role):0.2")
     assertEquals(
-      OfferResult.neverMatch("cpus < 0.5"),
-      broker.matches(offer("cpus:0.2; cpus(role):0.2")))
+      OfferResult.neverMatch(theOffer, broker, "cpus < 0.5"),
+      broker.matches(theOffer))
     broker.cpus = 0
 
     // mem
     broker.mem = 100
-    BrokerTest.assertAccept(broker.matches(offer("mem:70; mem(role):30; ports:1000")))
+    theOffer = offer("mem:70; mem(role):30; ports:1000")
+    BrokerTest.assertAccept(broker.matches(theOffer))
+
+    theOffer = offer("mem:70; mem(role):29")
     assertEquals(
-      OfferResult.neverMatch("mem < 100"),
-      broker.matches(offer("mem:70; mem(role):29")))
+      OfferResult.neverMatch(theOffer, broker, "mem < 100"),
+      broker.matches(theOffer))
     broker.mem = 0
 
     // port
-    BrokerTest.assertAccept(broker.matches(offer("ports:1000")))
+    theOffer = offer("ports:1000")
+    BrokerTest.assertAccept(broker.matches(theOffer))
+
+    theOffer = offer("")
     assertEquals(
-      OfferResult.neverMatch("no suitable port"),
-      broker.matches(offer("")))
+      OfferResult.neverMatch(theOffer, broker, "no suitable port"),
+      broker.matches(theOffer))
   }
 
   @Test
@@ -104,34 +114,42 @@ class BrokerTest extends KafkaMesosTestCase {
 
     // token
     broker.constraints = parseMap("hostname=like:master").mapValues(new Constraint(_)).toMap
-    BrokerTest.assertAccept(broker.matches(offer("master", resources)))
+    var theOffer = offer("master", resources)
+    BrokerTest.assertAccept(broker.matches(theOffer))
+
+    theOffer = offer("slave", resources)
     assertEquals(
-      OfferResult.neverMatch("hostname doesn't match like:master"),
-      broker.matches(offer("slave", resources)))
+      OfferResult.neverMatch(theOffer, broker, "hostname doesn't match like:master"),
+      broker.matches(theOffer))
 
     // like
     broker.constraints = parseMap("hostname=like:master.*").mapValues(new Constraint(_)).toMap
     BrokerTest.assertAccept(broker.matches(offer("master", resources)))
     BrokerTest.assertAccept(broker.matches(offer("master-2", resources)))
+    theOffer = offer("slave", resources)
     assertEquals(
-      OfferResult.neverMatch("hostname doesn't match like:master.*"),
-      broker.matches(offer("slave", resources)))
+      OfferResult.neverMatch(theOffer, broker, "hostname doesn't match like:master.*"),
+      broker.matches(theOffer))
 
     // unique
     broker.constraints = parseMap("hostname=unique").mapValues(new Constraint(_)).toMap
-    BrokerTest.assertAccept(broker.matches(offer("master", resources)))
+    theOffer = offer("master", resources)
+    BrokerTest.assertAccept(broker.matches(theOffer))
+
+    theOffer = offer("master", resources)
     assertEquals(
-      OfferResult.neverMatch("hostname doesn't match unique"),
-      broker.matches(offer("master", resources), now, _ => util.Arrays.asList("master")))
+      OfferResult.neverMatch(theOffer, broker, "hostname doesn't match unique"),
+      broker.matches(theOffer, now, _ => util.Arrays.asList("master")))
     BrokerTest.assertAccept(broker.matches(offer("master", resources), now, _ => util.Arrays.asList("slave")))
 
     // groupBy
     broker.constraints = parseMap("hostname=groupBy").mapValues(new Constraint(_)).toMap
     BrokerTest.assertAccept(broker.matches(offer("master", resources)))
     BrokerTest.assertAccept(broker.matches(offer("master", resources), now, _ => util.Arrays.asList("master")))
+    theOffer = offer("master", resources)
     assertEquals(
-      OfferResult.neverMatch("hostname doesn't match groupBy"),
-      broker.matches(offer("master", resources), now, _ => util.Arrays.asList("slave")))
+      OfferResult.neverMatch(theOffer, broker, "hostname doesn't match groupBy"),
+      broker.matches(theOffer, now, _ => util.Arrays.asList("slave")))
   }
 
   @Test
@@ -147,10 +165,14 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.registerStart(host0)
     broker.registerStop(new Date(0))
 
+
     BrokerTest.assertAccept(broker.matches(offer(host0, resources), new Date(0)))
+    val theOffer = offer(host1, resources)
     assertEquals(
-      OfferResult.eventuallyMatch("hostname != stickiness host", broker.stickiness.period.ms().toInt / 1000),
-      broker.matches(offer(host1, resources), new Date(0)))
+      OfferResult.eventuallyMatch(
+        theOffer, broker,
+        "hostname != stickiness host", broker.stickiness.period.ms().toInt / 1000),
+      broker.matches(theOffer, new Date(0)))
   }
 
   @Test
@@ -163,17 +185,19 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.constraints = parseMap("rack=like:1-.*").mapValues(new Constraint(_)).toMap
     BrokerTest.assertAccept(broker.matches(offer("rack=1-1")))
     BrokerTest.assertAccept(broker.matches(offer("rack=1-2")))
+    var theOffer = offer("rack=2-1")
     assertEquals(
-      OfferResult.neverMatch("rack doesn't match like:1-.*"),
-      broker.matches(offer("rack=2-1")))
+      OfferResult.neverMatch(theOffer, broker, "rack doesn't match like:1-.*"),
+      broker.matches(theOffer))
 
     // groupBy
     broker.constraints = parseMap("rack=groupBy").mapValues(new Constraint(_)).toMap
     BrokerTest.assertAccept(broker.matches(offer("rack=1")))
     BrokerTest.assertAccept(broker.matches(offer("rack=1"), now, _ => util.Arrays.asList("1")))
+    theOffer = offer("rack=2")
     assertEquals(
-      OfferResult.neverMatch("rack doesn't match groupBy"),
-      broker.matches(offer("rack=2"), now, _ => util.Arrays.asList("1")))
+      OfferResult.neverMatch(theOffer, broker, "rack doesn't match groupBy"),
+      broker.matches(theOffer, now, _ => util.Arrays.asList("1")))
   }
 
   @Test
@@ -342,10 +366,9 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.registerStop(now, failed = true)
     assertTrue(broker.failover.isWaitingDelay(now))
 
-    assertFalse(broker.shouldStart(host, now = now))
-    assertTrue(broker.shouldStart(host, now = new Date(now.getTime + broker.failover.delay.ms)))
+    assertFalse(broker.failover.isWaitingDelay(now = new Date(now.getTime + broker.failover.delay.ms)))
     broker.failover.resetFailures()
-    assertTrue(broker.shouldStart(host, now = now))
+    assertFalse(broker.failover.isWaitingDelay(now = now))
   }
 
   @Test
