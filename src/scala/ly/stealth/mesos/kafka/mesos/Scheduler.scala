@@ -79,6 +79,7 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
     with BrokerLogManagerComponent
     with SchedulerDriverComponent
     with BrokerLifecyleManagerComponent
+    with BrokerTaskManagerComponent
     with EventLoopComponent =>
 
   val scheduler: KafkaMesosScheduler = new KafkaMesosSchedulerImpl
@@ -129,8 +130,17 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
 
     def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
       logger.info("[statusUpdate] " + Repr.status(status))
-      val broker = cluster.getBroker(Broker.idFromTaskId(status.getTaskId.getValue))
-      eventLoop.execute(() => brokerLifecycleManager.onBrokerStatus(broker, status))
+      val taskId = status.getTaskId
+      val broker = cluster.getBrokerByTaskId(taskId.getValue)
+
+      eventLoop.execute(() =>
+        broker match {
+          case Some(b) => brokerLifecycleManager.onBrokerStatus(b, status)
+          case None =>
+            logger.info(
+              s"Got ${ status.getState } for unknown broker, killing task $taskId")
+            brokerTaskManager.killTask(taskId)
+        })
     }
 
     def frameworkMessage(

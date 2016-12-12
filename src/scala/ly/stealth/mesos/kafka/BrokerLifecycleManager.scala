@@ -75,11 +75,11 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
       status.getState match {
         case TaskState.TASK_STAGING =>
         case TaskState.TASK_RUNNING =>
-          onBrokerStarted(broker, status)
+          onRunning(broker, status)
         case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
              TaskState.TASK_FAILED | TaskState.TASK_KILLED |
              TaskState.TASK_ERROR =>
-          onBrokerStopped(broker, status)
+          onStopped(broker, status)
         case _ => logger.warn("Got unexpected task state: " + status.getState)
       }
 
@@ -87,10 +87,18 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
       offerManager.pauseOrResumeOffers()
     }
 
-    private[this] def onBrokerStarted(broker: Broker, status: TaskStatus): Unit = {
-      if (broker == null || broker.task == null || broker.task.id != status.getTaskId.getValue) {
-        logger.info(
-          s"Got ${ status.getState } for unknown/stopped broker, killing task ${status.getTaskId}")
+    private[this] def onRunning(broker: Broker, status: TaskStatus): Unit = {
+      if (broker.task != null && broker.task.stopping) {
+        // This broker is supposed to be shutting down but instead we got a RUNNING message,
+        // try to kill it again
+        logger.warn(
+          s"Got RUNNING message for broker in STOPPING [${broker.id}], attempting to stop it agian.")
+        stopBroker(broker)
+        return
+      } else if (broker.task == null) {
+        // We don't even know about this task, kill it.
+        logger.warn(
+          s"Got RUNNING status for broker without a task [${broker.id}], killing the task.")
         brokerTaskManager.killTask(status.getTaskId)
         return
       }
@@ -104,18 +112,11 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
       broker.registerStart(broker.task.hostname)
     }
 
-    private[this] def onBrokerStopped(broker: Broker, status: TaskStatus): Unit = {
-      if (broker == null) {
-        logger.info(s"Got ${ status.getState } for unknown broker, ignoring it")
-        return
-      }
-
+    private[this] def onStopped(broker: Broker, status: TaskStatus): Unit = {
       val now = clock.now()
-      broker.task = null
-      val failed = broker.active &&
-        status.getState != TaskState.TASK_FINISHED &&
-        status.getState != TaskState.TASK_KILLED
+      val failed = broker.active && (broker.task != null && !broker.task.stopping)
       broker.registerStop(now, failed)
+      broker.task = null
 
       if (failed) {
         var msg = s"Broker ${ broker.id } failed ${ broker.failover.failures }"

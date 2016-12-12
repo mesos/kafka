@@ -42,6 +42,13 @@ class Cluster {
     null
   }
 
+  def getBrokerByTaskId(taskId: String): Option[Broker] = {
+    for (broker <- brokers)
+      if (broker.task != null && broker.task.id == taskId)
+        return Some(broker)
+    None
+  }
+
   def addBroker(broker: Broker): Broker = {
     brokers.add(broker)
     broker

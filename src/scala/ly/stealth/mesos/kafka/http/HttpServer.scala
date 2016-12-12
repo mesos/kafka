@@ -24,7 +24,7 @@ import javax.ws.rs.ext.ContextResolver
 import javax.ws.rs.{GET, POST, Path, QueryParam}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.{ClusterComponent, OfferManagerComponentImpl, SchedulerComponent}
+import ly.stealth.mesos.kafka.mesos.{ClusterComponent, SchedulerComponent}
 import org.apache.log4j.{Level, Logger}
 import org.eclipse.jetty.server.handler.HandlerList
 import org.eclipse.jetty.server.{Server, ServerConnector}
@@ -50,7 +50,6 @@ trait HttpServerComponentImpl extends HttpServerComponent {
     with KafkaDistributionComponent
     with BrokerLogManagerComponent
     with BrokerLifecyleManagerComponent
-    with OfferManagerComponentImpl
     with HttpApiComponent =>
 
   val httpServer = new HttpServerImpl
@@ -134,20 +133,12 @@ trait HttpServerComponentImpl extends HttpServerComponent {
       ): Response = {
         val logger = inLogger match {
           case "root" => Logger.getRootLogger
-          case "offer" => Logger.getLogger(classOf[OfferManager])
           case "scheduler" => Logger.getLogger(classOf[KafkaMesosScheduler])
           case "brokerManager" => Logger.getLogger(classOf[BrokerLifecycleManager])
           case l => Logger.getLogger(l)
         }
         logger.setLevel(Level.toLevel(level))
 
-        Response.ok.build()
-      }
-
-      @Path("forcerevive")
-      @POST
-      def forceReviveOffers(): Response = {
-        offerManager.pauseOrResumeOffers(forceRevive = true)
         Response.ok.build()
       }
     }
