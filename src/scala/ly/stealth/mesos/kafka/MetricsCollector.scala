@@ -51,7 +51,7 @@ class MetricsCollector(server: AnyRef, send: Broker.Metrics => Unit)
   }
   private val logger = Logger.getLogger(classOf[MetricsCollector])
   private val scopeLevelMetricExcludes = Set("FetcherLagMetrics", "FetcherStats")
-  private val apacheMetricsIncludes = Set("client-id")
+  private val apacheMetricsIncludes = Set("byte-rate", "throttle-time")
   private val apacheMetricsAccessor = initKafkaServerMetricsAccessor()
 
   private def buildName(name: MetricName, prefix: String = ""): String = {
@@ -118,16 +118,25 @@ class MetricsCollector(server: AnyRef, send: Broker.Metrics => Unit)
   }
 
   private def collectApacheMetrics: Map[String, Number] = {
-    // TODO: include replication throttling stats as well
     val allApacheMetrics = apacheMetricsAccessor()
-    val clientMetrics = allApacheMetrics.map(
-      m => m.metrics().filterKeys(k => k.tags().containsKey("client-id"))
+    val metrics = allApacheMetrics.map(
+      m => m.metrics().filterKeys(k => apacheMetricsIncludes.contains(k.name()))
     )
-    clientMetrics.map(_.map({
+    metrics.map(_.map({
       case (name, metric) =>
-        val userId = name.tags.getOrDefault("user-id", "")
-        val clientId = name.tags.get("client-id")
-        s"kafka.metrics,ClientMetrics,${name.name()},${name.group()},$clientId${ if(userId.nonEmpty) "." + userId else "" }" -> metric.value().asInstanceOf[Number]
+        val metricName =
+          if (name.tags().containsKey("client-id")) {
+            val userId = name.tags.getOrDefault("user-id", null)
+            var metricSuffix = name.tags.get("client-id")
+            if (userId != null) {
+              metricSuffix += "." + userId
+            }
+            s"kafka.metrics,ClientMetrics,${name.name()},${name.group()},$metricSuffix"
+          } else {
+            s"kafka.metrics,${name.name()},${name.group()}"
+          }
+
+        metricName -> metric.value().asInstanceOf[Number]
     }).toMap).getOrElse(Map())
   }
 
