@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.kafka.http
+package ly.stealth.mesos.kafka.scheduler.http
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.io._
@@ -24,7 +24,8 @@ import javax.ws.rs.ext.ContextResolver
 import javax.ws.rs.{GET, POST, Path, QueryParam}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.{ClusterComponent, SchedulerComponent}
+import ly.stealth.mesos.kafka.scheduler.mesos.{ClusterComponent, SchedulerComponent}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, BrokerLogManagerComponent, HttpApiComponent, KafkaDistributionComponent}
 import org.apache.log4j.{Level, Logger}
 import org.eclipse.jetty.server.handler.HandlerList
 import org.eclipse.jetty.server.{Server, ServerConnector}

@@ -1,4 +1,4 @@
-package ly.stealth.mesos.kafka.http
+package ly.stealth.mesos.kafka.scheduler.http
 
 import javax.inject.{Inject, Singleton}
 import javax.ws.rs.core.{Feature, FeatureContext, Form, MediaType}
@@ -38,7 +38,7 @@ class BothParamValueFactoryProvider @Inject() (
     extractor: MultivaluedParameterExtractor[_],
     decode: Boolean
   ) extends AbstractContainerRequestValueFactory[Object] {
-    private val FORM_CACHE_KEY = "ly.stealth.mesos.kafka.http.FORM_CACHE_KEY"
+    private val FORM_CACHE_KEY = "ly.stealth.mesos.kafka.scheduler.http.FORM_CACHE_KEY"
 
     override def provide(): Object = {
       val request = getContainerRequest

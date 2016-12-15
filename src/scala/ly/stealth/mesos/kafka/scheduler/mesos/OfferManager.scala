@@ -1,4 +1,4 @@
-package ly.stealth.mesos.kafka.mesos
+package ly.stealth.mesos.kafka.scheduler.mesos
 
 import java.util.Date
 import ly.stealth.mesos.kafka.Broker

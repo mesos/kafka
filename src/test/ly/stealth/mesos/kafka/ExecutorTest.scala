@@ -20,6 +20,7 @@ package ly.stealth.mesos.kafka
 import java.io.File
 import java.util
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Metrics}
+import ly.stealth.mesos.kafka.executor.{Executor, LaunchConfig}
 import ly.stealth.mesos.kafka.json.JsonUtil
 import org.junit.Test
 import org.junit.Assert._

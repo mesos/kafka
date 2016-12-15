@@ -1,10 +1,10 @@
-package ly.stealth.mesos.kafka.http.api
+package ly.stealth.mesos.kafka.scheduler.http.api
 
 import javax.ws.rs.core.{MediaType, Response}
 import javax.ws.rs.{GET, POST, Path, Produces}
-import ly.stealth.mesos.kafka.Quotas
-import ly.stealth.mesos.kafka.http.BothParam
-import ly.stealth.mesos.kafka.mesos.ClusterComponent
+import ly.stealth.mesos.kafka.scheduler.Quotas
+import ly.stealth.mesos.kafka.scheduler.http.BothParam
+import ly.stealth.mesos.kafka.scheduler.mesos.ClusterComponent
 
 trait QuotaApiComponent {
   val quotaApi: QuotaApi

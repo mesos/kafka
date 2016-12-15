@@ -1,4 +1,4 @@
-package ly.stealth.mesos.kafka.http.api
+package ly.stealth.mesos.kafka.scheduler.http.api
 
 import javax.ws.rs.core.Response
 import javax.ws.rs.core.Response.StatusType

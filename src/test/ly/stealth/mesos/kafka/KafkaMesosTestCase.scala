@@ -11,6 +11,8 @@ import scala.collection.JavaConversions._
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util
 import java.util.Date
+import ly.stealth.mesos.kafka.executor.{BrokerServer, Executor, KafkaServer, LaunchConfig}
+import ly.stealth.mesos.kafka.scheduler.{KafkaDistributionComponent, KafkaDistributionInfo, ProductionRegistry, Rebalancer, Registry, ZkUtilsWrapper}
 import net.elodina.mesos.test.TestSchedulerDriver
 import org.apache.mesos.Protos.{Status, TaskState}
 import org.junit.Assert._

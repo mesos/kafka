@@ -1,4 +1,4 @@
-package ly.stealth.mesos.kafka.http.api
+package ly.stealth.mesos.kafka.scheduler.http.api
 
 import java.lang.{Boolean => JBool, Double => JDouble, Integer => JInt, Long => JLong}
 import java.util.concurrent.{TimeUnit, TimeoutException}
@@ -8,8 +8,9 @@ import ly.stealth.mesos.kafka.Broker.State
 import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
-import ly.stealth.mesos.kafka.http.BothParam
-import ly.stealth.mesos.kafka.mesos.{ClusterComponent, EventLoopComponent, SchedulerComponent}
+import ly.stealth.mesos.kafka.scheduler.http.BothParam
+import ly.stealth.mesos.kafka.scheduler.mesos.{ClusterComponent, EventLoopComponent, SchedulerComponent}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, Expr, ZkUtilsWrapper}
 import net.elodina.mesos.util.{Period, Range}
 import org.apache.log4j.Logger
 import scala.concurrent.Await

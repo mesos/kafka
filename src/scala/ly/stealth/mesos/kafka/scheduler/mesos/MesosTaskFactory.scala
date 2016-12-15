@@ -1,8 +1,10 @@
-package ly.stealth.mesos.kafka.mesos
+package ly.stealth.mesos.kafka.scheduler.mesos
 
 import com.google.protobuf.ByteString
 import ly.stealth.mesos.kafka._
+import ly.stealth.mesos.kafka.executor.LaunchConfig
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.KafkaDistributionComponent
 import net.elodina.mesos.util.Version
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.Protos._
@@ -29,7 +31,7 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
       if (broker.jvmOptions != null) cmd += " " + broker.jvmOptions.replace("$id", broker.id)
 
       if (Config.debug) cmd += " -Ddebug"
-      cmd += " ly.stealth.mesos.kafka.Executor"
+      cmd += " ly.stealth.mesos.kafka.executor.Executor"
 
       val commandBuilder = CommandInfo.newBuilder
       if (Config.jre != null) {

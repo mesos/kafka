@@ -15,19 +15,17 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.kafka
-
-import net.elodina.mesos.util.Repr
-import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
-import org.apache.mesos.Protos._
-import java.io._
-
-import org.apache.log4j._
+package ly.stealth.mesos.kafka.executor
 
 import com.google.protobuf.ByteString
+import java.io._
 import ly.stealth.mesos.kafka.json.JsonUtil
-
+import ly.stealth.mesos.kafka.{Broker, FrameworkMessage, LogRequest, LogResponse, Util}
+import net.elodina.mesos.util.Repr
+import org.apache.log4j._
 import org.apache.log4j.net.SyslogAppender
+import org.apache.mesos.Protos._
+import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 
 object Executor extends org.apache.mesos.Executor {
   val logger: Logger = Logger.getLogger(Executor.getClass)

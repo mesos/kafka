@@ -23,8 +23,9 @@ import org.junit.Assert._
 import org.apache.mesos.Protos.{Offer, TaskID, TaskState, TaskStatus}
 import java.util.{Date, UUID}
 import java.util.concurrent.TimeUnit
+import ly.stealth.mesos.kafka.executor.{Executor, LaunchConfig}
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.{OfferManager, OfferResult}
+import ly.stealth.mesos.kafka.scheduler.mesos.{OfferManager, OfferResult}
 import net.elodina.mesos.util.Period
 import net.elodina.mesos.util.Strings.parseMap
 import scala.collection.JavaConversions._

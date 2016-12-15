@@ -3,6 +3,7 @@ package ly.stealth.mesos.kafka
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import java.util
+import ly.stealth.mesos.kafka.scheduler.{Expr, Topics}
 import net.elodina.mesos.util.Strings.parseMap
 import scala.collection.JavaConversions._
 

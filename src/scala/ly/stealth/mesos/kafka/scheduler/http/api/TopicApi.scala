@@ -1,11 +1,12 @@
-package ly.stealth.mesos.kafka.http.api
+package ly.stealth.mesos.kafka.scheduler.http.api
 
 import java.lang.{Integer => JInt}
 import javax.ws.rs.core.{MediaType, Response}
 import javax.ws.rs.{DefaultValue, GET, POST, Path, PathParam, Produces}
-import ly.stealth.mesos.kafka.http.BothParam
-import ly.stealth.mesos.kafka.{Expr, ListTopicsResponse, RebalanceStartResponse, Rebalancer}
-import ly.stealth.mesos.kafka.mesos.ClusterComponent
+import ly.stealth.mesos.kafka.scheduler.{Expr, Rebalancer}
+import ly.stealth.mesos.kafka.scheduler.http.BothParam
+import ly.stealth.mesos.kafka.{ListTopicsResponse, RebalanceStartResponse}
+import ly.stealth.mesos.kafka.scheduler.mesos.ClusterComponent
 import net.elodina.mesos.util.Period
 import scala.collection.JavaConversions._
 import scala.util.Try

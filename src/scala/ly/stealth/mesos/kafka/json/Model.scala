@@ -9,9 +9,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
-import ly.stealth.mesos.kafka.{Broker, Cluster}
+import ly.stealth.mesos.kafka.{Broker, Cluster, Topic}
 import ly.stealth.mesos.kafka.Broker._
-import ly.stealth.mesos.kafka.Topics.Topic
 import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Constraint, Period, Range, Strings}
 import scala.collection.JavaConversions._

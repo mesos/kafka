@@ -16,13 +16,14 @@
   */
 
 
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.executor
 
-import java.util.concurrent.TimeUnit
 import com.yammer.metrics.Metrics
 import com.yammer.metrics.core._
 import com.yammer.metrics.reporting.AbstractPollingReporter
 import com.yammer.metrics.util.DeathRattleExceptionHandler
+import java.util.concurrent.TimeUnit
+import ly.stealth.mesos.kafka.Broker
 import org.apache.kafka.common.metrics.{Metrics => ApacheMetrics}
 import org.apache.log4j.Logger
 import scala.collection.JavaConversions._

@@ -1,4 +1,4 @@
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
 import java.util.Properties
 

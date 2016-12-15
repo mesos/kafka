@@ -1,10 +1,10 @@
-package ly.stealth.mesos.kafka.http.api
+package ly.stealth.mesos.kafka.scheduler.http.api
 
 import javax.ws.rs.{GET, POST, Path, Produces}
 import javax.ws.rs.core.{MediaType, Response}
-import ly.stealth.mesos.kafka.Expr
-import ly.stealth.mesos.kafka.http.BothParam
-import ly.stealth.mesos.kafka.mesos.ClusterComponent
+import ly.stealth.mesos.kafka.scheduler.Expr
+import ly.stealth.mesos.kafka.scheduler.http.BothParam
+import ly.stealth.mesos.kafka.scheduler.mesos.ClusterComponent
 
 trait PartitionApiComponent {
   val partitionApi: PartitionApi

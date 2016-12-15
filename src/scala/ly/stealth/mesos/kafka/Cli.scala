@@ -27,9 +27,9 @@ import scala.collection.JavaConverters._
 import java.util.{Collections, Date, Properties}
 import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Period, Repr, Strings}
-import ly.stealth.mesos.kafka.Topics.{Partition, Topic}
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.KafkaMesosScheduler
+import ly.stealth.mesos.kafka.scheduler.ProductionRegistry
+import ly.stealth.mesos.kafka.scheduler.mesos.KafkaMesosScheduler
 
 
 object Cli {
@@ -156,6 +156,27 @@ object Cli {
   }
 
   private def printLine(s: Object = "", indent: Int = 0): Unit = out.println("  " * indent + s)
+
+  def printBrokerExprExamples(out: PrintStream): Unit = {
+    out.println("broker-expr examples:")
+    out.println("  0      - broker 0")
+    out.println("  0,1    - brokers 0,1")
+    out.println("  0..2   - brokers 0,1,2")
+    out.println("  0,1..2 - brokers 0,1,2")
+    out.println("  *      - any broker")
+    out.println("attribute filtering:")
+    out.println("  *[rack=r1]           - any broker having rack=r1")
+    out.println("  *[hostname=slave*]   - any broker on host with name starting with 'slave'")
+    out.println("  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1")
+  }
+
+  def printTopicExprExamples(out: PrintStream): Unit = {
+    out.println("topic-expr examples:")
+    out.println("  t0        - topic t0")
+    out.println("  t0,t1     - topics t0, t1")
+    out.println("  *         - any topic")
+    out.println("  t*        - topics starting with 't'")
+  }
 
   private[kafka] def resolveApi(apiOption: String): Unit = {
     if (api != null) return
@@ -478,7 +499,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -507,7 +528,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -568,7 +589,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
 
         printLine()
         printConstraintExamples()
@@ -637,7 +658,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -663,7 +684,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -696,7 +717,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -744,7 +765,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -980,7 +1001,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printTopicExprExamples(out)
+        printTopicExprExamples(out)
 
         return
       }
@@ -1030,11 +1051,11 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printTopicExprExamples(out)
+        printTopicExprExamples(out)
 
         if (add) {
           printLine()
-          Expr.printBrokerExprExamples(out)
+          printBrokerExprExamples(out)
         }
 
         return
@@ -1103,10 +1124,10 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printTopicExprExamples(out)
+        printTopicExprExamples(out)
 
         printLine()
-        Expr.printBrokerExprExamples(out)
+        printBrokerExprExamples(out)
         return
       }
 
@@ -1150,7 +1171,7 @@ object Cli {
         handleGenericOptions(null, help = true)
 
         printLine()
-        Expr.printTopicExprExamples(out)
+        printTopicExprExamples(out)
 
         return
       }

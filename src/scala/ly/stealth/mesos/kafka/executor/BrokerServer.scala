@@ -15,18 +15,18 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.executor
 
-import java.util.concurrent.TimeUnit
-import org.apache.log4j.Logger
 import java.io.{File, FileInputStream}
 import java.net.{URL, URLClassLoader}
-import java.util.Properties
 import java.util
-import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
+import java.util.Properties
+import java.util.concurrent.TimeUnit
 import ly.stealth.mesos.kafka.Util.BindAddress
+import ly.stealth.mesos.kafka.Broker
 import net.elodina.mesos.util.{IO, Version}
+import org.apache.log4j.Logger
+import scala.collection.JavaConversions._
 
 
 case class LaunchConfig(

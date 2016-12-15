@@ -1,10 +1,10 @@
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
 import java.util
-import scala.collection.JavaConversions._
-import java.io.PrintStream
 import ly.stealth.mesos.kafka.Broker.Task
+import ly.stealth.mesos.kafka.{Broker, Cluster}
 import net.elodina.mesos.util.Strings
+import scala.collection.JavaConversions._
 
 object Expr {
   def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): Seq[String] = {
@@ -146,19 +146,6 @@ object Expr {
     if (sortByAttrs) sortBrokers()
   }
 
-  def printBrokerExprExamples(out: PrintStream): Unit = {
-    out.println("broker-expr examples:")
-    out.println("  0      - broker 0")
-    out.println("  0,1    - brokers 0,1")
-    out.println("  0..2   - brokers 0,1,2")
-    out.println("  0,1..2 - brokers 0,1,2")
-    out.println("  *      - any broker")
-    out.println("attribute filtering:")
-    out.println("  *[rack=r1]           - any broker having rack=r1")
-    out.println("  *[hostname=slave*]   - any broker on host with name starting with 'slave'")
-    out.println("  0..4[rack=r1,dc=dc1] - any broker having rack=r1 and dc=dc1")
-  }
-
   def expandTopics(expr: String): Seq[String] = {
     val allTopics = ZkUtilsWrapper().getAllTopics()
 
@@ -168,13 +155,5 @@ object Expr {
       else
         allTopics.filter(topic => topic.startsWith(part.substring(0, part.length - 1)))
     )
-  }
-
-  def printTopicExprExamples(out: PrintStream): Unit = {
-    out.println("topic-expr examples:")
-    out.println("  t0        - topic t0")
-    out.println("  t0,t1     - topics t0, t1")
-    out.println("  *         - any topic")
-    out.println("  t*        - topics starting with 't'")
   }
 }

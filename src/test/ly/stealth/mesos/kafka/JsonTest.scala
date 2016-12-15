@@ -21,7 +21,6 @@ import org.junit.Test
 import org.junit.Assert._
 import net.elodina.mesos.util.{Constraint, Period, Range}
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, Stickiness, Task}
-import ly.stealth.mesos.kafka.Topics.Topic
 import scala.io.Source
 
 class JsonTest {
@@ -73,7 +72,7 @@ class JsonTest {
 
   @Test
   def topic_legacy(): Unit = {
-    val topic = getResourceJson[Topics.Topic]("/topic.json")
+    val topic = getResourceJson[Topic]("/topic.json")
     val t = Topic(
       "__consumer_offsets",
       Map(

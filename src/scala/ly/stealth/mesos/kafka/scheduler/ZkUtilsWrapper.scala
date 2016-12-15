@@ -1,12 +1,12 @@
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
 import java.lang.reflect.Method
-import java.util
 import java.util.Properties
 import kafka.admin.AdminUtils
-import kafka.common.{AppInfo, TopicAndPartition}
+import kafka.common.TopicAndPartition
 import kafka.controller.{LeaderIsrAndControllerEpoch, ReassignedPartitionsContext}
 import kafka.utils.ZkUtils
+import ly.stealth.mesos.kafka.Config
 import net.elodina.mesos.util.Version
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkMarshallingError

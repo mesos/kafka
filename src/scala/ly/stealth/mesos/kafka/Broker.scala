@@ -27,7 +27,7 @@ import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
 import ly.stealth.mesos.kafka.Broker.{Failover, Metrics, Stickiness}
 import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.OfferResult
+import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
 import net.elodina.mesos.util.{Constraint, Period, Range, Repr}
 
 class Broker(_id: String = "0") {

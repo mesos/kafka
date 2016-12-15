@@ -1,6 +1,7 @@
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
-import ly.stealth.mesos.kafka.mesos._
+import ly.stealth.mesos.kafka.scheduler.mesos._
+import ly.stealth.mesos.kafka.{Broker, ClockComponent}
 import net.elodina.mesos.util.Repr
 import org.apache.log4j.Logger
 import org.apache.mesos.Protos._

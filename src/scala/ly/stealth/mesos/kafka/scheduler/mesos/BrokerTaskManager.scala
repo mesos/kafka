@@ -1,7 +1,7 @@
-package ly.stealth.mesos.kafka.mesos
+package ly.stealth.mesos.kafka.scheduler.mesos
 
 import ly.stealth.mesos.kafka.Broker
-import ly.stealth.mesos.kafka.mesos.OfferResult.Accept
+import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult.Accept
 import net.elodina.mesos.util.Repr
 import org.apache.log4j.Logger
 import org.apache.mesos.Protos.{ExecutorID, SlaveID, TaskID}

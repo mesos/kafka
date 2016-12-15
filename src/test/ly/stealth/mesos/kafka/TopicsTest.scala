@@ -4,9 +4,9 @@ import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.Topics
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 
 class TopicsTest extends KafkaMesosTestCase {
@@ -86,7 +86,7 @@ class TopicsTest extends KafkaMesosTestCase {
   // Topic
   @Test
   def Topic_toJson_fromJson() {
-    val topic = Topics.Topic(
+    val topic = Topic(
       "name",
       Map(
         0 -> Seq(0, 1),

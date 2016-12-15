@@ -15,33 +15,33 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
 import java.util
 import java.util.Properties
 import kafka.api.LeaderAndIsr
 import kafka.common.TopicAndPartition
 import kafka.controller.LeaderIsrAndControllerEpoch
+import kafka.log.LogConfig
+import ly.stealth.mesos.kafka.{Partition, Topic}
+import org.apache.kafka.common.KafkaException
 import scala.collection.JavaConversions._
 import scala.collection.{Map, Seq, mutable}
-import ly.stealth.mesos.kafka.Topics.Topic
-import kafka.log.LogConfig
-import org.apache.kafka.common.KafkaException
 
 class Topics {
-  def getTopic(name: String): Topics.Topic = {
+  def getTopic(name: String): Topic = {
     if (name == null) return null
     val topics: util.List[Topic] = getTopics.filter(_.name == name)
     if (topics.nonEmpty) topics(0) else null
   }
 
-  def getTopics: Seq[Topics.Topic] = {
+  def getTopics: Seq[Topic] = {
     val names = ZkUtilsWrapper().getAllTopics()
 
     val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtilsWrapper().getPartitionAssignmentForTopics(names)
     val configs = ZkUtilsWrapper().fetchAllTopicConfigs()
 
-    names.sorted.map(t => Topics.Topic(
+    names.sorted.map(t => Topic(
       t,
       assignments.getOrElse(t, null),
       propertiesAsScalaMap(configs.getOrElse(t, null)))
@@ -50,7 +50,7 @@ class Topics {
 
   private val NoLeader = LeaderIsrAndControllerEpoch(LeaderAndIsr(LeaderAndIsr.NoLeader, -1, List(), -1), -1)
 
-  def getPartitions(topics: Seq[String]): Map[String, Set[Topics.Partition]] = {
+  def getPartitions(topics: Seq[String]): Map[String, Set[Partition]] = {
     // returns topic name -> (partition -> brokers)
     val assignments = ZkUtilsWrapper().getPartitionAssignmentForTopics(topics)
     val topicAndPartitions = assignments.flatMap {
@@ -63,7 +63,7 @@ class Topics {
     topicAndPartitions.map(tap => {
       val replicas = assignments(tap.topic).getOrElse(tap.partition, Seq())
       val partitionLeader = leaderAndisr.getOrElse(tap, NoLeader)
-      tap.topic -> new Topics.Partition(
+      tap.topic -> Partition(
         tap.partition,
         replicas,
         partitionLeader.leaderAndIsr.isr,
@@ -113,31 +113,5 @@ class Topics {
       case e: KafkaException => return e.getMessage
     }
     null
-  }
-}
-
-object Topics {
-  class Exception(message: String) extends java.lang.Exception(message)
-
-  case class Partition(
-      id: Int = 0,
-      replicas: Seq[Int] = null,
-      isr: Seq[Int] = null,
-      leader: Int = 0,
-      expectedLeader: Int = 0)
-
-  case class Topic(
-    name: String = null,
-    partitions: Map[Int, Seq[Int]] = Map(),
-    options: Map[String, String] = Map()
-  ) {
-    def partitionsState: String = {
-      var s: String = ""
-      for ((partition, brokers) <- partitions.toSeq.sortBy(_._1)) {
-        if (!s.isEmpty) s += ", "
-        s += partition + ":[" + brokers.mkString(",") + "]"
-      }
-      s
-    }
   }
 }

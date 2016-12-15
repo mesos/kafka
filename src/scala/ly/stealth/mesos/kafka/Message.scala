@@ -18,8 +18,6 @@
 
 package ly.stealth.mesos.kafka
 
-class Message {  }
-
 case class LogRequest(requestId: Long, lines: Int, name: String) {
   override def toString: String = s"log,$requestId,$lines,$name"
 }

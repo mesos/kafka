@@ -30,8 +30,9 @@ import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
 import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, State, Stickiness, Task}
 import java.util
+import ly.stealth.mesos.kafka.executor.LaunchConfig
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.OfferResult
+import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
 import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
 
 class BrokerTest extends KafkaMesosTestCase {

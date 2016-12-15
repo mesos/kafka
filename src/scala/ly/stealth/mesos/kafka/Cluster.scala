@@ -22,7 +22,8 @@ import scala.collection.JavaConversions._
 import java.util.Collections
 import java.io.{File, FileWriter}
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.mesos.KafkaMesosScheduler
+import ly.stealth.mesos.kafka.scheduler.{Quotas, Rebalancer, Topics, ZKStringSerializer}
+import ly.stealth.mesos.kafka.scheduler.mesos.KafkaMesosScheduler
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 

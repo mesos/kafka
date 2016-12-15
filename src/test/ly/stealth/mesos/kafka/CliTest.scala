@@ -24,6 +24,7 @@ import java.util
 import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.Rebalancer
 import net.elodina.mesos.util.{Period, Strings}
 
 class CliTest extends KafkaMesosTestCase {
@@ -231,7 +232,7 @@ class CliTest extends KafkaMesosTestCase {
   }
 
   @Test
-  def broker_restart: Unit = {
+  def broker_restart_timeout: Unit = {
     exec("help broker")
     assertOutContains("restart    - restart broker")
 
@@ -243,17 +244,24 @@ class CliTest extends KafkaMesosTestCase {
     val broker0 = registry.cluster.addBroker(new Broker("0"))
     val broker1 = registry.cluster.addBroker(new Broker("1"))
 
-    for(broker <- registry.cluster.getBrokers) {
+    for (broker <- registry.cluster.getBrokers) {
       exec("broker start " + broker.id + " --timeout 0s")
       started(broker)
     }
 
     // timeout
     assertCliErrorContains("broker restart * --timeout 200ms", "broker 0 timeout on stop")
+  }
 
-    // restarted
-    exec("broker start " + broker0.id + " --timeout 0s")
-    started(broker0)
+  @Test
+  def broker_restart_success = {
+    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker1 = registry.cluster.addBroker(new Broker("1"))
+
+    for (broker <- registry.cluster.getBrokers) {
+      exec("broker start " + broker.id + " --timeout 0s")
+      started(broker)
+    }
 
     delay("150ms") { stopped(broker0) }
     delay("250ms") { started(broker0) }

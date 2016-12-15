@@ -15,13 +15,14 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.kafka.mesos
+package ly.stealth.mesos.kafka.scheduler.mesos
 
 import java.util
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, BrokerLogManagerComponent, Registry}
 import net.elodina.mesos.util.{Repr, Version}
 import org.apache.log4j._
 import org.apache.mesos.Protos._

@@ -15,21 +15,20 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
 import java.lang.reflect.InvocationTargetException
 import java.util
 import java.util.Random
-
-import scala.collection.JavaConversions._
-import scala.collection.{Map, Seq, mutable}
-import org.I0Itec.zkclient.ZkClient
-import org.I0Itec.zkclient.exception.ZkNodeExistsException
-import kafka.admin._
 import kafka.common.TopicAndPartition
 import kafka.utils.ZkUtils
+import ly.stealth.mesos.kafka.Config
 import net.elodina.mesos.util.Period
+import org.I0Itec.zkclient.ZkClient
+import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.apache.log4j.Logger
+import scala.collection.JavaConversions._
+import scala.collection.{Map, Seq, mutable}
 
 class Rebalancer {
   private val logger: Logger = Logger.getLogger(this.getClass)

@@ -25,9 +25,9 @@ import java.net.{HttpURLConnection, URL}
 import net.elodina.mesos.util.{IO, Period}
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 import Cli.{sendRequest, sendRequestObj}
-import ly.stealth.mesos.kafka.Topics.Topic
 import java.util.Properties
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.{Quota, Quotas}
 import scala.collection.JavaConversions._
 import scala.io.Source
 
@@ -111,7 +111,7 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertTrue(broker.needsRestart)
     registry.scheduler.resourceOffers(schedulerDriver, Seq(offer("cpus:0.01;mem:128;ports:0..1")))
     assertTrue(broker.waitFor(Broker.State.STOPPING, new Period("1s"), 1))
-    registry.scheduler.statusUpdate(schedulerDriver, taskStatus(Broker.nextTaskId(broker), TaskState.TASK_FINISHED))
+    registry.scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_FINISHED))
     assertTrue(broker.waitFor(null, new Period("1s"), 1))
     assertFalse(broker.needsRestart)
   }

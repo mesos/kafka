@@ -1,8 +1,9 @@
-package ly.stealth.mesos.kafka
+package ly.stealth.mesos.kafka.scheduler
 
-import ly.stealth.mesos.kafka.http.api._
-import ly.stealth.mesos.kafka.http.{HttpServerComponent, HttpServerComponentImpl}
-import ly.stealth.mesos.kafka.mesos._
+import ly.stealth.mesos.kafka.scheduler.http.api._
+import ly.stealth.mesos.kafka.scheduler.http.{HttpServerComponent, HttpServerComponentImpl}
+import ly.stealth.mesos.kafka.scheduler.mesos._
+import ly.stealth.mesos.kafka.{ClockComponent, Cluster, WallClockComponent}
 
 trait HttpApiComponent
   extends BrokerApiComponent

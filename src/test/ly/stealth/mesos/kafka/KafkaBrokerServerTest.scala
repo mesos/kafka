@@ -1,5 +1,6 @@
 package ly.stealth.mesos.kafka
 
+import ly.stealth.mesos.kafka.executor.KafkaServer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.junit.Test

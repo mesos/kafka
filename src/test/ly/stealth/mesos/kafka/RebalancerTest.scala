@@ -23,6 +23,7 @@ import org.I0Itec.zkclient.ZkClient
 import kafka.utils.ZkUtils
 import scala.collection.JavaConversions._
 import java.util
+import ly.stealth.mesos.kafka.scheduler.{Rebalancer, ZKStringSerializer, ZkUtilsWrapper}
 
 class RebalancerTest extends KafkaMesosTestCase {
   var rebalancer: Rebalancer = null
