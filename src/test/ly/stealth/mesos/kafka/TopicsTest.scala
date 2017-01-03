@@ -44,11 +44,11 @@ class TopicsTest extends KafkaMesosTestCase {
 
   @Test
   def fairAssignment {
-    val assignment: util.Map[Int, util.List[Int]] = topics.fairAssignment(3, 2, util.Arrays.asList(0, 1, 2), 0, 0)
-    assertEquals(3, assignment.size())
-    assertEquals(util.Arrays.asList(0, 1), assignment.get(0))
-    assertEquals(util.Arrays.asList(1, 2), assignment.get(1))
-    assertEquals(util.Arrays.asList(2, 0), assignment.get(2))
+    val assignment = topics.fairAssignment(3, 2, Seq(0, 1, 2), 0, 0)
+    assertEquals(3, assignment.size)
+    assertEquals(Seq(0, 1), assignment(0))
+    assertEquals(Seq(1, 2), assignment(1))
+    assertEquals(Seq(2, 0), assignment(2))
   }
 
   @Test

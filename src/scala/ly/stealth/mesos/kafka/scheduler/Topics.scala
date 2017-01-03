@@ -73,25 +73,25 @@ class Topics {
     }).groupBy(_._1).mapValues(v => v.map(_._2))
   }
 
-  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: Seq[Int] = null, fixedStartIndex: Int = -1, startPartitionId: Int = -1): util.Map[Int, util.List[Int]] = {
+  def fairAssignment(partitions: Int = 1, replicas: Int = 1, brokers: Seq[Int] = null, fixedStartIndex: Int = -1, startPartitionId: Int = -1): Map[Int, Seq[Int]] = {
     var brokers_ = brokers
 
     if (brokers_ == null) {
       brokers_ = ZkUtilsWrapper().getSortedBrokerList()
     }
 
-    ZkUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId).mapValues(new util.ArrayList[Int](_))
+    ZkUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId)
   }
 
-  def addTopic(name: String, assignment: util.Map[Int, util.List[Int]] = null, options: Map[String, String] = null): Topic = {
-    var assignment_ = assignment
-    if (assignment_ == null) assignment_ = fairAssignment(1, 1, null)
-
-    val config: Properties = new Properties()
+  def addTopic(name: String, assignment: Map[Int, Seq[Int]] = null, options: Map[String, String] = null): Topic = {
+    val config = new Properties()
     if (options != null)
       for ((k, v) <- options) config.setProperty(k, v)
 
-    ZkUtilsWrapper().createOrUpdateTopicPartitionAssignmentPathInZK(name, assignment_.mapValues(_.toList), config)
+    ZkUtilsWrapper().createOrUpdateTopicPartitionAssignmentPathInZK(
+      name,
+      Option(assignment).getOrElse(fairAssignment(1, 1, null)),
+      config)
     getTopic(name)
   }
 

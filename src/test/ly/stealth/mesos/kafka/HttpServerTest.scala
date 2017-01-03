@@ -24,8 +24,9 @@ import java.io.{File, FileOutputStream, IOException}
 import java.net.{HttpURLConnection, URL}
 import net.elodina.mesos.util.{IO, Period}
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
-import Cli.{sendRequest, sendRequestObj}
+import ly.stealth.mesos.kafka.cli.Cli.{sendRequest, sendRequestObj}
 import java.util.Properties
+import ly.stealth.mesos.kafka.cli.Cli
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.{Quota, Quotas}
 import scala.collection.JavaConversions._

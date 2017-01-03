@@ -23,6 +23,7 @@ import org.junit.Assert._
 import java.util
 import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
+import ly.stealth.mesos.kafka.cli.Cli
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.Rebalancer
 import net.elodina.mesos.util.{Period, Strings}

@@ -36,5 +36,13 @@ trait PartitionApiComponentImpl extends PartitionApiComponent {
     @GET
     @Produces(Array(MediaType.APPLICATION_JSON))
     def listGet(@BothParam("topic") topicExpr: String) = list(topicExpr)
+
+    @Path("add")
+    @POST
+    @Produces(Array(MediaType.APPLICATION_JSON))
+    def add(@BothParam("topic") topic: String): Response = {
+      cluster.rebalancer
+      Response.ok().build()
+    }
   }
 }
