@@ -21,7 +21,6 @@ import java.io.{File, FileInputStream}
 import java.net.{URL, URLClassLoader}
 import java.util
 import java.util.Properties
-import java.util.concurrent.TimeUnit
 import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka.Broker
 import net.elodina.mesos.util.{IO, Version}
@@ -67,7 +66,7 @@ abstract class BrokerServer {
 class KafkaServer extends BrokerServer {
   val logger = Logger.getLogger(classOf[BrokerServer])
   @volatile var server: Object = null
-  @volatile var collector: MetricsCollector = null
+  @volatile var collector: MetricCollectorProxy = null
 
   def isStarted: Boolean = server != null
 
@@ -110,7 +109,7 @@ class KafkaServer extends BrokerServer {
 trait BaseDistro {
   def newServer(options: Map[String, String]): Object
   def startReporters(options: Map[String, String]): Object
-  def startCollector(server: AnyRef, send: Broker.Metrics => Unit, interval: Int = 60): MetricsCollector
+  def startCollector(server: AnyRef, send: Broker.Metrics => Unit, interval: Int = 60): MetricCollectorProxy
   def configureLog4j(config: LaunchConfig): Unit
   val dir: File
 }
@@ -145,14 +144,6 @@ object KafkaServer {
           // Snappy injects 3 classes and native lib to root ClassLoader
           // See - org.xerial.snappy.SnappyLoader.injectSnappyNativeLoader
           if (snappyHackEnabled && snappyHackedClasses.contains(name))
-            return super.loadClass(name, true)
-          // Always load com.yammer.metrics from the root ClassLoader.
-          // This ensures that both our MetricsCollector and Kafka see the same
-          // MetricsRegistry.
-          if (name.startsWith("com.yammer.metrics"))
-            return super.loadClass(name, true)
-
-          if (name.startsWith("org.apache.kafka.common"))
             return super.loadClass(name, true)
 
           // Check class is loaded
@@ -197,11 +188,9 @@ object KafkaServer {
       metricsReporter
     }
 
-    def startCollector(server: AnyRef, send: Broker.Metrics => Unit, interval: Int = 60): MetricsCollector = {
-      val collector = new MetricsCollector(server, send)
-      collector.start(interval, TimeUnit.SECONDS)
-      collector.run()
-
+    def startCollector(server: AnyRef, send: Broker.Metrics => Unit, interval: Int = 60): MetricCollectorProxy = {
+      val collector = new MetricCollectorProxy(loader, server, send)
+      collector.start()
       collector
     }
 
@@ -277,6 +266,7 @@ object KafkaServer {
       for (file <- new File(dir, "libs").listFiles())
         classpath.add(new URL("" + file.toURI))
 
+      classpath.add(classOf[MetricCollectorProxy].getProtectionDomain.getCodeSource.getLocation)
       dir -> new Loader(classpath.toArray(Array()))
     }
   }

@@ -306,7 +306,7 @@ object KafkaMesosScheduler {
     val logger = Logger.getLogger(KafkaMesosScheduler.getClass)
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
-    val layout = new PatternLayout("%d %-5p %c{1.} %x - %m%n")
+    val layout = new PatternLayout("%d %-5p %c %x - %m%n")
 
     var appender: Appender = null
     if (Config.log == null) appender = new ConsoleAppender(layout)

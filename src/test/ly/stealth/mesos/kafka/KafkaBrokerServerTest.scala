@@ -8,7 +8,7 @@ import org.junit.Assert._
 import scala.collection.JavaConversions._
 
 class KafkaBrokerServerTest extends KafkaMesosTestCase {
-  //@Test
+  @Test
   def launchKafkaBroker {
 
     Thread.currentThread().setContextClassLoader(KafkaServer.Distro.loader)

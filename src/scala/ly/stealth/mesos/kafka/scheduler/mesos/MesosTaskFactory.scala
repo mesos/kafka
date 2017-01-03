@@ -65,7 +65,7 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
     }
 
     def newTask(broker: Broker, offer: Offer, reservation: Broker.Reservation): TaskInfo = {
-      def taskData: ByteString = {
+      val taskData = {
         var defaults: Map[String, String] = Map(
           "broker.id" -> broker.id,
           "port" -> ("" + reservation.port),

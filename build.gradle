@@ -70,7 +70,10 @@ dependencies {
         exclude group: "com.sun.jmx"
         exclude group: "junit"
         exclude group: "jline"
+        exclude module: "com.yammer.metrics", group: "metrics-core"
     }
+
+    runtime "com.yammer.metrics:metrics-core:2.2.0"
 }
 
 jar {
