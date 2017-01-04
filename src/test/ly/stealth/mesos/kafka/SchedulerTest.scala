@@ -236,7 +236,6 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertEquals(Broker.State.RECONCILING, broker2.task.state)
 
     for (i <- 2 until Config.reconciliationAttempts + 1) {
-
       registry.taskReconciler.asInstanceOf[{def retryReconciliation()}].retryReconciliation()
       assertEquals(i, registry.taskReconciler.attempts)
       assertEquals(Broker.State.RECONCILING, broker1.task.state)
@@ -290,7 +289,14 @@ class SchedulerTest extends KafkaMesosTestCase {
     status.setTaskId(TaskID.newBuilder().setValue("1"))
     registry.brokerLifecycleManager.onBrokerStatus(broker1, status.build())
 
-    registry.taskReconciler.asInstanceOf[{def retryReconciliation()}].retryReconciliation()
+    while(registry.taskReconciler.isReconciling) {
+      Thread.sleep(10)
+    }
+
+    assertFalse(broker1.task.reconciling)
+    // Starting again should reset the attempts
+    registry.taskReconciler.start()
+    assertEquals(1, registry.taskReconciler.attempts)
   }
 
   @Test

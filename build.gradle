@@ -24,6 +24,8 @@ repositories {
 }
 
 buildDir = 'out/gradle'
+libsDirName = '../../'
+distsDirName = '../../'
 
 sourceSets {
     main {

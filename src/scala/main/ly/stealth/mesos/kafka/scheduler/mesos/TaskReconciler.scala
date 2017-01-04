@@ -1,7 +1,8 @@
 package ly.stealth.mesos.kafka.scheduler.mesos
 
 import java.util.Date
-import java.util.concurrent.{Future, TimeUnit}
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{Future, ScheduledFuture, TimeUnit}
 import ly.stealth.mesos.kafka.{Broker, ClockComponent, Cluster, Config}
 import org.apache.log4j.Logger
 import org.apache.mesos.Protos.{TaskID, TaskState, TaskStatus}
@@ -12,6 +13,7 @@ trait TaskReconcilerComponent {
 
   trait TaskReconciler {
     def start(): Future[_]
+    def onBrokerReconciled(broker: Broker): Unit
     def isReconciling: Boolean
 
     def attempts: Int
@@ -35,20 +37,30 @@ trait TaskReconcilerComponentImpl extends TaskReconcilerComponent {
     import ly.stealth.mesos.kafka.RunnableConversions._
 
     private[this] val logger = Logger.getLogger(classOf[TaskReconciler])
+    private[this] val retryFuture: AtomicReference[ScheduledFuture[_]] = new AtomicReference[ScheduledFuture[_]]()
 
-    private var _attempts: Int = 1
-    private var _lastAttempt: Date = new Date(0)
+    private[this] var _attempts: Int = 1
+    private[this] var _lastAttempt: Date = new Date(0)
 
     def attempts: Int = _attempts
     def lastReconcile: Date = _lastAttempt
 
+    def onBrokerReconciled(broker: Broker): Unit = {
+      if (!isReconciling) {
+        logger.info("Reconciliation complete")
+        Option(retryFuture.getAndSet(null)).foreach { _.cancel(false) }
+      }
+    }
+
     def isReconciling: Boolean =
       cluster.getBrokers.exists(b => b.task != null && b.task.reconciling)
 
-    private def scheduleRetry() = eventLoop.schedule(
-      retryReconciliation _,
-      Config.reconciliationTimeout.ms,
-      TimeUnit.MILLISECONDS)
+    private def scheduleRetry() = {
+      retryFuture.set(eventLoop.schedule(
+        retryReconciliation _,
+        Config.reconciliationTimeout.ms,
+        TimeUnit.MILLISECONDS))
+    }
 
     def retryReconciliation(): Unit = {
       if (!isReconciling) {
@@ -101,8 +113,11 @@ trait TaskReconcilerComponentImpl extends TaskReconcilerComponent {
       )
     }
 
-    private def startImpl(): Future[_] = {
+    private def startImpl() = {
+      retryFuture.set(null)
+      _attempts = 1
       logger.info("Starting reconciliation")
+
       val brokersToReconcile = cluster.getBrokers.filter(_.task != null)
       brokersToReconcile.foreach(broker => {
         broker.task.state = Broker.State.RECONCILING

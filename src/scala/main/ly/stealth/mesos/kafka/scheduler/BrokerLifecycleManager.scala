@@ -22,7 +22,8 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
   this: ClusterComponent
     with OfferManagerComponent
     with ClockComponent
-    with BrokerTaskManagerComponent =>
+    with BrokerTaskManagerComponent
+    with TaskReconcilerComponent =>
 
   val brokerLifecycleManager = new BrokerLifecycleManagerImpl
 
@@ -104,10 +105,13 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
         return
       }
 
-      if (broker.task.reconciling)
-        logger.info(s"Finished reconciling of broker ${ broker.id }, task ${ broker.task.id }")
-
+      val wasReconciling = broker.task.reconciling
       broker.task.state = Broker.State.RUNNING
+      if (wasReconciling) {
+        logger.info(s"Finished reconciling of broker ${ broker.id }, task ${ broker.task.id }")
+        taskReconciler.onBrokerReconciled(broker)
+      }
+
       if (status.hasData && status.getData.size() > 0)
         broker.task.endpoint = new Broker.Endpoint(status.getData.toStringUtf8)
       broker.registerStart(broker.task.hostname)
