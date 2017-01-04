@@ -21,6 +21,7 @@ import java.io.{File, FileInputStream}
 import java.net.{URL, URLClassLoader}
 import java.util
 import java.util.Properties
+import java.util.concurrent.atomic.AtomicBoolean
 import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka.Broker
 import net.elodina.mesos.util.{IO, Version}
@@ -65,8 +66,9 @@ abstract class BrokerServer {
 
 class KafkaServer extends BrokerServer {
   val logger = Logger.getLogger(classOf[BrokerServer])
-  @volatile var server: Object = null
-  @volatile var collector: MetricCollectorProxy = null
+  @volatile var server: Object = _
+  @volatile private var collector: MetricCollectorProxy = _
+  private val stopping = new AtomicBoolean(false)
 
   def isStarted: Boolean = server != null
 
@@ -87,11 +89,13 @@ class KafkaServer extends BrokerServer {
   }
 
   def stop(): Unit = {
-    if (!isStarted) throw new IllegalStateException("!started")
+    val wasStopping = stopping.getAndSet(true)
+    if (!isStarted || wasStopping)
+      return
 
     logger.info("Stopping KafkaServer")
-    collector.shutdown()
-    server.getClass.getMethod("shutdown").invoke(server)
+    Option(collector).foreach { _.shutdown() }
+    Option(server).foreach { s => s.getClass.getMethod("shutdown").invoke(s) }
 
     waitFor()
     server = null
