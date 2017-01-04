@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util
 import java.util.Date
 import ly.stealth.mesos.kafka.executor.{BrokerServer, Executor, KafkaServer, LaunchConfig}
-import ly.stealth.mesos.kafka.scheduler.{KafkaDistributionComponent, KafkaDistributionInfo, ProductionRegistry, Rebalancer, Registry, ZkUtilsWrapper}
+import ly.stealth.mesos.kafka.scheduler._
 import net.elodina.mesos.test.TestSchedulerDriver
 import org.apache.mesos.Protos.{Status, TaskState}
 import org.junit.Assert._
@@ -106,6 +106,7 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     Executor.server = new KafkaServer()
     BasicConfigurator.resetConfiguration()
     ZkUtilsWrapper.reset()
+    AdminUtilsWrapper.reset()
   }
 
   def startZkServer(): ZkClient = {

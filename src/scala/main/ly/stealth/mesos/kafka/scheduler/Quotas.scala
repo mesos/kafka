@@ -21,13 +21,13 @@ class Quotas {
   }
 
   def getClientQuotas(): Map[String, Quota] = {
-    val quotas = ZkUtilsWrapper().fetchAllEntityConfigs("clients")
+    val quotas = AdminUtilsWrapper().fetchAllEntityConfigs("clients")
     quotas.mapValues(p => Quota(propToInt(p, Quotas.PRODUCER_BYTE_RATE), propToInt(p, Quotas.CONSUMER_BYTE_RATE))).toMap
   }
 
   def getClientConfig(clientId: String) =
-    ZkUtilsWrapper().fetchEntityConfig("clients", clientId)
+    AdminUtilsWrapper().fetchEntityConfig("clients", clientId)
 
   def setClientConfig(clientId: String, configs: Properties) =
-    ZkUtilsWrapper().changeClientIdConfig(clientId, configs)
+    AdminUtilsWrapper().changeClientIdConfig(clientId, configs)
 }

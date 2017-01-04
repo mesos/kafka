@@ -118,6 +118,6 @@ class ExprTest extends KafkaMesosTestCase {
     assertEquals(Seq("t0"), Expr.expandTopics("t0"))
     assertEquals(Seq("t0", "t1"), Expr.expandTopics("t0, t1"))
     assertEquals(Set("t0", "t1", "x"), Expr.expandTopics("*").toSet)
-    assertEquals(Seq("t0", "t1"), Expr.expandTopics("t*"))
+    assertEquals(Set("t0", "t1"), Expr.expandTopics("t*").toSet)
   }
 }

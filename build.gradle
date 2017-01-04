@@ -5,13 +5,14 @@ plugins {
     id 'de.undercouch.download' version '2.1.0'
 }
 
-version = new File('src/scala/ly/stealth/mesos/kafka/Config.scala').readLines().findResult(
+version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala').readLines().findResult(
         { x -> x.contains("new Version(\"") ? x.substring(x.indexOf("new Version(\"") + 13, x.lastIndexOf("\")")) : null })
 
 jar.archiveName = "kafka-mesos-${version}.jar"
 
 def mesosVersion = "0.28.0"
-def kafkaVersion="0.10.1.0"
+def kafkaVersion="0.10.1.1"
+def kafkaMajorVersion="${kafkaVersion.split("\\.").take(2).join("_")}"
 def kafkaScalaVersion="2.10"
 def jettyVersion = "9.0.4.v20130625"
 def jerseyVersion = "2.24"
@@ -23,18 +24,21 @@ repositories {
 }
 
 buildDir = 'out/gradle'
-libsDirName = '../../'
-distsDirName = '../../'
 
 sourceSets {
     main {
-        scala { srcDirs = ['src/scala'] }
+        scala {
+            srcDirs = [
+                'src/scala/main',
+                'src/scala/iface/base/',
+                "src/scala/iface/$kafkaMajorVersion/"
+            ]
+        }
     }
     test {
         scala { srcDirs = ['src/test'] }
     }
 }
-
 
 dependencies {
     compile "org.scala-lang:scala-library:2.10.6"
@@ -61,7 +65,6 @@ dependencies {
     compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
     compile "com.fasterxml.jackson.module:jackson-module-scala_$kafkaScalaVersion:$jacksonVersion"
 
-
     testCompile 'junit:junit:4.12'
 
     compile ("org.apache.kafka:kafka_$kafkaScalaVersion:$kafkaVersion") {
@@ -78,6 +81,7 @@ dependencies {
 
 jar {
     dependsOn 'test'
+
     doFirst {
         from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
             exclude "*"

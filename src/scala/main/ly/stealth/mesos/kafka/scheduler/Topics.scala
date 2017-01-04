@@ -39,7 +39,7 @@ class Topics {
     val names = ZkUtilsWrapper().getAllTopics()
 
     val assignments: mutable.Map[String, Map[Int, Seq[Int]]] = ZkUtilsWrapper().getPartitionAssignmentForTopics(names)
-    val configs = ZkUtilsWrapper().fetchAllTopicConfigs()
+    val configs = AdminUtilsWrapper().fetchAllTopicConfigs()
 
     names.sorted.map(t => Topic(
       t,
@@ -80,7 +80,7 @@ class Topics {
       brokers_ = ZkUtilsWrapper().getSortedBrokerList()
     }
 
-    ZkUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId)
+    AdminUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId)
   }
 
   def addTopic(name: String, assignment: Map[Int, Seq[Int]] = null, options: Map[String, String] = null): Topic = {
@@ -88,7 +88,7 @@ class Topics {
     if (options != null)
       for ((k, v) <- options) config.setProperty(k, v)
 
-    ZkUtilsWrapper().createOrUpdateTopicPartitionAssignmentPathInZK(
+    AdminUtilsWrapper().createOrUpdateTopicPartitionAssignmentPathInZK(
       name,
       Option(assignment).getOrElse(fairAssignment(1, 1, null)),
       config)
@@ -99,7 +99,7 @@ class Topics {
     val config: Properties = new Properties()
     for ((k, v) <- options) config.setProperty(k, v)
 
-    ZkUtilsWrapper().changeTopicConfig(topic.name, config)
+    AdminUtilsWrapper().changeTopicConfig(topic.name, config)
     topic
   }
 
