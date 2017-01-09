@@ -28,7 +28,6 @@ import net.elodina.mesos.util.{IO, Version}
 import org.apache.log4j.Logger
 import scala.collection.JavaConversions._
 
-
 case class LaunchConfig(
   id: String,
   options: Map[String, String] = Map(),
@@ -124,7 +123,7 @@ object KafkaServer {
 
     // Loader that loads classes in reverse order: 1. from self, 2. from parent.
     // This is required, because current jar have classes incompatible with classes from kafka distro.
-    class Loader(urls: Array[URL]) extends URLClassLoader(urls) {
+    class Loader(urls: Seq[URL]) extends URLClassLoader(urls.toArray) {
       private[this] val snappyHackedClasses = Array[String]("org.xerial.snappy.SnappyNativeAPI", "org.xerial.snappy.SnappyNative", "org.xerial.snappy.SnappyErrorCode")
       private[this] val snappyHackEnabled = checkSnappyVersion
 
@@ -258,20 +257,15 @@ object KafkaServer {
 
     private def init(): (File, Loader) = {
       // find kafka dir
-      var dir: File = null
-      for (file <- new File(".").listFiles())
-        if (file.isDirectory && file.getName.startsWith("kafka"))
-          dir = file
+      new File(".").listFiles().toSeq.find {
+        f => f.isDirectory && f.getName.startsWith("kafka")
+      }.map { d =>
+        val classPath =
+          new File(d, "libs").listFiles().map(_.toURI.toURL) ++
+            Seq(classOf[MetricCollectorProxy].getProtectionDomain.getCodeSource.getLocation)
 
-      if (dir == null) throw new IllegalStateException("Kafka distribution dir not found")
-
-      // create kafka classLoader
-      val classpath = new util.ArrayList[URL]()
-      for (file <- new File(dir, "libs").listFiles())
-        classpath.add(new URL("" + file.toURI))
-
-      classpath.add(classOf[MetricCollectorProxy].getProtectionDomain.getCodeSource.getLocation)
-      dir -> new Loader(classpath.toArray(Array()))
+        (d, new Loader(classPath))
+      }.getOrElse {throw new IllegalStateException("Kafka distribution dir not found") }
     }
   }
 }

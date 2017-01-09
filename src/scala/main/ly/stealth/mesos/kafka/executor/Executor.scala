@@ -68,60 +68,58 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   private[kafka] def startBroker(driver: ExecutorDriver, task: TaskInfo): Unit = {
-    def runBroker0 {
-      try {
-        if (task.getData == null) {
-          throw new IllegalArgumentException("No task data received")
-        }
-        val config = JsonUtil.fromJson[LaunchConfig](task.getData.toByteArray)
-
-        def send(metrics: Broker.Metrics): Unit = {
-          try {
-            driver.sendFrameworkMessage(
-              JsonUtil.toJsonBytes(FrameworkMessage(metrics = Some(metrics))))
+    val brokerThread = new Thread {
+      override def run(): Unit = {
+        try {
+          if (task.getData == null) {
+            throw new IllegalArgumentException("No task data received")
           }
-          catch {
-            case t: Exception =>
-              logger.error("Error posting metrics", t)
+          val config = JsonUtil.fromJson[LaunchConfig](task.getData.toByteArray)
+
+          def send(metrics: Broker.Metrics): Unit = {
+            try {
+              driver.sendFrameworkMessage(
+                JsonUtil.toJsonBytes(FrameworkMessage(metrics = Some(metrics))))
+            }
+            catch {
+              case t: Exception =>
+                logger.error("Error posting metrics", t)
+            }
           }
+
+          val endpoint = server.start(config, send)
+
+          var status = TaskStatus.newBuilder
+            .setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
+            .setData(ByteString.copyFromUtf8("" + endpoint))
+          driver.sendStatusUpdate(status.build)
+
+          server.waitFor()
+          status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED)
+          driver.sendStatusUpdate(status.build)
+        } catch {
+          case t: Throwable =>
+            logger.warn("", t)
+            sendTaskFailed(driver, task, t)
+        } finally {
+          stopExecutor(driver)
         }
-
-        val endpoint = server.start(config, send)
-
-        var status = TaskStatus.newBuilder
-          .setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
-          .setData(ByteString.copyFromUtf8("" + endpoint))
-        driver.sendStatusUpdate(status.build)
-
-        server.waitFor()
-        status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED)
-        driver.sendStatusUpdate(status.build)
-      } catch {
-        case t: Throwable =>
-          logger.warn("", t)
-          sendTaskFailed(driver, task, t)
-      } finally {
-        stopExecutor(driver)
       }
     }
-
-    new Thread {
-      override def run() {
-        setName("BrokerServer")
-        Thread.currentThread().setContextClassLoader(server.getClassLoader)
-        runBroker0
-      }
-    }.start()
+    brokerThread.setContextClassLoader(server.getClassLoader)
+    brokerThread.setName("BrokerServer")
+    brokerThread.start()
   }
 
   private def killExecutor(driver: ExecutorDriver, taskId: TaskID): Unit = {
-    new Thread() {
+    val killThread = new Thread() {
       override def run(): Unit = {
-        setName("ExecutorStopper")
-
+        logger.info("Sending task killing")
         driver.sendStatusUpdate(TaskStatus.newBuilder
           .setTaskId(taskId)
           .setState(TaskState.TASK_KILLING)
+          .setMessage("Asked to shut down")
+          .clearReason()
           .build)
 
         if (server.isStarted)
@@ -130,11 +128,15 @@ object Executor extends org.apache.mesos.Executor {
         driver.sendStatusUpdate(TaskStatus.newBuilder
           .setTaskId(taskId)
           .setState(TaskState.TASK_KILLED)
+          .setMessage("Asked to shut down")
+          .clearReason()
           .build)
 
         stopExecutor(driver)
       }
-    }.start()
+    }
+    killThread.setName("ExecutorStopper")
+    killThread.start()
   }
 
   private[kafka] def stopExecutor(driver: ExecutorDriver): Unit = {
