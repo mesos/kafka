@@ -59,8 +59,7 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
       ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
         .setCommand(commandBuilder)
-        .setName("kafka.broker")
-        .setSource(Config.frameworkName + ".broker." + broker.id)
+        .setName("broker-" + broker.id)
         .build()
     }
 
