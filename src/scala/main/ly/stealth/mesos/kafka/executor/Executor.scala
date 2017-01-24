@@ -87,16 +87,22 @@ object Executor extends org.apache.mesos.Executor {
             }
           }
 
+          val startingStatus = TaskStatus.newBuilder
+            .setTaskId(task.getTaskId).setState(TaskState.TASK_STARTING)
+          driver.sendStatusUpdate(startingStatus.build())
+
           val endpoint = server.start(config, send)
 
-          var status = TaskStatus.newBuilder
+          val runningStatus = TaskStatus.newBuilder
             .setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
             .setData(ByteString.copyFromUtf8("" + endpoint))
-          driver.sendStatusUpdate(status.build)
+          driver.sendStatusUpdate(runningStatus.build())
 
           server.waitFor()
-          status = TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED)
-          driver.sendStatusUpdate(status.build)
+          val finishedStatus = TaskStatus.newBuilder
+            .setTaskId(task.getTaskId)
+            .setState(TaskState.TASK_FINISHED)
+          driver.sendStatusUpdate(finishedStatus.build())
         } catch {
           case t: Throwable =>
             logger.warn("", t)

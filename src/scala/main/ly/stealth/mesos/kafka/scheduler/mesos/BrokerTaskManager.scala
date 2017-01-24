@@ -31,7 +31,7 @@ trait BrokerTaskManagerComponent {
     def forceStopBroker(broker: Broker): Unit
     def killBroker(broker: Broker): Unit
     def killTask(taskId: TaskID): Unit
-    def launchBroker(offerResult: OfferResult.Accept): Unit
+    def launchBroker(offerResult: OfferResult.Accept): Broker.Task
   }
 }
 
@@ -61,7 +61,7 @@ trait BrokerTaskManagerComponentImpl extends BrokerTaskManagerComponent {
 
     def killTask(taskId: TaskID): Unit = Driver.call(_.killTask(taskId))
 
-    def launchBroker(offerResult: Accept): Unit = {
+    def launchBroker(offerResult: Accept): Broker.Task = {
       val broker = offerResult.broker
       val offer = offerResult.offer
 
@@ -77,17 +77,16 @@ trait BrokerTaskManagerComponentImpl extends BrokerTaskManagerComponent {
         .toMap
 
       Driver.call(_.launchTasks(Seq(offer.getId).asJava, Seq(task_).asJava))
-      broker.task = Broker.Task(
+      logger
+        .info(s"Starting broker ${broker.id}: launching task $id by offer " +
+          s"${offer.getHostname + Repr.id(offer.getId.getValue)}\n ${Repr.task(task_)}")
+
+      Broker.Task(
         id,
         task_.getSlaveId.getValue,
         task_.getExecutor.getExecutorId.getValue,
         offer.getHostname,
         attributes)
-      logger
-        .info(s"Starting broker ${ broker.id }: launching task $id by offer ${
-          offer
-            .getHostname + Repr.id(offer.getId.getValue)
-        }\n ${ Repr.task(task_) }")
     }
   }
 
