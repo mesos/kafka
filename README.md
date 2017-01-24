@@ -1,4 +1,4 @@
-Kafka Mesos Framework
+Kafka Mesos Framework [![Build Status](https://travis-ci.org/mesos/kafka.svg?branch=master)](https://travis-ci.org/mesos/kafka)
 ======================
 
 For issues https://github.com/mesos/kafka/issues
