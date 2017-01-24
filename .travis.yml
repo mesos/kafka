@@ -15,9 +15,11 @@
 
 language: java
 java:
-- 1.7
-- 1.8
-
+  - 1.7
+  - 1.8
 before_install: wget http://www-us.apache.org/dist/kafka/0.8.2.2/kafka_2.10-0.8.2.2.tgz
-
+cache:
+  directories:
+    - $HOME/.m2/repository
+sudo: false
 install: ./gradlew jar
