@@ -20,6 +20,11 @@ import ly.stealth.mesos.kafka.interface.impl.AdminUtils
 import java.util.Properties
 import scala.collection.Map
 
+case class FeatureSupport(
+  quotas: Boolean,
+  genericEntityConfigs: Boolean
+)
+
 trait AdminUtilsProxy {
   def fetchAllTopicConfigs(): Map[String, Properties]
 
@@ -40,6 +45,8 @@ trait AdminUtilsProxy {
     replicationFactor: Int,
     fixedStartIndex: Int = -1,
     startPartitionId: Int = -1): Map[Int, Seq[Int]]
+
+  val features: FeatureSupport
 }
 
 object AdminUtilsProxy {

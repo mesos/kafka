@@ -42,4 +42,4 @@ cache:
 install: true
 before_script:
   - 'export JAVA_OPTS="-XX:MaxPermSize=512m -Xms1g -Xmx3g -Xss2m -XX:+CMSClassUnloadingEnabled -XX:+UseConcMarkSweepGC"'
-script: ./gradlew jar -P$KAFKA_VER
+script: ./gradlew jar -PkafkaVersion=$KAFKA_VER

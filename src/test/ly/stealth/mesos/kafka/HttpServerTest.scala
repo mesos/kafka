@@ -22,13 +22,13 @@ import org.junit.{After, Before, Test}
 import org.junit.Assert._
 import java.io.{File, FileOutputStream, IOException}
 import java.net.{HttpURLConnection, URL}
-import net.elodina.mesos.util.{IO, Period}
+import net.elodina.mesos.util.{IO, Period, Version}
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 import ly.stealth.mesos.kafka.cli.Cli.{sendRequest, sendRequestObj}
 import java.util.Properties
 import ly.stealth.mesos.kafka.cli.Cli
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.scheduler.{Quota, Quotas}
+import ly.stealth.mesos.kafka.scheduler.{AdminUtilsWrapper, Quota, Quotas}
 import scala.collection.JavaConversions._
 import scala.io.Source
 
@@ -413,6 +413,8 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def quota_list: Unit = {
+    if (!AdminUtilsWrapper().features.quotas) return
+
     val cluster = registry.cluster
     val configs = new Properties()
     configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
@@ -426,6 +428,8 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def quota_list_partial: Unit = {
+    if (!AdminUtilsWrapper().features.quotas) return
+
     val cluster = registry.cluster
     val configs = new Properties()
     configs.setProperty(Quotas.PRODUCER_BYTE_RATE, "100")
@@ -438,6 +442,8 @@ class HttpServerTest extends KafkaMesosTestCase {
 
   @Test
   def quota_set: Unit = {
+    if (!AdminUtilsWrapper().features.quotas) return
+
     sendRequest("/quota/set", parseMap("entityType=clients,entity=test,producerByteRate=100,consumerByteRate=200"))
 
     val quotas = registry.cluster.quotas.getClientQuotas()

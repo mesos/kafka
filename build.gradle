@@ -18,7 +18,7 @@ version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala')
         .readLines()
         .findResult({ x -> x.contains("val value = \"") ? x.substring(x.indexOf("\"") + 1, x.lastIndexOf("\"")) : null })
 
-jar.archiveName = "kafka-mesos-${kafkaMajorVersion.replace('_', '.')}-${version}.jar"
+jar.archiveName = "kafka-mesos-${version}-kafka_$kafkaScalaVersion-${kafkaVersion.replace('_', '.')}.jar"
 
 
 repositories {
@@ -76,6 +76,7 @@ dependencies {
     compile "com.fasterxml.jackson.module:jackson-module-scala_$kafkaScalaVersion:$jacksonVersion"
 
     testCompile 'junit:junit:4.12'
+    testCompile 'com.101tec:zkclient:0.7'
 
     compile ("org.apache.kafka:kafka_$kafkaScalaVersion:$kafkaVersion") {
         exclude group: "javax.jms"

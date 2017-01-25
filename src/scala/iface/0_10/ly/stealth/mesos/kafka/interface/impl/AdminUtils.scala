@@ -19,7 +19,7 @@ package ly.stealth.mesos.kafka.interface.impl
 import kafka.utils.{ZkUtils => KafkaZkUtils}
 import kafka.admin.{BrokerMetadata, AdminUtils => KafkaAdminUtils}
 import java.util.Properties
-import ly.stealth.mesos.kafka.interface.AdminUtilsProxy
+import ly.stealth.mesos.kafka.interface.{AdminUtilsProxy, FeatureSupport}
 import scala.collection.Map
 
 
@@ -64,4 +64,6 @@ class AdminUtils(zkUrl: String) extends AdminUtilsProxy {
     val md = ids.map(BrokerMetadata(_, None))
     KafkaAdminUtils.assignReplicasToBrokers(md, nPartitions, replicationFactor, fixedStartIndex, startPartitionId)
   }
+
+  override val features: FeatureSupport = FeatureSupport(quotas = true, genericEntityConfigs = true)
 }
