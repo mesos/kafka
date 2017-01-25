@@ -250,8 +250,6 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
 }
 
 object KafkaMesosScheduler {
-  val version: Version = SchedulerVersion.value
-
   private val logger = Logger.getLogger(KafkaMesosScheduler.getClass)
   private[this] var driver: SchedulerDriver = _
 

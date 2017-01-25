@@ -6,11 +6,6 @@ plugins {
     id "com.github.hierynomus.license" version "0.13.1"
 }
 
-version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala').readLines().findResult(
-        { x -> x.contains("new Version(\"") ? x.substring(x.indexOf("new Version(\"") + 13, x.lastIndexOf("\")")) : null })
-
-jar.archiveName = "kafka-mesos-${version}.jar"
-
 def mesosVersion = "0.28.0"
 ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "0.10.1.1"
 def kafkaMajorVersion="${kafkaVersion.split("\\.").take(2).join("_")}"
@@ -18,6 +13,13 @@ def kafkaScalaVersion="2.10"
 def jettyVersion = "9.0.4.v20130625"
 def jerseyVersion = "2.24"
 def jacksonVersion = "2.8.2"
+
+version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala')
+        .readLines()
+        .findResult({ x -> x.contains("val value = \"") ? x.substring(x.indexOf("\"") + 1, x.lastIndexOf("\"")) : null })
+
+jar.archiveName = "kafka-mesos-${kafkaMajorVersion.replace('_', '.')}-${version}.jar"
+
 
 repositories {
     mavenCentral()

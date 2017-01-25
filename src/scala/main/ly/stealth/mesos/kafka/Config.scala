@@ -24,7 +24,7 @@ import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Period, Version}
 
 object SchedulerVersion {
-  val value = new Version("0.9.5.1")
+  val value = "0.10.0.0-SNAPSHOT"
 }
 
 object Config {
