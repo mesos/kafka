@@ -43,8 +43,13 @@ case class LaunchConfig(
 
     result ++= options
 
-    if (bindAddress != null)
-      result += ("host.name" -> bindAddress.resolve())
+    if (bindAddress != null) {
+      val addr = bindAddress.resolve()
+      result += ("host.name" -> addr)
+      if (result.contains("listeners")) {
+        result += ("listeners" -> s"PLAINTEXT://$addr:${result("port")}")
+      }
+    }
 
     result.mapValues(v => v.replace("$id", id))
   }

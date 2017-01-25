@@ -69,6 +69,11 @@ class BrokerTest extends KafkaMesosTestCase {
       val li = LaunchConfig("0", Map("host.name" -> "123"), false, Map(), new BindAddress("127.0.0.1"), Map())
       assertEquals(Map("host.name" -> "127.0.0.1"), li.interpolatedOptions)
     }
+    {
+      broker.bindAddress = new BindAddress("127.0.0.1")
+      val li = LaunchConfig("0", Map("listeners" -> "PLAINTEXT://:3002", "port" -> "3002"), false, Map(), new BindAddress("127.0.0.1"), Map())
+      assertEquals(Map("host.name" -> "127.0.0.1", "port" -> "3002", "listeners" -> "PLAINTEXT://127.0.0.1:3002"), li.interpolatedOptions)
+    }
   }
 
   @Test
