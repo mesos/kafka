@@ -17,9 +17,16 @@ language: java
 jdk:
   - oraclejdk8
   - oraclejdk7
-before_install: wget http://www-us.apache.org/dist/kafka/0.8.2.2/kafka_2.10-0.8.2.2.tgz
+before_install:
+  - 'wget http://www-us.apache.org/dist/kafka/0.8.2.2/kafka_2.10-0.8.2.2.tgz'
+  - 'export JAVA_OPTS="-XX:MaxPermSize=512m -Xms1g -Xmx3g -Xss2m -XX:+CMSClassUnloadingEnabled -XX:+UseConcMarkSweepGC"'
+before_cache:
+  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
 cache:
   directories:
     - $HOME/.m2/repository
+    - $HOME/.gradle/caches/
+    - $HOME/.gradle/wrapper/
 sudo: false
 install: ./gradlew jar

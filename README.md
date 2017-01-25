@@ -1053,4 +1053,4 @@ Project Goals
 
 * scaling the cluster up and down with automatic, programmatic and manual options.
 
-* smart partition assignment via constraints, roles, resources and attributes.
+* smart partition assignment via constraints, roles, resources and attributes. 
