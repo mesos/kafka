@@ -1,0 +1,1 @@
+{"name" : "__consumer_offsets", "partitions" : {"45" : [5, 3, 4], "34" : [2, 7, 0]}, "options" : {"cleanup.policy" : "compact", "compression.type" : "uncompressed", "segment.bytes" : "104857600"}}

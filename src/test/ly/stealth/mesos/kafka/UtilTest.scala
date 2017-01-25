@@ -23,14 +23,6 @@ import ly.stealth.mesos.kafka.Util.BindAddress
 import java.util
 
 class UtilTest {
-  @Test
-  def parseJson {
-    val node: Map[String, Object] = Util.parseJson("{\"a\":\"1\", \"b\":\"2\"}")
-    assertEquals(2, node.size)
-    assertEquals("1", node("a").asInstanceOf[String])
-    assertEquals("2", node("b").asInstanceOf[String])
-  }
-
   // BindAddress
   @Test
   def BindAddress_init {

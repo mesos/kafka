@@ -17,7 +17,11 @@
 
 package ly.stealth.mesos.kafka
 
+import java.io.File
 import java.util
+import ly.stealth.mesos.kafka.Broker.{Endpoint, Metrics}
+import ly.stealth.mesos.kafka.executor.{Executor, LaunchConfig}
+import ly.stealth.mesos.kafka.json.JsonUtil
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.{Status, TaskState}
@@ -26,7 +30,7 @@ import net.elodina.mesos.util.Strings
 class ExecutorTest extends KafkaMesosTestCase {
   @Test(timeout = 5000)
   def startBroker_success {
-    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson()))
+    val data = JsonUtil.toJson(LaunchConfig("0"))
     Executor.startBroker(executorDriver, task("id", "task", "slave", data))
     executorDriver.waitForStatusUpdates(1)
     assertEquals(1, executorDriver.statusUpdates.size())
@@ -73,7 +77,7 @@ class ExecutorTest extends KafkaMesosTestCase {
 
   @Test(timeout = 5000)
   def launchTask {
-    val data: String = Strings.formatMap(util.Collections.singletonMap("broker", "" + new Broker().toJson()))
+    val data = JsonUtil.toJson(LaunchConfig("0"))
     Executor.launchTask(executorDriver, task("id", "task", "slave", data))
 
     executorDriver.waitForStatusUpdates(1)

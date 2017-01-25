@@ -1,0 +1,38 @@
+{
+  "task": {
+    "hostname": "host1",
+    "state": "running",
+    "slaveId": "1fbd3a0d-a685-47e6-8066-01be06d68fac-S821",
+    "executorId": "kafka-general-0-ff258207-18f3-4fd2-9028-5f4c4143f84d",
+    "attributes": {
+      "ip": "10.253.166.214",
+      "host": "host1",
+      "ami": "ami-d0232eba",
+      "cluster": "us-east-1",
+      "dedicated": "kafka\/general",
+      "zone": "us-east-1d",
+      "instance_type": "i2.2xlarge"
+    },
+    "id": "kafka-general-0-705d56e2-7d62-4d7e-b033-74ea5526ed82",
+    "endpoint": "host1:9092"
+  },
+  "syslog": false,
+  "stickiness": {
+    "period": "10m",
+    "hostname": "host1"
+  },
+  "log4jOptions": "k1=v1,k2=v2",
+  "options": "a=1,b=2",
+  "id": "1",
+  "port": "9092",
+  "constraints": "dedicated=like:kafka\/general",
+  "mem": 56320,
+  "jvmOptions": "-server",
+  "cpus": 7,
+  "heap": 5120,
+  "failover": {
+    "delay": "1m",
+    "maxDelay": "10m"
+  },
+  "active": true
+}

@@ -20,7 +20,8 @@ package ly.stealth.mesos.kafka
 import org.junit.{Before, Test}
 import java.util
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Broker.State
+import ly.stealth.mesos.kafka.Broker.{Metrics, State}
+import ly.stealth.mesos.kafka.json.JsonUtil
 
 class ClusterTest extends KafkaMesosTestCase {
   var cluster: Cluster = new Cluster()
@@ -60,8 +61,7 @@ class ClusterTest extends KafkaMesosTestCase {
     cluster.addBroker(new Broker("1"))
     cluster.save()
 
-    val read = new Cluster()
-    read.load()
+    val read = Cluster.load()
     assertEquals(2, read.getBrokers.size())
   }
 
@@ -72,11 +72,23 @@ class ClusterTest extends KafkaMesosTestCase {
     cluster.addBroker(new Broker("1"))
     cluster.frameworkId = "id"
 
-    val read = new Cluster()
-    read.fromJson(Util.parseJson("" + cluster.toJson))
+    val read = JsonUtil.fromJson[Cluster](JsonUtil.toJson(cluster))
 
     assertEquals(cluster.frameworkId, read.frameworkId)
     assertEquals(2, read.getBrokers.size())
     BrokerTest.assertBrokerEquals(broker0, read.getBroker("0"))
+  }
+
+  @Test
+  def toJsonExcludesMetrics: Unit = {
+    val broker0 = cluster.addBroker(new Broker("0"))
+    broker0.metrics = Metrics(Map("test" -> 0), System.currentTimeMillis())
+
+    val read = JsonUtil.fromJson[Cluster](JsonUtil.toJson(cluster))
+    assertEquals(read.getBroker("0").metrics.timestamp, 0)
+
+    // Make sure a broker itself still works normally
+    val readBroker = JsonUtil.fromJson[Broker](JsonUtil.toJson(broker0))
+    assertEquals(broker0.metrics.timestamp, readBroker.metrics.timestamp)
   }
 }

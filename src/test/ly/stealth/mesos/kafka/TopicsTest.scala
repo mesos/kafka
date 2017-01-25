@@ -1,10 +1,29 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package ly.stealth.mesos.kafka
 
+import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
-import ly.stealth.mesos.kafka.Topics.Topic
 import java.util
-import net.elodina.mesos.util.Strings.{parseMap, formatMap}
+import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.Topics
+import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 
 class TopicsTest extends KafkaMesosTestCase {
   var topics: Topics = null
@@ -13,7 +32,7 @@ class TopicsTest extends KafkaMesosTestCase {
   override def before {
     super.before
     startZkServer()
-    topics = Scheduler.cluster.topics
+    topics = registry.cluster.topics
   }
 
   @After
@@ -41,11 +60,11 @@ class TopicsTest extends KafkaMesosTestCase {
 
   @Test
   def fairAssignment {
-    val assignment: util.Map[Int, util.List[Int]] = topics.fairAssignment(3, 2, util.Arrays.asList(0, 1, 2))
-    assertEquals(3, assignment.size())
-    assertEquals(util.Arrays.asList(0, 1), assignment.get(0))
-    assertEquals(util.Arrays.asList(1, 2), assignment.get(1))
-    assertEquals(util.Arrays.asList(2, 0), assignment.get(2))
+    val assignment = topics.fairAssignment(3, 2, Seq(0, 1, 2), 0, 0)
+    assertEquals(3, assignment.size)
+    assertEquals(Seq(0, 1), assignment(0))
+    assertEquals(Seq(1, 2), assignment(1))
+    assertEquals(Seq(2, 0), assignment(2))
   }
 
   @Test
@@ -60,9 +79,9 @@ class TopicsTest extends KafkaMesosTestCase {
     assertEquals("t0", t0.name)
     assertEquals("flush.ms=1000", formatMap(t0.options))
 
-    assertEquals(2, t0.partitions.size())
-    assertEquals(util.Arrays.asList(0), t0.partitions.get(0))
-    assertEquals(util.Arrays.asList(0), t0.partitions.get(1))
+    assertEquals(2, t0.partitions.size)
+    assertEquals(Seq(0), t0.partitions(0))
+    assertEquals(Seq(0), t0.partitions(1))
   }
 
   @Test
@@ -83,17 +102,19 @@ class TopicsTest extends KafkaMesosTestCase {
   // Topic
   @Test
   def Topic_toJson_fromJson() {
-    val topic: Topic = new Topics.Topic("name")
-    topic.partitions.put(0, util.Arrays.asList(0, 1))
-    topic.partitions.put(1, util.Arrays.asList(1, 2))
-    topic.partitions.put(2, util.Arrays.asList(0, 2))
-    topic.options = parseMap("a=1,b=2")
+    val topic = Topic(
+      "name",
+      Map(
+        0 -> Seq(0, 1),
+        1 -> Seq(1, 2),
+        2 -> Seq(0, 2)
+      ),
+      parseMap("a=1,b=2")
+    )
 
-    val read: Topic = new Topic()
-    read.fromJson(Util.parseJson("" + topic.toJson))
-
+    val read = JsonUtil.fromJson[Topic](JsonUtil.toJson(topic))
     assertEquals(topic.name, read.name)
-    assertEquals(topic.partitions, read.partitions)
+    assertEquals(topic.partitions(0), read.partitions(0))
     assertEquals(topic.options, read.options)
   }
 }
