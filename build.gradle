@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'distribution'
     id 'de.undercouch.download' version '2.1.0'
+    id "com.github.hierynomus.license" version "0.13.1"
 }
 
 version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala').readLines().findResult(
@@ -21,6 +22,11 @@ def jacksonVersion = "2.8.2"
 repositories {
     mavenCentral()
     flatDir { dirs 'lib' }
+}
+
+license {
+    header rootProject.file('license.hdr')
+    exclude "**/*.json"
 }
 
 buildDir = 'out/gradle'
