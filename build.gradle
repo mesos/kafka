@@ -12,7 +12,7 @@ version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala').readLin
 jar.archiveName = "kafka-mesos-${version}.jar"
 
 def mesosVersion = "0.28.0"
-def kafkaVersion="0.10.1.1"
+ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "0.10.1.1"
 def kafkaMajorVersion="${kafkaVersion.split("\\.").take(2).join("_")}"
 def kafkaScalaVersion="2.10"
 def jettyVersion = "9.0.4.v20130625"
