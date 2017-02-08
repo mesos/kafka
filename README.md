@@ -1,6 +1,8 @@
 Kafka Mesos Framework [![Build Status](https://travis-ci.org/mesos/kafka.svg?branch=master)](https://travis-ci.org/mesos/kafka)
 ======================
 
+**Join us on Slack at #kafka-mesos https://mesos-slackin.herokuapp.com/**
+
 For issues https://github.com/mesos/kafka/issues
 
 [Installation](#installation)    
