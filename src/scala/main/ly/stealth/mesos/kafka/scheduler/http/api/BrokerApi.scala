@@ -26,7 +26,7 @@ import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
 import ly.stealth.mesos.kafka.scheduler.http.BothParam
 import ly.stealth.mesos.kafka.scheduler.mesos.{ClusterComponent, EventLoopComponent, SchedulerComponent}
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, Expr, ZkUtilsWrapper}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, Expr, ZkUtilsWrapper}
 import net.elodina.mesos.util.{Period, Range}
 import org.apache.log4j.Logger
 import scala.concurrent.Await
@@ -42,7 +42,7 @@ trait BrokerApiComponent {
 
 trait BrokerApiComponentImpl extends BrokerApiComponent {
   this: ClusterComponent
-    with BrokerLifecyleManagerComponent
+    with BrokerLifecycleManagerComponent
     with SchedulerComponent
     with EventLoopComponent =>
 
