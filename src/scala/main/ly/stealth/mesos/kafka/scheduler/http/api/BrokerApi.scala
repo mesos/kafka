@@ -54,7 +54,7 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
 
   @Path("/broker")
   class BrokerApiImpl extends BrokerApi {
-    private[this] val logger = Logger.getLogger(classOf[BrokerApi])
+    private[this] val logger = Logger.getLogger("BrokerApi")
 
     @Path("list")
     @POST

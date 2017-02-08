@@ -17,7 +17,6 @@
 
 package ly.stealth.mesos.kafka
 
-import java.util
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.{Offer, TaskID, TaskState, TaskStatus}

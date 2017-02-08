@@ -66,7 +66,7 @@ object MetricCollectorProxy {
     import org.apache.kafka.common.metrics.{Metrics => ApacheMetrics}
 
     private def getMetricsRegistry = Metrics.defaultRegistry()
-    private val logger = Logger.getLogger(this.getClass)
+    private val logger = Logger.getLogger("MetricCollectorProxy")
 
     private def installCollectors() = {
       val c = Metrics.newCounter(new MetricName("vm", "threads", "unhandledThreadDeaths"))

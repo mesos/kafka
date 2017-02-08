@@ -62,8 +62,8 @@ trait HttpServerComponentImpl extends HttpServerComponent {
   }
 
   class HttpServerImpl extends HttpServer {
-    val logger = Logger.getLogger(classOf[HttpServerImpl])
-    var server: Server = _
+    private val logger = Logger.getLogger("HttpServerImpl")
+    private var server: Server = _
 
     @Path("/")
     class FileServer {
@@ -134,12 +134,11 @@ trait HttpServerComponentImpl extends HttpServerComponent {
       ): Response = {
         val logger = inLogger match {
           case "root" => Logger.getRootLogger
-          case "scheduler" => Logger.getLogger(classOf[KafkaMesosScheduler])
-          case "brokerManager" => Logger.getLogger(classOf[BrokerLifecycleManager])
+          case "scheduler" => Logger.getLogger("KafkaMesosScheduler")
+          case "brokerManager" => Logger.getLogger("BrokerLifecycleManager")
           case l => Logger.getLogger(l)
         }
         logger.setLevel(Level.toLevel(level))
-
         Response.ok.build()
       }
     }

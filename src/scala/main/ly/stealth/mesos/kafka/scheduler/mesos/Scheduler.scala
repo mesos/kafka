@@ -35,7 +35,7 @@ class MesosDriverException(status: Status) extends Exception
 class DriverDisconnectedException extends Exception
 
 object Driver {
-  private[this] val logger = Logger.getLogger(this.getClass)
+  private[this] val logger = Logger.getLogger("Driver")
 
   def call(fn: SchedulerDriver => Status)(implicit driver: SchedulerDriver): Unit = {
     if (driver == null) {
@@ -88,7 +88,7 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
   implicit def driver = _driver
 
   class KafkaMesosSchedulerImpl extends KafkaMesosScheduler {
-    private val logger: Logger = Logger.getLogger(classOf[KafkaMesosScheduler])
+    private val logger: Logger = Logger.getLogger("KafkaMesosScheduler")
 
     def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
       logger
@@ -301,10 +301,11 @@ object KafkaMesosScheduler {
     Logger.getLogger("org.apache.zookeeper").setLevel(Level.WARN)
     Logger.getLogger("org.I0Itec.zkclient").setLevel(Level.WARN)
 
-    val logger = Logger.getLogger(KafkaMesosScheduler.getClass)
+    val logger = Logger.getLogger("KafkaMesosScheduler")
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
-    val layout = new PatternLayout("%d %-5p %c %x - %m%n")
+    val layout = new PatternLayout("%d %-5p %23c] %m%n")
+
 
     var appender: Appender = null
     if (Config.log == null) appender = new ConsoleAppender(layout)

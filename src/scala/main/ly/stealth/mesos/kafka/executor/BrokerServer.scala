@@ -69,7 +69,7 @@ abstract class BrokerServer {
 }
 
 class KafkaServer extends BrokerServer {
-  val logger = Logger.getLogger(classOf[BrokerServer])
+  val logger = Logger.getLogger("BrokerServer")
   @volatile var server: Object = _
   @volatile private var collector: MetricCollectorProxy = _
   private val stopping = new AtomicBoolean(false)

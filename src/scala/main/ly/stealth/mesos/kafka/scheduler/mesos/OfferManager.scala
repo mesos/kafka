@@ -85,7 +85,7 @@ trait OfferManagerComponentImpl extends OfferManagerComponent {
 
   class OfferManagerImpl extends OfferManager {
     private[this] var offersAreSuppressed: Boolean = false
-    private[this] val logger = Logger.getLogger(classOf[OfferManager])
+    private[this] val logger = Logger.getLogger("OfferManager")
     private[this] var canSuppressOffers = true
 
     def enableOfferSuppression(): Unit = canSuppressOffers = true
