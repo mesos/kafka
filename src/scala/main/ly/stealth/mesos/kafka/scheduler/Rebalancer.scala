@@ -30,7 +30,7 @@ import scala.collection.JavaConversions._
 import scala.collection.{Map, Seq, mutable}
 
 class Rebalancer {
-  private val logger: Logger = Logger.getLogger(this.getClass)
+  private val logger: Logger = Logger.getLogger("Rebalancer")
 
   @volatile private var assignment: Map[TopicAndPartition, Seq[Int]] = null
   @volatile private var reassignment: Map[TopicAndPartition, Seq[Int]] = null

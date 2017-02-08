@@ -18,7 +18,7 @@ package ly.stealth.mesos.kafka
 
 import java.io.{File, FileWriter}
 import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
-import org.apache.log4j.{BasicConfigurator, Level, Logger}
+import org.apache.log4j.{Appender, BasicConfigurator, ConsoleAppender, Level, Logger, PatternLayout}
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import net.elodina.mesos.util.{IO, Net, Period, Version}
 import org.junit.{After, Before, Ignore}
@@ -92,7 +92,11 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
 
   @Before
   def before {
-    BasicConfigurator.configure()
+    BasicConfigurator.resetConfiguration()
+    val layout = new PatternLayout("%d %-5p %23c] %m%n")
+    val appender: Appender = new ConsoleAppender(layout)
+
+    Logger.getRootLogger.addAppender(appender)
     Logger.getLogger("org.apache.zookeeper").setLevel(Level.FATAL)
     Logger.getLogger("org.I0Itec.zkclient").setLevel(Level.FATAL)
 

@@ -28,7 +28,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
 
 object Executor extends org.apache.mesos.Executor {
-  val logger: Logger = Logger.getLogger(Executor.getClass)
+  val logger: Logger = Logger.getLogger("Executor")
   var server: BrokerServer = new KafkaServer()
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo): Unit = {
@@ -203,7 +203,7 @@ object Executor extends org.apache.mesos.Executor {
     val root = Logger.getRootLogger
     root.setLevel(Level.INFO)
 
-    val logger = Logger.getLogger(Executor.getClass.getPackage.getName)
+    val logger = Logger.getLogger("Executor")
     logger.setLevel(if (System.getProperty("debug") != null) Level.DEBUG else Level.INFO)
 
     val pattern = "%d [%t] %-5p %c %x - %m%n"

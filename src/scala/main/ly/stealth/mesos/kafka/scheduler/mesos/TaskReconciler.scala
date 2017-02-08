@@ -52,7 +52,7 @@ trait TaskReconcilerComponentImpl extends TaskReconcilerComponent {
   class TaskReconcilerImpl extends TaskReconciler {
     import ly.stealth.mesos.kafka.RunnableConversions._
 
-    private[this] val logger = Logger.getLogger(classOf[TaskReconciler])
+    private[this] val logger = Logger.getLogger("TaskReconciler")
     private[this] val retryFuture: AtomicReference[ScheduledFuture[_]] = new AtomicReference[ScheduledFuture[_]]()
 
     private[this] var _attempts: Int = 1

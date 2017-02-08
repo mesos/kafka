@@ -46,7 +46,7 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecycleManagerComponen
 
   class BrokerLifecycleManagerImpl extends BrokerLifecycleManager {
 
-    private[this] val logger = Logger.getLogger(classOf[BrokerLifecycleManager])
+    private[this] val logger = Logger.getLogger("BrokerLifecycleManager")
 
     def activateBroker(broker: Broker): Unit = {
       logger.info(s"Activating broker ${broker.id}")

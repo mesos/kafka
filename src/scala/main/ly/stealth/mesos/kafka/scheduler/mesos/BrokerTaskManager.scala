@@ -42,7 +42,7 @@ trait BrokerTaskManagerComponentImpl extends BrokerTaskManagerComponent {
   val brokerTaskManager: BrokerTaskManager = new BrokerTaskManagerImpl
 
   class BrokerTaskManagerImpl extends BrokerTaskManager {
-    private[this] val logger = Logger.getLogger(classOf[BrokerTaskManager])
+    private[this] val logger = Logger.getLogger("BrokerTaskManager")
 
     def forceStopBroker(broker: Broker): Unit = {
       if (driver != null && broker.task != null) {
