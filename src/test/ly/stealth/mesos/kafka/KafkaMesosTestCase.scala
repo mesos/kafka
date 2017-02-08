@@ -208,7 +208,7 @@ class TestRebalancer extends Rebalancer {
 
   override def running: Boolean = _running
 
-  override def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1, realignment: Boolean = false): Unit = {
+  override def start(topics: Seq[String], brokers: Seq[Int], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1, realignment: Boolean = false): Unit = {
     if (_failOnStart) throw new Rebalancer.Exception("failOnStart")
     _running = true
   }

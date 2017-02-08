@@ -34,7 +34,7 @@ import scala.concurrent.duration.Duration
 class SchedulerTest extends KafkaMesosTestCase {
   @Test
   def newTask {
-    val broker = new Broker("1")
+    val broker = new Broker(1)
     broker.options = parseMap("a=1").toMap
     broker.log4jOptions = parseMap("b=2").toMap
     broker.cpus = 0.5
@@ -69,7 +69,7 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertEquals(broker.log4jOptions, launchConfig.log4jOptions)
 
     val defaults = launchConfig.interpolatedOptions
-    assertEquals(broker.id, defaults("broker.id"))
+    assertEquals(broker.id.toString, defaults("broker.id"))
     assertEquals("" + 1000, defaults("port"))
     assertEquals(Config.zk, defaults("zookeeper.connect"))
 
@@ -142,8 +142,8 @@ class SchedulerTest extends KafkaMesosTestCase {
 
   @Test
   def launchMultipleBrokers = {
-    val b1 = registry.cluster.addBroker(new Broker("1"))
-    val b2 = registry.cluster.addBroker(new Broker("2"))
+    val b1 = registry.cluster.addBroker(new Broker(1))
+    val b2 = registry.cluster.addBroker(new Broker(2))
     b1.active = true
     b2.active = true
 
@@ -222,12 +222,12 @@ class SchedulerTest extends KafkaMesosTestCase {
 
   @Test
   def declineFailedBroker: Unit = {
-    val broker = registry.cluster.addBroker(new Broker("0"))
+    val broker = registry.cluster.addBroker(new Broker(0))
   }
 
   @Test
   def launchTask {
-    val broker = registry.cluster.addBroker(new Broker("100"))
+    val broker = registry.cluster.addBroker(new Broker(100))
     val offer = this.offer("id", "fw-id", "slave-id", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "a=1,b=2")
     broker.needsRestart = true
     broker.active = true
@@ -245,12 +245,12 @@ class SchedulerTest extends KafkaMesosTestCase {
 
   @Test
   def reconcileTasksIfRequired {
-    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker0 = registry.cluster.addBroker(new Broker(0))
 
-    val broker1 = registry.cluster.addBroker(new Broker("1"))
+    val broker1 = registry.cluster.addBroker(new Broker(1))
     broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
 
-    val broker2 = registry.cluster.addBroker(new Broker("2"))
+    val broker2 = registry.cluster.addBroker(new Broker(2))
     broker2.task = new Broker.Task(id = "2", _state = Broker.State.STARTING)
 
     MockWallClock.overrideNow(Some(new Date(0)))
@@ -282,12 +282,12 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     val mockRegistry = registry
 
-    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker0 = registry.cluster.addBroker(new Broker(0))
 
-    val broker1 = registry.cluster.addBroker(new Broker("1"))
+    val broker1 = registry.cluster.addBroker(new Broker(1))
     broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
 
-    val broker2 = registry.cluster.addBroker(new Broker("2"))
+    val broker2 = registry.cluster.addBroker(new Broker(2))
     broker2.task = new Broker.Task(id = "2", _state = Broker.State.STARTING)
 
     registry.taskReconciler.start().get
@@ -303,9 +303,9 @@ class SchedulerTest extends KafkaMesosTestCase {
   def reconciliationSucceeds: Unit = {
     Config.reconciliationTimeout = new Period("100ms")
 
-    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker0 = registry.cluster.addBroker(new Broker(0))
 
-    val broker1 = registry.cluster.addBroker(new Broker("1"))
+    val broker1 = registry.cluster.addBroker(new Broker(1))
     broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
 
     registry.taskReconciler.start()
@@ -330,10 +330,10 @@ class SchedulerTest extends KafkaMesosTestCase {
 
   @Test
   def otherTasksAttributes {
-    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker0 = registry.cluster.addBroker(new Broker(0))
     broker0.task = Broker.Task(hostname = "host0", attributes = parseMap("a=1,b=2").toMap)
 
-    val broker1 = registry.cluster.addBroker(new Broker("1"))
+    val broker1 = registry.cluster.addBroker(new Broker(1))
     broker1.task = Broker.Task(hostname = "host1", attributes = parseMap("b=3").toMap)
 
     val brokers = Seq(broker0, broker1)
@@ -344,9 +344,9 @@ class SchedulerTest extends KafkaMesosTestCase {
 
   @Test
   def onFrameworkMessage = {
-    val broker0 = registry.cluster.addBroker(new Broker("0"))
+    val broker0 = registry.cluster.addBroker(new Broker(0))
     broker0.active = true
-    val broker1 = registry.cluster.addBroker(new Broker("1"))
+    val broker1 = registry.cluster.addBroker(new Broker(1))
     broker1.active = true
 
     val metrics0 = new Broker.Metrics(Map[String, Number](
@@ -383,7 +383,7 @@ class SchedulerTest extends KafkaMesosTestCase {
 
   @Test
   def sendReceiveBrokerLog = {
-    val broker = registry.cluster.addBroker(new Broker("0"))
+    val broker = registry.cluster.addBroker(new Broker(0))
     broker.task = new Broker.Task("task-id", "slave-id", "executor-id")
 
     // driver connected
@@ -400,7 +400,7 @@ class SchedulerTest extends KafkaMesosTestCase {
     val data = JsonUtil.toJsonBytes(FrameworkMessage(log = Some(LogResponse(requestId, content))))
 
     // skip log response when broker is null
-    registry.scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(new Broker("100"))), slaveId(), data)
+    registry.scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(new Broker(100))), slaveId(), data)
     assertFalse(future.isCompleted)
 
     // skip log response when not active

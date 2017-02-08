@@ -30,7 +30,6 @@ import ly.stealth.mesos.kafka.Broker._
 import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Constraint, Period, Range, Strings}
 import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
 
 object IgnoreMetricsAttribute {}
 
@@ -65,7 +64,7 @@ class BrokerSerializer extends StdSerializer[Broker](classOf[Broker]) {
       }
 
     provider.defaultSerializeValue(BrokerModel(
-      b.id, b.active, b.cpus, b.mem, b.heap, b.port, b.volume, b.bindAddress, b.syslog,
+      b.id.toString, b.active, b.cpus, b.mem, b.heap, b.port, b.volume, b.bindAddress, b.syslog,
       Strings.formatMap(b.constraints), Strings.formatMap(b.options), Strings.formatMap(b.log4jOptions),
       b.jvmOptions, b.stickiness, b.failover, b.task, metrics, b.needsRestart
     ), gen)
@@ -75,8 +74,7 @@ class BrokerSerializer extends StdSerializer[Broker](classOf[Broker]) {
 class BrokerDeserializer extends StdDeserializer[Broker](classOf[Broker]) {
   override def deserialize(p: JsonParser, ctxt: DeserializationContext): Broker = {
     val model = p.readValueAs(classOf[BrokerModel])
-    val b = new Broker()
-    b.id = model.id
+    val b = new Broker(model.id.toInt)
     b.active = model.active
     b.cpus = model.cpus
     b.mem = model.mem

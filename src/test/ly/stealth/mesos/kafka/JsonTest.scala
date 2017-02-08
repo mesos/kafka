@@ -35,7 +35,7 @@ class JsonTest {
   def broker_legacy(): Unit = {
     val broker = getResourceJson[Broker]("/broker.json")
 
-    val b = new Broker("1")
+    val b = new Broker(1)
     b.task = Task(
       id = "kafka-general-0-705d56e2-7d62-4d7e-b033-74ea5526ed82",
       hostname = "host1",

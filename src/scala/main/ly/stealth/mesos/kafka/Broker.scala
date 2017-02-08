@@ -30,8 +30,7 @@ import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
 import net.elodina.mesos.util.{Constraint, Period, Range, Repr}
 
-class Broker(_id: String = "0") {
-  var id: String = _id
+class Broker(val id: Int = 0) {
   @volatile var active: Boolean = false
 
   var cpus: Double = 1
@@ -248,7 +247,7 @@ class Broker(_id: String = "0") {
     matches
   }
 
-  def clone(newId: String): Broker = {
+  def clone(newId: Int): Broker = {
     val nb = new Broker(newId)
     nb.cpus = cpus
     nb.mem = mem
@@ -280,9 +279,9 @@ object Broker {
 
   def nextExecutorId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
 
-  def idFromTaskId(taskId: String): String = taskId.dropRight(37).replace(Config.frameworkName + "-", "")
+  def idFromTaskId(taskId: String): Int = taskId.dropRight(37).replace(Config.frameworkName + "-", "").toInt
 
-  def idFromExecutorId(executorId: String): String = idFromTaskId(executorId)
+  def idFromExecutorId(executorId: String): Int = idFromTaskId(executorId)
 
   def isOptionOverridable(name: String): Boolean = !Set("broker.id", "port", "zookeeper.connect").contains(name)
 

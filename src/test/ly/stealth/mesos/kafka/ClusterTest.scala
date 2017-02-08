@@ -36,8 +36,8 @@ class ClusterTest extends KafkaMesosTestCase {
   def addBroker_removeBroker_getBrokers {
     assertTrue(cluster.getBrokers.isEmpty)
 
-    val broker0 = cluster.addBroker(new Broker("0"))
-    val broker1 = cluster.addBroker(new Broker("1"))
+    val broker0 = cluster.addBroker(new Broker(0))
+    val broker1 = cluster.addBroker(new Broker(1))
     assertEquals(util.Arrays.asList(broker0, broker1), cluster.getBrokers)
 
     cluster.removeBroker(broker0)
@@ -49,16 +49,16 @@ class ClusterTest extends KafkaMesosTestCase {
 
   @Test
   def getBroker {
-    assertNull(cluster.getBroker("0"))
+    assertNull(cluster.getBroker(0))
 
-    val broker0 = cluster.addBroker(new Broker("0"))
-    assertSame(broker0, cluster.getBroker("0"))
+    val broker0 = cluster.addBroker(new Broker(0))
+    assertSame(broker0, cluster.getBroker(0))
   }
 
   @Test
   def save_load {
-    cluster.addBroker(new Broker("0"))
-    cluster.addBroker(new Broker("1"))
+    cluster.addBroker(new Broker(0))
+    cluster.addBroker(new Broker(1))
     cluster.save()
 
     val read = Cluster.load()
@@ -67,25 +67,25 @@ class ClusterTest extends KafkaMesosTestCase {
 
   @Test
   def toJson_fromJson {
-    val broker0 = cluster.addBroker(new Broker("0"))
+    val broker0 = cluster.addBroker(new Broker(0))
     broker0.task = new Broker.Task("1", "slave", "executor", "host", _state = State.RUNNING)
-    cluster.addBroker(new Broker("1"))
+    cluster.addBroker(new Broker(1))
     cluster.frameworkId = "id"
 
     val read = JsonUtil.fromJson[Cluster](JsonUtil.toJson(cluster))
 
     assertEquals(cluster.frameworkId, read.frameworkId)
     assertEquals(2, read.getBrokers.size())
-    BrokerTest.assertBrokerEquals(broker0, read.getBroker("0"))
+    BrokerTest.assertBrokerEquals(broker0, read.getBroker(0))
   }
 
   @Test
   def toJsonExcludesMetrics: Unit = {
-    val broker0 = cluster.addBroker(new Broker("0"))
+    val broker0 = cluster.addBroker(new Broker(0))
     broker0.metrics = Metrics(Map("test" -> 0), System.currentTimeMillis())
 
     val read = JsonUtil.fromJson[Cluster](JsonUtil.toJson(cluster))
-    assertEquals(read.getBroker("0").metrics.timestamp, 0)
+    assertEquals(read.getBroker(0).metrics.timestamp, 0)
 
     // Make sure a broker itself still works normally
     val readBroker = JsonUtil.fromJson[Broker](JsonUtil.toJson(broker0))
