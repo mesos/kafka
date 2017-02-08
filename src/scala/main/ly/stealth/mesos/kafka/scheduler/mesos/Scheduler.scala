@@ -22,7 +22,7 @@ import java.util.concurrent.{Executors, ScheduledExecutorService}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, BrokerLogManagerComponent, Registry}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerLogManagerComponent, Registry}
 import net.elodina.mesos.util.{Repr, Version}
 import org.apache.log4j._
 import org.apache.mesos.Protos._
@@ -79,7 +79,7 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
     with ClusterComponent
     with BrokerLogManagerComponent
     with SchedulerDriverComponent
-    with BrokerLifecyleManagerComponent
+    with BrokerLifecycleManagerComponent
     with BrokerTaskManagerComponent
     with EventLoopComponent =>
 

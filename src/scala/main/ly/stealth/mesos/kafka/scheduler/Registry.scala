@@ -37,7 +37,7 @@ trait Registry
   with MesosTaskFactoryComponent
   with BrokerLogManagerComponent
   with SchedulerDriverComponent
-  with BrokerLifecyleManagerComponent
+  with BrokerLifecycleManagerComponent
   with ClockComponent
   with BrokerTaskManagerComponent
   with HttpApiComponent

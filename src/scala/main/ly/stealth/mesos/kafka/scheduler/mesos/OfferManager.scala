@@ -53,7 +53,7 @@ object OfferResult {
 }
 
 object OfferManager {
-  def otherTasksAttributes(name: String, brokers: Seq[Broker]): Seq[String] = {
+  def otherTasksAttributes(name: String, brokers: Iterable[Broker]): Iterable[String] = {
     def value(task: Broker.Task, name: String): Option[String] = {
       if (name == "hostname") return Some(task.hostname)
       task.attributes.get(name)
@@ -70,7 +70,7 @@ trait OfferManagerComponent {
     def enableOfferSuppression()
     def tryAcceptOffer(
       offer: Offer,
-      brokers: Seq[Broker]
+      brokers: Iterable[Broker]
     ): Either[OfferResult.Accept, Seq[OfferResult.Decline]]
     def pauseOrResumeOffers(forceRevive: Boolean = false): Unit
     def declineOffer(offer: OfferID): Unit
@@ -92,7 +92,7 @@ trait OfferManagerComponentImpl extends OfferManagerComponent {
 
     def tryAcceptOffer(
       offer: Offer,
-      brokers: Seq[Broker]
+      brokers: Iterable[Broker]
     ): Either[OfferResult.Accept, Seq[OfferResult.Decline]] = {
       val now = new Date()
       val declines = mutable.Buffer[OfferResult.Decline]()

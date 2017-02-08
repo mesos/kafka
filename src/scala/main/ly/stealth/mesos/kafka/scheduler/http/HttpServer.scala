@@ -25,7 +25,7 @@ import javax.ws.rs.{GET, POST, Path, QueryParam}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.{ClusterComponent, SchedulerComponent}
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, BrokerLogManagerComponent, HttpApiComponent, KafkaDistributionComponent}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerLogManagerComponent, HttpApiComponent, KafkaDistributionComponent}
 import org.apache.log4j.{Level, Logger}
 import org.eclipse.jetty.server.handler.HandlerList
 import org.eclipse.jetty.server.{Server, ServerConnector}
@@ -50,7 +50,7 @@ trait HttpServerComponentImpl extends HttpServerComponent {
     with SchedulerComponent
     with KafkaDistributionComponent
     with BrokerLogManagerComponent
-    with BrokerLifecyleManagerComponent
+    with BrokerLifecycleManagerComponent
     with HttpApiComponent =>
 
   val httpServer = new HttpServerImpl

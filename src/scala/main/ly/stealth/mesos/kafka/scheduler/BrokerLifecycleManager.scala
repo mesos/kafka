@@ -22,8 +22,9 @@ import net.elodina.mesos.util.Repr
 import org.apache.log4j.Logger
 import org.apache.mesos.Protos._
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 
-trait BrokerLifecyleManagerComponent {
+trait BrokerLifecycleManagerComponent {
   val brokerLifecycleManager: BrokerLifecycleManager
   trait BrokerLifecycleManager {
     def onBrokerStatus(broker: Broker, status: TaskStatus): Unit
@@ -34,7 +35,7 @@ trait BrokerLifecyleManagerComponent {
   }
 }
 
-trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent{
+trait BrokerLifecycleManagerComponentImpl extends BrokerLifecycleManagerComponent{
   this: ClusterComponent
     with OfferManagerComponent
     with ClockComponent
@@ -67,26 +68,30 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
         }
     }
 
-    def tryLaunchBrokers(offers: Seq[Offer]): Boolean = {
-      val brokers = cluster.getBrokers
-      val results = offers.map(o => offerManager.tryAcceptOffer(o, brokers))
-
-      // Only care about accepts, offers that didnt match have been declined already
-      results.foreach({
-        case Left(accept) => brokerTaskManager.launchBroker(accept)
-        case _ =>
-      })
-
+    private def debugLog(result: Either[OfferResult.Accept, Seq[OfferResult.Decline]]): Unit = {
       if (logger.isDebugEnabled)
-        logger.debug("\n" + results.map({
-          case Left(r) => s"[ACCEPT ]: ${ Repr.offer(r.offer) } => ${ r.broker }"
-          case Right(r) => "[DECLINE]: " + r.map(d => s"\t${ Repr.offer(d.offer) } for ${d.duration}s because ${d.reason} ").mkString("\n")
-        }).mkString("\n"))
+        logger.debug(
+          result match {
+            case Left(r) => s"[ACCEPT ]: ${ Repr.offer(r.offer) } => ${ r.broker }"
+            case Right(r) => "[DECLINE]: " + r
+              .map(d => s"\t${ Repr.offer(d.offer) } for ${ d.duration }s because ${ d.reason } ")
+              .mkString("\n")
+          })
+    }
 
-      results.exists({
-        case Left(_) => true
-        case _ => false
-      })
+    def tryLaunchBrokers(offers: Seq[Offer]): Boolean = {
+      val brokers = cluster.getBrokers.toSet
+      offers.foldLeft(Set[Broker]())((launched, o) => {
+        val r = offerManager.tryAcceptOffer(o, brokers -- launched)
+        // If the broker matched, remove it from the list so it doesn't match other offers too.
+        debugLog(r)
+        r match {
+          case Left(accept) =>
+            brokerTaskManager.launchBroker(accept)
+            launched + accept.broker
+          case _ => launched
+        }
+      }).nonEmpty
     }
 
     def onBrokerStatus(broker: Broker, status: TaskStatus): Unit = {

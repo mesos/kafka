@@ -83,12 +83,12 @@ class SchedulerTest extends KafkaMesosTestCase {
     val offer = this.offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
 
     // broker !active
-    registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer))
+    assertFalse(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer)))
     assertEquals(0, schedulerDriver.launchedTasks.size())
 
     // broker active
     broker.active = true
-    registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer))
+    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer)))
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertEquals(0, schedulerDriver.killedTasks.size())
 
@@ -123,6 +123,36 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertEquals(
       Right(Seq(OfferResult.NoWork(theOffer))),
       registry.offerManager.tryAcceptOffer(theOffer, Seq(broker)))
+  }
+
+  @Test
+  def acceptMultipleOffers: Unit = {
+    val broker = registry.cluster.addBroker(new Broker())
+    broker.active = true
+    broker.task = null
+
+    val o1 = offer(s"cpus:1; mem: ${broker.mem}; ports:1000")
+    val o2 = offer(s"cpus:1; mem: ${broker.mem}; ports:1000")
+    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(o1, o2)))
+    assertEquals(1, schedulerDriver.acceptedOffers.size())
+    assertEquals(1, schedulerDriver.declinedOffers.size())
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertEquals(broker.task.id, schedulerDriver.launchedTasks.get(0).getTaskId.getValue)
+  }
+
+  @Test
+  def launchMultipleBrokers = {
+    val b1 = registry.cluster.addBroker(new Broker("1"))
+    val b2 = registry.cluster.addBroker(new Broker("2"))
+    b1.active = true
+    b2.active = true
+
+    val o1 = offer("host1", s"cpus:1; mem: ${b1.mem}; ports:1000")
+    val o2 = offer("host2", s"cpus:1; mem: ${b2.mem}; ports:1000")
+    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(o1, o2)))
+    assertEquals(2, schedulerDriver.acceptedOffers.distinct.size)
+    assertEquals(2, schedulerDriver.launchedTasks.map(_.getTaskId.getValue).size())
+    assertNotEquals(b1.task.hostname, b2.task.hostname)
   }
 
   @Test
@@ -201,8 +231,7 @@ class SchedulerTest extends KafkaMesosTestCase {
     val offer = this.offer("id", "fw-id", "slave-id", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "a=1,b=2")
     broker.needsRestart = true
     broker.active = true
-    registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer))
-    //registry.scheduler.launchBroker(broker, offer)
+    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer)))
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertFalse(broker.needsRestart)
 
