@@ -37,7 +37,7 @@ class Cluster {
 
   def getBrokers:util.List[Broker] = Collections.unmodifiableList(brokers)
 
-  def getBroker(id: String): Broker = {
+  def getBroker(id: Int): Broker = {
     for (broker <- brokers)
       if (broker.id == id) return broker
     null

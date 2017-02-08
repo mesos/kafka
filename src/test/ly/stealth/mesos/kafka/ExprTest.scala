@@ -42,53 +42,53 @@ class ExprTest extends KafkaMesosTestCase {
     val cluster = registry.cluster
 
     for (i <- 0 until 5)
-      cluster.addBroker(new Broker("" + i))
+      cluster.addBroker(new Broker(i))
 
     try {
       assertEquals(util.Arrays.asList(), Expr.expandBrokers(cluster, ""))
       fail()
     } catch { case e: IllegalArgumentException => }
 
-    assertEquals(Seq("0"), Expr.expandBrokers(cluster, "0"))
-    assertEquals(Seq("0", "2", "4"), Expr.expandBrokers(cluster, "0,2,4"))
-    assertEquals(Seq("1", "2", "3"), Expr.expandBrokers(cluster, "1..3"))
-    assertEquals(Seq("0", "1", "3", "4"), Expr.expandBrokers(cluster, "0..1,3..4"))
-    assertEquals(Seq("0", "1", "2", "3", "4"), Expr.expandBrokers(cluster, "*"))
+    assertEquals(Seq(0), Expr.expandBrokers(cluster, "0"))
+    assertEquals(Seq(0, 2, 4), Expr.expandBrokers(cluster, "0,2,4"))
+    assertEquals(Seq(1, 2, 3), Expr.expandBrokers(cluster, "1..3"))
+    assertEquals(Seq(0, 1, 3, 4), Expr.expandBrokers(cluster, "0..1,3..4"))
+    assertEquals(Seq(0, 1, 2, 3, 4), Expr.expandBrokers(cluster, "*"))
 
     // duplicates
-    assertEquals(Seq("0", "1", "2", "3", "4"), Expr.expandBrokers(cluster, "0..3,2..4"))
+    assertEquals(Seq(0, 1, 2, 3, 4), Expr.expandBrokers(cluster, "0..3,2..4"))
 
     // sorting
-    assertEquals(Seq("2", "3", "4"), Expr.expandBrokers(cluster, "4,3,2"))
+    assertEquals(Seq(2, 3, 4), Expr.expandBrokers(cluster, "4,3,2"))
 
     // not-existent brokers
-    assertEquals(Seq("5", "6", "7"), Expr.expandBrokers(cluster, "5,6,7"))
+    assertEquals(Seq(5, 6, 7), Expr.expandBrokers(cluster, "5,6,7"))
   }
 
   @Test
   def expandBrokers_attributes {
     val cluster = registry.cluster
-    val b0 = cluster.addBroker(new Broker("0"))
-    val b1 = cluster.addBroker(new Broker("1"))
-    val b2 = cluster.addBroker(new Broker("2"))
-    cluster.addBroker(new Broker("3"))
+    val b0 = cluster.addBroker(new Broker(0))
+    val b1 = cluster.addBroker(new Broker(1))
+    val b2 = cluster.addBroker(new Broker(2))
+    cluster.addBroker(new Broker(3))
 
-    b0.task = new Broker.Task(hostname = "master", attributes = parseMap("a=1").toMap)
-    b1.task = new Broker.Task(hostname = "slave0", attributes = parseMap("a=2,b=2").toMap)
-    b2.task = new Broker.Task(hostname = "slave1", attributes = parseMap("b=2").toMap)
+    b0.task = Broker.Task(hostname = "master", attributes = parseMap("a=1").toMap)
+    b1.task = Broker.Task(hostname = "slave0", attributes = parseMap("a=2,b=2").toMap)
+    b2.task = Broker.Task(hostname = "slave1", attributes = parseMap("b=2").toMap)
 
     // exact match
-    assertEquals(Seq("0", "1", "2", "3"), Expr.expandBrokers(cluster, "*"))
-    assertEquals(Seq("0"), Expr.expandBrokers(cluster, "*[a=1]"))
-    assertEquals(Seq("1", "2"), Expr.expandBrokers(cluster, "*[b=2]"))
+    assertEquals(Seq(0, 1, 2, 3), Expr.expandBrokers(cluster, "*"))
+    assertEquals(Seq(0), Expr.expandBrokers(cluster, "*[a=1]"))
+    assertEquals(Seq(1, 2), Expr.expandBrokers(cluster, "*[b=2]"))
 
     // attribute present
-    assertEquals(Seq("0", "1"), Expr.expandBrokers(cluster, "*[a]"))
-    assertEquals(Seq("1", "2"), Expr.expandBrokers(cluster, "*[b]"))
+    assertEquals(Seq(0, 1), Expr.expandBrokers(cluster, "*[a]"))
+    assertEquals(Seq(1, 2), Expr.expandBrokers(cluster, "*[b]"))
 
     // hostname
-    assertEquals(Seq("0"), Expr.expandBrokers(cluster, "*[hostname=master]"))
-    assertEquals(Seq("1", "2"), Expr.expandBrokers(cluster, "*[hostname=slave*]"))
+    assertEquals(Seq(0), Expr.expandBrokers(cluster, "*[hostname=master]"))
+    assertEquals(Seq(1, 2), Expr.expandBrokers(cluster, "*[hostname=slave*]"))
 
     // not existent broker
     assertEquals(Seq(), Expr.expandBrokers(cluster, "5[a]"))
@@ -98,26 +98,29 @@ class ExprTest extends KafkaMesosTestCase {
   @Test
   def expandBrokers_sortByAttrs {
     val cluster = registry.cluster
-    val b0 = cluster.addBroker(new Broker("0"))
-    val b1 = cluster.addBroker(new Broker("1"))
-    val b2 = cluster.addBroker(new Broker("2"))
-    val b3 = cluster.addBroker(new Broker("3"))
-    val b4 = cluster.addBroker(new Broker("4"))
-    val b5 = cluster.addBroker(new Broker("5"))
+    val b0 = cluster.addBroker(new Broker(0))
+    val b1 = cluster.addBroker(new Broker(1))
+    val b2 = cluster.addBroker(new Broker(2))
+    val b3 = cluster.addBroker(new Broker(3))
+    val b4 = cluster.addBroker(new Broker(4))
+    val b5 = cluster.addBroker(new Broker(5))
+    val b6 = cluster.addBroker(new Broker(6))
 
-    b0.task = new Broker.Task(attributes = parseMap("r=2,a=1").toMap)
-    b1.task = new Broker.Task(attributes = parseMap("r=0,a=1").toMap)
-    b2.task = new Broker.Task(attributes = parseMap("r=1,a=1").toMap)
-    b3.task = new Broker.Task(attributes = parseMap("r=1,a=2").toMap)
-    b4.task = new Broker.Task(attributes = parseMap("r=0,a=2").toMap)
-    b5.task = new Broker.Task(attributes = parseMap("r=0,a=2").toMap)
 
-    assertEquals(Seq("0", "1", "2", "3", "4", "5"), Expr.expandBrokers(cluster, "*", sortByAttrs = true))
-    assertEquals(Seq("1", "2", "0", "4", "3", "5"), Expr.expandBrokers(cluster, "*[r]", sortByAttrs = true))
-    assertEquals(Seq("1", "4", "2", "3", "0", "5"), Expr.expandBrokers(cluster, "*[r,a]", sortByAttrs = true))
+    b0.task = Broker.Task(attributes = parseMap("r=2,a=1").toMap)
+    b1.task = Broker.Task(attributes = parseMap("r=0,a=1").toMap)
+    b2.task = Broker.Task(attributes = parseMap("r=1,a=1").toMap)
+    b3.task = Broker.Task(attributes = parseMap("r=1,a=2").toMap)
+    b4.task = Broker.Task(attributes = parseMap("r=0,a=2").toMap)
+    b5.task = Broker.Task(attributes = parseMap("r=0,a=2").toMap)
+    b6.task = Broker.Task(attributes = parseMap("a=2").toMap)
 
-    assertEquals(Seq("1", "2", "0"), Expr.expandBrokers(cluster, "*[r=*,a=1]", sortByAttrs = true))
-    assertEquals(Seq("4", "3", "5"), Expr.expandBrokers(cluster, "*[r,a=2]", sortByAttrs = true))
+    assertEquals(Seq(0, 1, 2, 3, 4, 5, 6), Expr.expandBrokers(cluster, "*", sortByAttrs = true))
+    assertEquals(Seq(1, 2, 0, 4, 3, 5), Expr.expandBrokers(cluster, "*[r]", sortByAttrs = true))
+    assertEquals(Seq(1, 4, 2, 3, 0, 5), Expr.expandBrokers(cluster, "*[r,a]", sortByAttrs = true))
+
+    assertEquals(Seq(1, 2, 0), Expr.expandBrokers(cluster, "*[r=*,a=1]", sortByAttrs = true))
+    assertEquals(Seq(4, 3, 5), Expr.expandBrokers(cluster, "*[r,a=2]", sortByAttrs = true))
   }
 
   @Test

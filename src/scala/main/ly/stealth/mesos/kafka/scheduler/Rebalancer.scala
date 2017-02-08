@@ -18,7 +18,6 @@
 package ly.stealth.mesos.kafka.scheduler
 
 import java.lang.reflect.InvocationTargetException
-import java.util
 import java.util.Random
 import kafka.common.TopicAndPartition
 import kafka.utils.ZkUtils
@@ -44,7 +43,7 @@ class Rebalancer {
     finally { zkClient.close() }
   }
 
-  def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1, realign: Boolean = false): Unit = {
+  def start(topics: Seq[String], brokers: Seq[Int], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1, realign: Boolean = false): Unit = {
     if (topics.isEmpty) throw new Rebalancer.Exception("no topics")
 
     logger.info(s"Starting rebalance for topics ${topics.mkString(",")} on brokers ${brokers.mkString(",")} with ${if (replicas == -1) "<default>" else replicas} replicas and realign=$realign")
@@ -54,7 +53,7 @@ class Rebalancer {
     // Realignment mode
     if (realign) {
       // Get our reassignment, disturbing as few partitions as possible
-      reassignment = getRealignments(brokers.map(Integer.parseInt), topics, assignment, replicas, fixedStartIndex)
+      reassignment = getRealignments(brokers, topics, assignment, replicas, fixedStartIndex)
       // Some partitions do not require any changes in membership. Remove them completely so the
       // controller never even looks at them.
       val noOpPartitions = assignment.keySet.diff(reassignment.keySet)
@@ -62,7 +61,7 @@ class Rebalancer {
     }
     // Regular old scramble mode
     else {
-      reassignment = getReassignments(brokers.map(Integer.parseInt), topics, assignment, replicas, fixedStartIndex, startPartitionId)
+      reassignment = getReassignments(brokers, topics, assignment, replicas, fixedStartIndex, startPartitionId)
     }
 
     // Don't do anything if all assignments remain the same
@@ -70,7 +69,7 @@ class Rebalancer {
     assignment.keySet.foreach { topic =>
       val oldBrokers = assignment.get(topic).toSet
       val newBrokers = reassignment.get(topic).toSet
-      if ((oldBrokers.diff(newBrokers).size > 0) || (newBrokers.diff(oldBrokers).size > 0)) {
+      if (oldBrokers.diff(newBrokers).nonEmpty || newBrokers.diff(oldBrokers).nonEmpty) {
         identicalMaps = false
       }
     }
@@ -120,7 +119,7 @@ class Rebalancer {
     matches
   }
 
-  private def getReassignments(brokerIds: Seq[Int], topics: util.List[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
+  private def getReassignments(brokerIds: Seq[Int], topics: Seq[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
     var reassignment : Map[TopicAndPartition, Seq[Int]] = new mutable.HashMap[TopicAndPartition, List[Int]]()
 
     val byTopic: Map[String, Map[TopicAndPartition, Seq[Int]]] = assignment.groupBy(tp => tp._1.topic)
@@ -136,7 +135,7 @@ class Rebalancer {
     reassignment.toMap
   }
 
-  private def getRealignments(brokerIds: Seq[Int], topics: util.List[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1, fixedStartIndex: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
+  private def getRealignments(brokerIds: Seq[Int], topics: Seq[String], assignment: Map[TopicAndPartition, Seq[Int]], replicas: Int = -1, fixedStartIndex: Int = -1): Map[TopicAndPartition, Seq[Int]] = {
     var realignment : Map[TopicAndPartition, Seq[Int]] = new mutable.HashMap[TopicAndPartition, List[Int]]()
 
     // Start at a random index unless told otherwise

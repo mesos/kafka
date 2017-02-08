@@ -76,7 +76,7 @@ trait TopicApiComponentImpl extends TopicApiComponent {
       if (topicExpr == null)
         return Status.BadRequest("topic required")
 
-      val brokerIds = Option(brokerExpr).map(b => Expr.expandBrokers(cluster, b, sortByAttrs = true).map(_.toInt))
+      val brokerIds = Option(brokerExpr).map(b => Expr.expandBrokers(cluster, b, sortByAttrs = true))
       if (!add && options == null)
         return Status.BadRequest("options required")
       if (options != null)

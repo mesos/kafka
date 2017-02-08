@@ -44,7 +44,7 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
       val distInfo = kafkaDistribution.distInfo
       var cmd = "java -cp " + distInfo.jar.getName
       cmd += " -Xmx" + broker.heap + "m"
-      if (broker.jvmOptions != null) cmd += " " + broker.jvmOptions.replace("$id", broker.id)
+      if (broker.jvmOptions != null) cmd += " " + broker.jvmOptions.replace("$id", broker.id.toString)
 
       if (Config.debug) cmd += " -Ddebug"
       cmd += " ly.stealth.mesos.kafka.executor.Executor"
@@ -82,7 +82,7 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
     def newTask(broker: Broker, offer: Offer, reservation: Broker.Reservation): TaskInfo = {
       val taskData = {
         var defaults: Map[String, String] = Map(
-          "broker.id" -> broker.id,
+          "broker.id" -> broker.id.toString,
           "port" -> ("" + reservation.port),
           "log.dirs" -> "kafka-logs",
           "log.retention.bytes" -> ("" + 10l * 1024 * 1024 * 1024),

@@ -30,7 +30,7 @@ import net.elodina.mesos.util.Strings
 class ExecutorTest extends KafkaMesosTestCase {
   @Test(timeout = 5000)
   def startBroker_success {
-    val data = JsonUtil.toJson(LaunchConfig("0"))
+    val data = JsonUtil.toJson(LaunchConfig(0))
     Executor.startBroker(executorDriver, task("id", "task", "slave", data))
     executorDriver.waitForStatusUpdates(1)
     assertEquals(1, executorDriver.statusUpdates.size())
@@ -77,7 +77,7 @@ class ExecutorTest extends KafkaMesosTestCase {
 
   @Test(timeout = 5000)
   def launchTask {
-    val data = JsonUtil.toJson(LaunchConfig("0"))
+    val data = JsonUtil.toJson(LaunchConfig(0))
     Executor.launchTask(executorDriver, task("id", "task", "slave", data))
 
     executorDriver.waitForStatusUpdates(1)

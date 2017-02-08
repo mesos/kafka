@@ -184,7 +184,7 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
           b.foreach(cluster.removeBroker)
           cluster.save()
           Response.status(Response.Status.OK)
-            .entity(BrokerRemoveResponse(b.map(_.id)))
+            .entity(BrokerRemoveResponse(b.map(_.id.toString)))
             .build()
         case Failure(e) => Status.BadRequest(e.getMessage)
       }
@@ -357,7 +357,7 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
       name: String,
       lines: Int,
       timeout: Period
-    ): Map[String, HttpLogResponse] = {
+    ): Map[Int, HttpLogResponse] = {
       val futures = brokers.map(b =>
         b.id -> scheduler.requestBrokerLog(b, name, lines, Duration(timeout.ms(), TimeUnit.MILLISECONDS))
       ).toMap
@@ -396,7 +396,7 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
       }
     }
 
-    def cloneBrokerImpl(source: Broker, newIds: Seq[String]) = {
+    def cloneBrokerImpl(source: Broker, newIds: Seq[Int]) = {
       val newBrokers = newIds.map(source.clone)
       newBrokers.foreach(cluster.addBroker)
       cluster.save()

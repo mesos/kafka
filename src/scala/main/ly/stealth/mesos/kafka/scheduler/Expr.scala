@@ -16,160 +16,125 @@
  */
 package ly.stealth.mesos.kafka.scheduler
 
-import java.util
-import ly.stealth.mesos.kafka.Broker.Task
 import ly.stealth.mesos.kafka.{Broker, Cluster}
 import net.elodina.mesos.util.Strings
 import scala.collection.JavaConversions._
 
 object Expr {
-  def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): Seq[String] = {
-    var expr: String = _expr
-    var attributes: util.Map[String, String] = null
-    
-    if (expr.endsWith("]")) {
-      val filterIdx = expr.lastIndexOf("[")
-      if (filterIdx == -1) throw new IllegalArgumentException("Invalid expr " + expr)
-      
-      attributes = Strings.parseMap(expr.substring(filterIdx + 1, expr.length - 1), true)
-      expr = expr.substring(0, filterIdx)
-    }
-
-    var ids: util.List[String] = new util.ArrayList[String]()
-
-    for (_part <- expr.split(",")) {
-      val part = _part.trim()
-
-      if (part.equals("*"))
-        for (broker <- cluster.getBrokers) ids.add(broker.id)
-      else if (part.contains("..")) {
-        val idx = part.indexOf("..")
-
-        var start: Integer = null
-        var end: Integer = null
-        try {
-          start = Integer.parseInt(part.substring(0, idx))
-          end = Integer.parseInt(part.substring(idx + 2, part.length))
-        } catch {
-          case e: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + expr)
-        }
-
-        for (id <- start.toInt until end + 1)
-          ids.add("" + id)
-      } else {
-        var id: Integer = null
-        try { id = Integer.parseInt(part) }
-        catch { case e: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + expr) }
-        ids.add("" + id)
-      }
-    }
-
-    ids = new util.ArrayList[String](ids.distinct.sorted.toList)
-
-    if (attributes != null) 
-      filterAndSortBrokersByAttrs(cluster, ids, attributes, sortByAttrs)
-
-    ids
+  object any {
+    def unapply(arg: String): Option[String] = if (arg.equals("*")) Some(arg) else None
   }
-  
-  private def filterAndSortBrokersByAttrs(cluster: Cluster, ids: util.Collection[String], attributes: util.Map[String, String], sortByAttrs: Boolean): Unit = {
-    def brokerAttr(broker: Broker, name: String): String = {
-      if (broker == null || broker.task == null) return null
-
-      val task: Task = broker.task
-      if (name != "hostname") task.attributes.get(name).orNull else task.hostname
+  object wildcard {
+    def unapply(arg: String): Option[String] =
+      if (arg.endsWith("*"))
+        Some(arg.substring(0, arg.length - 1))
+      else None
+  }
+  object range {
+    def unapply(part: String): Option[(Int, Int)] =
+      part.indexOf("..") match {
+        case v if v == -1 => None
+        case v if v == 0 => throw new IllegalArgumentException("Invalid expr " + part)
+        case idx => Some(
+          try {
+            (part.substring(0, idx).toInt, part.substring(idx + 2, part.length).toInt)
+          } catch {
+            case _: NumberFormatException => throw new IllegalArgumentException("Invalid expr " + part)
+          })
+      }
+  }
+  object parsable {
+    def unapply(arg: String): Option[Int] = try {
+      Some(arg.toInt)
+    } catch {
+      case _: NumberFormatException => None
     }
+  }
 
-    def brokerMatches(broker: Broker): Boolean = {
-      if (broker == null) return false
+  private def parseAttrs(expr: String): (String, Option[Map[String, Option[String]]]) = {
+    if (expr.endsWith("]")) {
+      val idx = expr.lastIndexOf("[")
+      if (idx == -1)
+        throw new IllegalArgumentException("Invalid expr " + expr)
 
-      for (e <- attributes.entrySet()) {
-        val expected = e.getValue
-        val actual = brokerAttr(broker, e.getKey)
-        if (actual == null) return false
+      (expr.substring(0, idx),
+        Some(Strings.parseMap(expr.substring(idx + 1, expr.length - 1), true)
+          .toMap.mapValues(Option.apply)))
+    } else {
+      (expr, None)
+    }
+  }
 
-        if (expected != null) {
-          if (expected.endsWith("*") && !actual.startsWith(expected.substring(0, expected.length - 1)))
-            return false
+  def expandBrokers(cluster: Cluster, _expr: String, sortByAttrs: Boolean = false): Seq[Int] = {
+    val (expr, attributes) = parseAttrs(_expr)
+    val ids = expr.split(",").map(_.trim).flatMap {
+      case wildcard(i) if i.isEmpty => cluster.getBrokers.map(_.id)
+      case range((start, end)) => start until end + 1
+      case parsable(i) => Seq(i)
+      case _ => throw new IllegalArgumentException("Invalid expr " + expr)
+    }.distinct
 
-          if (!expected.endsWith("*") && actual != expected)
-            return false
+    attributes
+      .map(attrs => filterAndSortBrokersByAttrs(cluster, ids, attrs, sortByAttrs))
+      .getOrElse(ids.sorted)
+  }
+
+  private def brokerAttr(broker: Broker, name: String): Option[String] = {
+    Option(broker)
+      .flatMap(b => Option(b.task))
+      .flatMap { t =>
+        name match {
+          case "hostname" => Some(t.hostname)
+          case attr => t.attributes.get(attr)
         }
       }
+  }
 
-      true
-    }
-
-     def filterBrokers(): Unit = {
-      val iterator = ids.iterator()
-      while (iterator.hasNext) {
-        val id = iterator.next()
-        val broker = cluster.getBroker(id)
-
-        if (!brokerMatches(broker))
-          iterator.remove()
-      }
-    }
-
-    def sortBrokers(): Unit = {
-      class Value(broker: Broker) extends Comparable[Value] {
-        def compareTo(v: Value): Int = toString.compareTo(v.toString)
-
-        override def hashCode(): Int = toString.hashCode
-
-        override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[Value] && toString == obj.toString
-
-        override def toString: String = {
-          val values = new util.LinkedHashMap[String, String]()
-
-          for (k <- attributes.keySet()) {
-            val value: String = brokerAttr(broker, k)
-            values.put(k, value)
-          }
-
-          Strings.formatMap(values)
+  private def filterAndSortBrokersByAttrs(
+    cluster: Cluster,
+    ids: Iterable[Int],
+    attributes: Map[String, Option[String]],
+    sortByAttrs: Boolean
+  ): Seq[Int] = {
+    val filtered = ids.map(id => cluster.getBroker(id)).filter(_ != null).filter { broker =>
+      attributes.forall { case (key, expected) =>
+        (brokerAttr(broker, key), expected) match {
+          case (Some(a), Some(e)) if e.endsWith("*") => a.startsWith(e.substring(0, e.length - 1))
+          case (Some(a), Some(e)) => a == e
+          case (Some(_), None) => true
+          case _ => false
         }
       }
-
-      val values = new util.HashMap[Value, util.List[String]]()
-      for (id <- ids) {
-        val broker: Broker = cluster.getBroker(id)
-
-        if (broker != null) {
-          val value = new Value(broker)
-          if (!values.containsKey(value)) values.put(value, new util.ArrayList[String]())
-          values.get(value).add(id)
-        }
-      }
-
-      val t = new util.ArrayList[String]()
-      while (!values.isEmpty) {
-        for (value <- new util.ArrayList[Value](values.keySet()).sorted) {
-          val ids = values.get(value)
-
-          val id: String = ids.remove(0)
-          t.add(id)
-
-          if (ids.isEmpty) values.remove(value)
-        }
-      }
-
-      ids.clear()
-      ids.addAll(t)
     }
-    
-    filterBrokers()
-    if (sortByAttrs) sortBrokers()
+    if (sortByAttrs)
+      sortBrokers(cluster, attributes.keys, filtered)
+    else
+      filtered.map(_.id).toSeq
+  }
+
+  // Group passed in brokers by attribute, and then round robin across the groups.
+  // All brokers in the broker list must have all attributes in the passed attribute list.
+  private def sortBrokers(
+    cluster: Cluster,
+    attributes: Iterable[String],
+    brokers: Iterable[Broker]
+  ): Seq[Int] = {
+    brokers
+      .groupBy(b => attributes
+        .map(a => a -> brokerAttr(b, a).get)) // Group by unique attribute (k,v) tuples
+      .toSeq
+      .sortBy(_._1) // Sort them (this will be by the key and value combo)
+      .flatMap(_._2.zipWithIndex) // Add an index to each element, and merge all lists together
+      .sortBy(_._2) // Sort by the index added from above
+      .map(_._1.id) // Pick the id off of the broker
   }
 
   def expandTopics(expr: String): Seq[String] = {
     val allTopics = ZkUtilsWrapper().getAllTopics()
 
-    expr.split(",").map(_.trim).filter(!_.isEmpty).flatMap(part =>
-      if (!part.endsWith("*"))
-        Seq(part)
-      else
-        allTopics.filter(topic => topic.startsWith(part.substring(0, part.length - 1)))
-    )
+    expr.split(",").map(_.trim).filter(!_.isEmpty).flatMap {
+      case wildcard(part) => allTopics.filter(topic => topic.startsWith(part))
+      case p => Seq(p)
+    }
   }
 }

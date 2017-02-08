@@ -42,7 +42,7 @@ class BrokerTest extends KafkaMesosTestCase {
   @Before
   override def before {
     super.before
-    broker = new Broker("0")
+    broker = new Broker(0)
     broker.cpus = 0
     broker.mem = 0
   }
@@ -51,27 +51,27 @@ class BrokerTest extends KafkaMesosTestCase {
   def options {
     {
       // $id substitution
-      val li = LaunchConfig("0", Map("a" -> "$id", "b" -> "2"), false, Map(), null, Map())
+      val li = LaunchConfig(0, Map("a" -> "$id", "b" -> "2"), false, Map(), null, Map())
       assertEquals(Map("a" -> "0", "b" -> "2"), li.interpolatedOptions)
     }
     {
       // defaults
-      val li = LaunchConfig("0", Map("a" -> "2"), false, Map(), null, Map("b" -> "1"))
+      val li = LaunchConfig(0, Map("a" -> "2"), false, Map(), null, Map("b" -> "1"))
       assertEquals(Map("b" -> "1", "a" -> "2"), li.interpolatedOptions)
     }
 
     {
       // bind-address
-      val li = LaunchConfig("0", Map("host.name" -> "123"), false, Map(), null, Map())
+      val li = LaunchConfig(0, Map("host.name" -> "123"), false, Map(), null, Map())
       assertEquals(Map("host.name" -> "123"), li.interpolatedOptions)
     }
     {
-      val li = LaunchConfig("0", Map("host.name" -> "123"), false, Map(), new BindAddress("127.0.0.1"), Map())
+      val li = LaunchConfig(0, Map("host.name" -> "123"), false, Map(), new BindAddress("127.0.0.1"), Map())
       assertEquals(Map("host.name" -> "127.0.0.1"), li.interpolatedOptions)
     }
     {
       broker.bindAddress = new BindAddress("127.0.0.1")
-      val li = LaunchConfig("0", Map("listeners" -> "PLAINTEXT://:3002", "port" -> "3002"), false, Map(), new BindAddress("127.0.0.1"), Map())
+      val li = LaunchConfig(0, Map("listeners" -> "PLAINTEXT://:3002", "port" -> "3002"), false, Map(), new BindAddress("127.0.0.1"), Map())
       assertEquals(Map("host.name" -> "127.0.0.1", "port" -> "3002", "listeners" -> "PLAINTEXT://127.0.0.1:3002"), li.interpolatedOptions)
     }
   }
@@ -466,8 +466,8 @@ class BrokerTest extends KafkaMesosTestCase {
   // static part
   @Test
   def idFromTaskId {
-    assertEquals("0", Broker.idFromTaskId(Broker.nextTaskId(new Broker("0"))))
-    assertEquals("100", Broker.idFromTaskId(Broker.nextTaskId(new Broker("100"))))
+    assertEquals(0, Broker.idFromTaskId(Broker.nextTaskId(new Broker(0))))
+    assertEquals(100, Broker.idFromTaskId(Broker.nextTaskId(new Broker(100))))
   }
 
   // Reservation
