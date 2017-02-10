@@ -22,7 +22,7 @@ import java.util.concurrent.{Executors, ScheduledExecutorService}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerLogManagerComponent, Registry}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerLogManagerComponent, BrokerState, Registry}
 import net.elodina.mesos.util.{Repr, Version}
 import org.apache.log4j._
 import org.apache.mesos.Protos._
@@ -66,6 +66,7 @@ trait SchedulerComponent {
   val scheduler: KafkaMesosScheduler
 
   trait KafkaMesosScheduler extends org.apache.mesos.Scheduler {
+    def tryLaunchBrokers(offers: Seq[Offer]): Boolean
     def requestBrokerLog(broker: Broker, name: String, lines: Int, timeout: Duration): Future[String]
     def stop(): Unit
     def kill(): Unit
@@ -119,10 +120,36 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
           offers.foreach(o => offerManager.declineOffer(o.getId))
         }
         else {
-          if (brokerLifecycleManager.tryLaunchBrokers(offers)) {
+          if (tryLaunchBrokers(offers)) {
             cluster.save()
           }
         })
+    }
+
+    private def debugLog(result: Either[OfferResult.Accept, Seq[OfferResult.Decline]]): Unit = {
+      if (logger.isDebugEnabled)
+        logger.debug(
+          result match {
+            case Left(r) => s"[ACCEPT ]: ${ Repr.offer(r.offer) } => ${ r.broker }"
+            case Right(r) => "[DECLINE]: " + r
+              .map(d => s"\t${ Repr.offer(d.offer) } for ${ d.duration }s because ${ d.reason } ")
+              .mkString("\n")
+          })
+    }
+
+    def tryLaunchBrokers(offers: Seq[Offer]): Boolean = {
+      val brokers = cluster.getBrokers.toSet
+      offers.foldLeft(false)((launched, o) => {
+        val r = offerManager.tryAcceptOffer(o, brokers)
+        // If the broker matched, remove it from the list so it doesn't match other offers too.
+        debugLog(r)
+        r match {
+          case Left(accept) =>
+            brokerLifecycleManager.tryTransition(accept.broker, BrokerState.Starting(accept))
+            true
+          case _ => launched
+        }
+      })
     }
 
     def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
@@ -131,17 +158,7 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
 
     def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
       logger.info("[statusUpdate] " + Repr.status(status))
-      val taskId = status.getTaskId
-      val broker = cluster.getBrokerByTaskId(taskId.getValue)
-
-      eventLoop.execute(() =>
-        broker match {
-          case Some(b) => brokerLifecycleManager.onBrokerStatus(b, status)
-          case None =>
-            logger.info(
-              s"Got ${ status.getState } for unknown broker, killing task $taskId")
-            brokerTaskManager.killTask(taskId)
-        })
+      eventLoop.execute(() => brokerLifecycleManager.tryTransition(status))
     }
 
     def frameworkMessage(

@@ -26,13 +26,12 @@ import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
 import ly.stealth.mesos.kafka.scheduler.http.BothParam
 import ly.stealth.mesos.kafka.scheduler.mesos.{ClusterComponent, EventLoopComponent, SchedulerComponent}
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, Expr, ZkUtilsWrapper}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerState, Expr, ZkUtilsWrapper}
 import net.elodina.mesos.util.{Period, Range}
 import org.apache.log4j.Logger
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
-import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 trait BrokerApiComponent {
@@ -113,11 +112,11 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
         var broker = cluster.getBroker(id)
 
         if (add)
-          if (broker != null) errors.add(s"Broker $id already exists")
+          if (broker != null) errors.append(s"Broker $id already exists")
           else broker = new Broker(id)
-        else if (broker == null) errors.add(s"Broker $id not found")
+        else if (broker == null) errors.append(s"Broker $id not found")
 
-        brokers.add(broker)
+        brokers.append(broker)
       }
 
       if (errors.nonEmpty) {
@@ -214,9 +213,9 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
       eventLoop.submit(() =>
         for (broker <- brokers) {
           if (start) {
-            brokerLifecycleManager.activateBroker(broker)
+            brokerLifecycleManager.tryTransition(broker, BrokerState.Active())
           } else {
-            brokerLifecycleManager.stopBroker(broker, force)
+            brokerLifecycleManager.tryTransition(broker, BrokerState.Inactive(force))
           }
           broker.failover.resetFailures()
         }).get
@@ -264,11 +263,9 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
 
       for (broker <- brokers) {
         val begin = System.currentTimeMillis()
-        if (broker.active && broker.task != null && broker.task.running) {
           // stop
-          eventLoop.submit(() => brokerLifecycleManager.stopBroker(broker)).get()
-          cluster.save()
-        }
+        eventLoop.submit(() => brokerLifecycleManager.tryTransition(broker, BrokerState.Inactive())).get()
+        cluster.save()
 
         if (!broker.waitFor(null, timeout)) {
           return timeoutJson(broker, "stop")
@@ -278,7 +275,7 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
           .max(timeout.ms - (System.currentTimeMillis() - begin), 0L) + "ms")
 
         // start
-        eventLoop.submit(() => brokerLifecycleManager.activateBroker(broker)).get
+        eventLoop.submit(() => brokerLifecycleManager.tryTransition(broker, BrokerState.Active())).get
         cluster.save()
 
         val startBegin = System.currentTimeMillis()

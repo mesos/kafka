@@ -98,10 +98,11 @@ class HttpServerTest extends KafkaMesosTestCase {
 
     // modification is made before offer thus when it arrives needsRestart reset to false
     registry.scheduler.resourceOffers(schedulerDriver, Seq(offer("slave0", "cpus:2.0;mem:8192;ports:9042..65000")))
-    assertTrue(broker.waitFor(Broker.State.STARTING, new Period("1s"), 1))
+    assertTrue(broker.waitFor(Broker.State.PENDING, new Period("1s"), 1))
     assertFalse(broker.needsRestart)
 
     // when running
+    registry.scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_STARTING, "slave0:9042"))
     registry.scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave0:9042"))
     assertTrue(broker.waitFor(Broker.State.RUNNING, new Period("1s"), 1))
     sendRequest("/broker/update", parseMap("broker=0,log4jOptions=log4j.logger.kafka\\=DEBUG\\\\\\, kafkaAppender"))
@@ -303,8 +304,8 @@ class HttpServerTest extends KafkaMesosTestCase {
     broker0.task = Broker.Task(
       id="t1",
       executorId=Broker.nextExecutorId(broker0),
-      slaveId="s1",
-      _state=Broker.State.RUNNING)
+      slaveId="s1")
+    broker0.task.state = Broker.State.RUNNING
 
     val timeoutResponse =
       sendRequestObj[HttpLogResponse]("/broker/log", Map("broker" -> "0", "timeout" -> "1ms"))

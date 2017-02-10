@@ -39,7 +39,6 @@ class JsonTest {
     b.task = Task(
       id = "kafka-general-0-705d56e2-7d62-4d7e-b033-74ea5526ed82",
       hostname = "host1",
-      _state = "running",
       executorId = "kafka-general-0-ff258207-18f3-4fd2-9028-5f4c4143f84d",
       attributes = Map(
         "ip" -> "10.253.166.214",
@@ -52,6 +51,7 @@ class JsonTest {
       ),
       slaveId = "1fbd3a0d-a685-47e6-8066-01be06d68fac-S821"
     )
+    b.task.state = Broker.State.RUNNING
     b.task.endpoint = new Endpoint("host1:9092")
     b.syslog = false
     b.stickiness = new Stickiness(new Period("10m"))

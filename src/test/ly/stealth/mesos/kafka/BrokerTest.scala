@@ -392,7 +392,8 @@ class BrokerTest extends KafkaMesosTestCase {
   def state {
     assertEquals("stopped", broker.state())
 
-    broker.task = Task(_state = State.STOPPING)
+    broker.task = Task()
+    broker.task.state = State.STOPPING
     assertEquals("stopping", broker.state())
 
     broker.task = null
@@ -400,7 +401,7 @@ class BrokerTest extends KafkaMesosTestCase {
     assertEquals("starting", broker.state())
 
     broker.task = Task()
-    assertEquals("starting", broker.state())
+    assertEquals("pending", broker.state())
 
     broker.task.state = State.RUNNING
     assertEquals("running", broker.state())
@@ -423,7 +424,10 @@ class BrokerTest extends KafkaMesosTestCase {
           setName(classOf[BrokerTest].getSimpleName + "-scheduleState")
           Thread.sleep(delay)
 
-          if (state != null) broker.task = new Task(_state = state)
+          if (state != null) {
+            broker.task = Task()
+            broker.task.state = state
+          }
           else broker.task = null
         }
       }.start()
@@ -665,7 +669,8 @@ class BrokerTest extends KafkaMesosTestCase {
   // Task
   @Test
   def Task_toJson_fromJson {
-    val task = new Task("id", "slave", "executor", "host", parseMap("a=1,b=2").toMap, State.RUNNING)
+    val task = Task("id", "slave", "executor", "host", parseMap("a=1,b=2").toMap)
+    task.state = State.RUNNING
     task.endpoint = new Endpoint("localhost:9092")
 
     val read = JsonUtil.fromJson[Task](JsonUtil.toJson(task))

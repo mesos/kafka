@@ -24,6 +24,7 @@ import java.util.{Date, UUID}
 import java.util.concurrent.TimeUnit
 import ly.stealth.mesos.kafka.executor.{Executor, LaunchConfig}
 import ly.stealth.mesos.kafka.json.JsonUtil
+import ly.stealth.mesos.kafka.scheduler.BrokerState
 import ly.stealth.mesos.kafka.scheduler.mesos.{OfferManager, OfferResult}
 import net.elodina.mesos.util.Period
 import net.elodina.mesos.util.Strings.parseMap
@@ -82,18 +83,19 @@ class SchedulerTest extends KafkaMesosTestCase {
     val offer = this.offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
 
     // broker !active
-    assertFalse(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer)))
+    assertFalse(registry.scheduler.tryLaunchBrokers(Seq(offer)))
     assertEquals(0, schedulerDriver.launchedTasks.size())
 
     // broker active
     broker.active = true
-    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer)))
+    assertTrue(registry.scheduler.tryLaunchBrokers(Seq(offer)))
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertEquals(0, schedulerDriver.killedTasks.size())
 
     // broker !active
     broker.task = Broker.Task(id = "1")
-    registry.brokerLifecycleManager.stopBroker(broker)
+    broker.task.state = Broker.State.RUNNING
+    registry.brokerLifecycleManager.tryTransition(broker, BrokerState.Inactive())
     assertTrue(broker.task.stopping)
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertEquals(1, schedulerDriver.killedTasks.size())
@@ -115,7 +117,7 @@ class SchedulerTest extends KafkaMesosTestCase {
       registry.offerManager.tryAcceptOffer(theOffer, Seq(broker)))
 
     theOffer = offer(s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000")
-    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(theOffer)))
+    assertTrue(registry.scheduler.tryLaunchBrokers(Seq(theOffer)))
     assertEquals(1, schedulerDriver.launchedTasks.size())
 
     theOffer = offer(s"cpus:${broker.cpus}; mem:${broker.mem}")
@@ -132,7 +134,7 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     val o1 = offer(s"cpus:1; mem: ${broker.mem}; ports:1000")
     val o2 = offer(s"cpus:1; mem: ${broker.mem}; ports:1000")
-    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(o1, o2)))
+    assertTrue(registry.scheduler.tryLaunchBrokers(Seq(o1, o2)))
     assertEquals(1, schedulerDriver.acceptedOffers.size())
     assertEquals(1, schedulerDriver.declinedOffers.size())
     assertEquals(1, schedulerDriver.launchedTasks.size())
@@ -148,7 +150,7 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     val o1 = offer("host1", s"cpus:1; mem: ${b1.mem}; ports:1000")
     val o2 = offer("host2", s"cpus:1; mem: ${b2.mem}; ports:1000")
-    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(o1, o2)))
+    assertTrue(registry.scheduler.tryLaunchBrokers(Seq(o1, o2)))
     assertEquals(2, schedulerDriver.acceptedOffers.distinct.size)
     assertEquals(2, schedulerDriver.launchedTasks.map(_.getTaskId.getValue).size())
     assertNotEquals(b1.task.hostname, b2.task.hostname)
@@ -157,16 +159,19 @@ class SchedulerTest extends KafkaMesosTestCase {
   @Test
   def onBrokerStatus {
     val broker = registry.cluster.addBroker(new Broker())
-    broker.task = new Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host")
-    assertEquals(Broker.State.STARTING, broker.task.state)
+    broker.active = true
+    broker.task = Broker.Task(Broker.nextTaskId(broker), "slave", "executor", "host")
+    assertEquals(Broker.State.PENDING, broker.task.state)
 
     // broker started
-    registry.brokerLifecycleManager.onBrokerStatus(broker, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "localhost:9092"))
+    registry.brokerLifecycleManager.tryTransition(taskStatus(broker.task.id, TaskState.TASK_STARTING))
+    registry.brokerLifecycleManager.tryTransition(taskStatus(broker.task.id, TaskState.TASK_RUNNING, "localhost:9092"))
     assertEquals(Broker.State.RUNNING, broker.task.state)
     assertEquals("localhost:9092", "" + broker.task.endpoint)
 
+    registry.brokerLifecycleManager.tryTransition(broker, BrokerState.Inactive())
     // broker finished
-    registry.brokerLifecycleManager.onBrokerStatus(broker, taskStatus(broker.task.id, TaskState.TASK_FINISHED))
+    registry.brokerLifecycleManager.tryTransition(taskStatus(broker.task.id, TaskState.TASK_FINISHED))
     assertNull(broker.task)
     assertEquals(0, broker.failover.failures)
   }
@@ -174,23 +179,28 @@ class SchedulerTest extends KafkaMesosTestCase {
   @Test
   def onBrokerStarted {
     val broker = registry.cluster.addBroker(new Broker())
-    broker.task = new Broker.Task(id = "0-" + UUID.randomUUID())
-    assertEquals(Broker.State.STARTING, broker.task.state)
+    broker.active = true
+    broker.task = Broker.Task(id = "0-" + UUID.randomUUID())
+    assertEquals(Broker.State.PENDING, broker.task.state)
 
-    registry.brokerLifecycleManager.onBrokerStatus(broker, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "localhost:9092"))
-    assertEquals(Broker.State.RUNNING, broker.task.state)
+    registry.brokerLifecycleManager.tryTransition(taskStatus(broker.task.id, TaskState.TASK_STARTING))
+    assertEquals(Broker.State.STARTING, broker.task.state)
+    registry.brokerLifecycleManager.tryTransition(taskStatus(broker.task.id, TaskState.TASK_RUNNING, "localhost:9092"))
     assertEquals("localhost:9092", "" + broker.task.endpoint)
   }
 
   @Test
   def onBrokerStopped {
     val broker = registry.cluster.addBroker(new Broker())
-    val task = new Broker.Task(id = "0-" + UUID.randomUUID(), _state = Broker.State.RUNNING)
+    broker.active = true
+    val task = Broker.Task(id = "0-" + UUID.randomUUID())
+    task.state = Broker.State.RUNNING
 
     // finished
     broker.task = task
     broker.needsRestart = true
-    registry.brokerLifecycleManager.onBrokerStatus(broker, taskStatus(TaskState.TASK_FINISHED))
+    registry.brokerLifecycleManager.tryTransition(broker, BrokerState.Inactive(false))
+    registry.brokerLifecycleManager.tryTransition(taskStatus(task.id, TaskState.TASK_FINISHED))
     assertNull(broker.task)
     assertEquals(0, broker.failover.failures)
     assertFalse(broker.needsRestart)
@@ -200,7 +210,8 @@ class SchedulerTest extends KafkaMesosTestCase {
     broker.task = task
     broker.needsRestart = true
     MockWallClock.overrideNow(Some(new Date(0)))
-    registry.brokerLifecycleManager.onBrokerStatus(broker, taskStatus(TaskState.TASK_FAILED)) //, new Date(0))
+    broker.task.state = Broker.State.RUNNING
+    registry.brokerLifecycleManager.tryTransition(taskStatus(task.id, TaskState.TASK_FAILED)) //, new Date(0))
     assertNull(broker.task)
     assertEquals(1, broker.failover.failures)
     assertEquals(new Date(0), broker.failover.failureTime)
@@ -210,7 +221,7 @@ class SchedulerTest extends KafkaMesosTestCase {
     broker.failover.maxTries = 2
     broker.task = task
     MockWallClock.overrideNow(Some(new Date(1)))
-    registry.brokerLifecycleManager.onBrokerStatus(broker, taskStatus(TaskState.TASK_FAILED)) //, new Date(1))
+    registry.brokerLifecycleManager.tryTransition(taskStatus(task.id, TaskState.TASK_FAILED)) //, new Date(1))
     assertNull(broker.task)
     assertEquals(2, broker.failover.failures)
     assertEquals(new Date(1), broker.failover.failureTime)
@@ -230,16 +241,30 @@ class SchedulerTest extends KafkaMesosTestCase {
     val offer = this.offer("id", "fw-id", "slave-id", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "a=1,b=2")
     broker.needsRestart = true
     broker.active = true
-    assertTrue(registry.brokerLifecycleManager.tryLaunchBrokers(Seq(offer)))
+    assertTrue(registry.scheduler.tryLaunchBrokers(Seq(offer)))
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertFalse(broker.needsRestart)
 
     assertNotNull(broker.task)
-    assertEquals(Broker.State.STARTING, broker.task.state)
+    assertEquals(Broker.State.PENDING, broker.task.state)
     assertEquals(parseMap("a=1,b=2").toMap, broker.task.attributes)
 
     val task = schedulerDriver.launchedTasks.get(0)
     assertEquals(task.getTaskId.getValue, broker.task.id)
+
+    val startingUpdate = TaskStatus.newBuilder()
+      .setTaskId(task.getTaskId)
+      .setState(TaskState.TASK_STARTING)
+      .build()
+    registry.brokerLifecycleManager.tryTransition(startingUpdate)
+    assertEquals(Broker.State.STARTING, broker.task.state)
+
+    val runningUpdate = TaskStatus.newBuilder()
+        .setTaskId(task.getTaskId)
+        .setState(TaskState.TASK_RUNNING)
+        .build()
+    registry.brokerLifecycleManager.tryTransition(runningUpdate)
+    assertEquals(Broker.State.RUNNING, broker.task.state)
   }
 
   @Test
@@ -247,10 +272,11 @@ class SchedulerTest extends KafkaMesosTestCase {
     val broker0 = registry.cluster.addBroker(new Broker(0))
 
     val broker1 = registry.cluster.addBroker(new Broker(1))
-    broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
+    broker1.task = Broker.Task(id = "1")
+    broker1.task.state = Broker.State.RUNNING
 
     val broker2 = registry.cluster.addBroker(new Broker(2))
-    broker2.task = new Broker.Task(id = "2", _state = Broker.State.STARTING)
+    broker2.task = Broker.Task(id = "2")
 
     MockWallClock.overrideNow(Some(new Date(0)))
     registry.taskReconciler.start()
@@ -284,10 +310,11 @@ class SchedulerTest extends KafkaMesosTestCase {
     val broker0 = registry.cluster.addBroker(new Broker(0))
 
     val broker1 = registry.cluster.addBroker(new Broker(1))
-    broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
+    broker1.task = Broker.Task(id = "1")
+    broker1.task.state = Broker.State.RUNNING
 
     val broker2 = registry.cluster.addBroker(new Broker(2))
-    broker2.task = new Broker.Task(id = "2", _state = Broker.State.STARTING)
+    broker2.task = Broker.Task(id = "2")
 
     registry.taskReconciler.start().get
     while(registry.taskReconciler.isReconciling) {
@@ -303,19 +330,18 @@ class SchedulerTest extends KafkaMesosTestCase {
     Config.reconciliationTimeout = new Period("100ms")
 
     val broker0 = registry.cluster.addBroker(new Broker(0))
-
     val broker1 = registry.cluster.addBroker(new Broker(1))
-    broker1.task = new Broker.Task(id = "1", _state = Broker.State.RUNNING)
+    broker1.active = true
+    broker1.task = Broker.Task(id = "1")
+    broker1.task.state = Broker.State.RUNNING
 
-    registry.taskReconciler.start()
-    while(!registry.taskReconciler.isReconciling) {
-      Thread.sleep(10)
-    }
+    registry.taskReconciler.start().get()
 
     val status = TaskStatus.newBuilder()
-    status.setState(TaskState.TASK_RUNNING)
-    status.setTaskId(TaskID.newBuilder().setValue("1"))
-    registry.brokerLifecycleManager.onBrokerStatus(broker1, status.build())
+      .setState(TaskState.TASK_RUNNING)
+      .setTaskId(TaskID.newBuilder().setValue("1"))
+      .setReason(TaskStatus.Reason.REASON_RECONCILIATION)
+    registry.brokerLifecycleManager.tryTransition(status.build())
 
     while(registry.taskReconciler.isReconciling) {
       Thread.sleep(10)
@@ -417,7 +443,8 @@ class SchedulerTest extends KafkaMesosTestCase {
     assertFalse(future.isCompleted)
 
     // broker has to be and task has to be running
-    broker.task = Broker.Task(_state = Broker.State.RUNNING)
+    broker.task = Broker.Task()
+    broker.task.state = Broker.State.RUNNING
     registry.scheduler.frameworkMessage(schedulerDriver, executorId(Broker.nextExecutorId(broker)), slaveId(), data)
     assertTrue(future.isCompleted)
   }

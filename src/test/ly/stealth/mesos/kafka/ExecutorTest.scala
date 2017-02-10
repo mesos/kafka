@@ -17,33 +17,31 @@
 
 package ly.stealth.mesos.kafka
 
-import java.io.File
-import java.util
-import ly.stealth.mesos.kafka.Broker.{Endpoint, Metrics}
 import ly.stealth.mesos.kafka.executor.{Executor, LaunchConfig}
 import ly.stealth.mesos.kafka.json.JsonUtil
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.mesos.Protos.{Status, TaskState}
-import net.elodina.mesos.util.Strings
+import scala.collection.JavaConversions._
 
 class ExecutorTest extends KafkaMesosTestCase {
   @Test(timeout = 5000)
   def startBroker_success {
     val data = JsonUtil.toJson(LaunchConfig(0))
     Executor.startBroker(executorDriver, task("id", "task", "slave", data))
-    executorDriver.waitForStatusUpdates(1)
-    assertEquals(1, executorDriver.statusUpdates.size())
+    executorDriver.waitForStatusUpdates(2)
+    assertEquals(2, executorDriver.statusUpdates.size())
 
-    var status = executorDriver.statusUpdates.get(0)
-    assertEquals(TaskState.TASK_RUNNING, status.getState)
+    assertEquals(
+      Seq(TaskState.TASK_STARTING, TaskState.TASK_RUNNING),
+      executorDriver.statusUpdates.map(_.getState))
     assertTrue(Executor.server.isStarted)
 
     Executor.server.stop()
-    executorDriver.waitForStatusUpdates(2)
+    executorDriver.waitForStatusUpdates(3)
 
-    assertEquals(2, executorDriver.statusUpdates.size())
-    status = executorDriver.statusUpdates.get(1)
+    assertEquals(3, executorDriver.statusUpdates.size())
+    val status = executorDriver.statusUpdates.get(2)
     assertEquals(TaskState.TASK_FINISHED, status.getState)
     assertFalse(Executor.server.isStarted)
   }

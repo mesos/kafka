@@ -44,6 +44,7 @@ object Config {
 
   var reconciliationTimeout = new Period("5m")
   var reconciliationAttempts = 6
+  var reconciliationInterval = new Period((reconciliationTimeout.ms() * reconciliationAttempts) + "ms")
 
   var jre: File = null
   var log: File = null
@@ -86,6 +87,7 @@ object Config {
 
     if (props.containsKey("reconciliation-timeout")) reconciliationTimeout = new Period(props.getProperty("reconciliation-timeout"))
     if (props.containsKey("reconciliation-attempts")) reconciliationAttempts = Integer.valueOf("reconciliation-attempts")
+    if (props.containsKey("reconciliation-interval")) reconciliationInterval = new Period(props.getProperty("reconciliation-interval"))
 
     if (props.containsKey("jre")) jre = new File(props.getProperty("jre"))
     if (props.containsKey("log")) log = new File(props.getProperty("log"))

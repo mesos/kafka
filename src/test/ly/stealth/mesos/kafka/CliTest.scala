@@ -152,7 +152,8 @@ class CliTest extends KafkaMesosTestCase {
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker start timeout")) }
     assertTrue(broker.active)
 
-    broker.task = new Broker.Task("id", "slave", "executor", "host", _state = Broker.State.RUNNING)
+    broker.task = Broker.Task("id", "slave", "executor", "host")
+    broker.task.state = Broker.State.RUNNING
     try { exec("broker stop 0 --timeout=1ms"); fail() }
     catch { case e: Cli.Error => assertTrue(e.getMessage, e.getMessage.contains("broker stop timeout")) }
     assertFalse(broker.active)
