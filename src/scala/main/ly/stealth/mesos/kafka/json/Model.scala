@@ -241,9 +241,9 @@ class ClusterDeserializer extends StdDeserializer[Cluster](classOf[Cluster]) {
     val model = p.readValueAs(classOf[ClusterModel])
     val c = new Cluster()
     c.frameworkId = model.frameworkId
-    for (b <- model.brokers)
-      c.addBroker(b)
-
+    Option(model.brokers).toList
+      .flatten
+      .foreach(c.addBroker)
     c
   }
 }
