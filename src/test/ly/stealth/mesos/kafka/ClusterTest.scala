@@ -66,6 +66,14 @@ class ClusterTest extends KafkaMesosTestCase {
   }
 
   @Test
+  def load_empty_cluster: Unit = {
+    val jsData = "{\"version\":\"0.10.1.0-SNAPSHOT\"}"
+    val cluster = JsonUtil.fromJson[Cluster](jsData)
+    assertNotNull(cluster.getBrokers)
+    assertEquals(0, cluster.getBrokers.size())
+  }
+
+  @Test
   def toJson_fromJson {
     val broker0 = cluster.addBroker(new Broker("0"))
     broker0.task = new Broker.Task("1", "slave", "executor", "host", _state = State.RUNNING)
