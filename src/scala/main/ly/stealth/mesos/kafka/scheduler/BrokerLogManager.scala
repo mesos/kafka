@@ -16,8 +16,8 @@
  */
 package ly.stealth.mesos.kafka.scheduler
 
-import java.util.concurrent.TimeoutException
-import org.jboss.netty.util.{HashedWheelTimer, Timeout, TimerTask}
+import java.util.concurrent.{Executors, ScheduledExecutorService, ScheduledFuture, TimeoutException}
+
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
@@ -38,14 +38,14 @@ trait BrokerLogManagerComponentImpl extends BrokerLogManagerComponent {
 
   class BrokerLogManagerImpl extends BrokerLogManager {
     private[this] val pendingLogs = TrieMap[Long, Promise[String]]()
-    private[this] val timer = new HashedWheelTimer()
+    private[this] val scheduler: ScheduledExecutorService  = Executors.newScheduledThreadPool(1);
 
     def putLog(requestId: Long, content: String): Unit =
       pendingLogs.get(requestId).foreach { log => log.complete(Success(content)) }
 
-    private def scheduleTimeout(promise: Promise[String], timeout: Duration): Timeout = {
-      timer.newTimeout(new TimerTask {
-        override def run(timeout: Timeout): Unit = promise.tryFailure(new TimeoutException())
+    private def scheduleTimeout(promise: Promise[String], timeout: Duration): ScheduledFuture[_] = {
+      scheduler.schedule(new Runnable {
+        override def run() = promise.tryFailure(new TimeoutException())
       }, timeout.length, timeout.unit)
     }
 
@@ -57,7 +57,7 @@ trait BrokerLogManagerComponentImpl extends BrokerLogManagerComponent {
 
       val timer = scheduleTimeout(promise, timeout)
       promise.future.onComplete { _ =>
-        timer.cancel()
+        timer.cancel(false) // false: probably too late to interrupt the failing promise anyway
         pendingLogs.remove(requestId)
       }
 
