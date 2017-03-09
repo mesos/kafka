@@ -20,7 +20,7 @@ jdk:
   - oraclejdk8
   - oraclejdk7
 env:
-  - KAFKA_VER=0.10.1.1
+  - KAFKA_VER=0.10.2.0
   - KAFKA_VER=0.9.0.1
   - KAFKA_VER=0.8.2.2
 matrix:
