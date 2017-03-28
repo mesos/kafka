@@ -23,6 +23,7 @@ import org.junit.Assert._
 import java.util
 import scala.collection.JavaConversions._
 import java.io.{ByteArrayOutputStream, PrintStream}
+import ly.stealth.mesos.kafka.Broker.{Container, ContainerType, Mount, MountMode}
 import ly.stealth.mesos.kafka.cli.Cli
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.Rebalancer
@@ -95,6 +96,52 @@ class CliTest extends KafkaMesosTestCase {
     val broker = registry.cluster.getBroker(0)
     assertEquals(0.1, broker.cpus, 0.001)
     assertEquals(128, broker.mem)
+  }
+
+  @Test
+  def broker_add_docker_image: Unit = {
+    exec("broker add 0 --cpus=1 --mem=128 --container-image=test --java-cmd=/usr/bin/java")
+
+    assertEquals(1, registry.cluster.getBrokers.size())
+    val broker = registry.cluster.getBroker(0)
+    assertEquals(
+      Some(Container(
+        ctype = ContainerType.Docker,
+        name = "test"
+      )), broker.executionOptions.container)
+    assertEquals("/usr/bin/java", broker.executionOptions.javaCmd)
+  }
+
+  @Test
+  def broker_add_mesos_image: Unit = {
+    exec("broker add 0 --cpus=1 --mem=128 --container-image=test --container-type=mesos --java-cmd=/usr/bin/java")
+
+    assertEquals(1, registry.cluster.getBrokers.size())
+    val broker = registry.cluster.getBroker(0)
+    assertEquals(
+      Some(Container(
+        ctype = ContainerType.Mesos,
+        name = "test"
+      )), broker.executionOptions.container)
+    assertEquals("/usr/bin/java", broker.executionOptions.javaCmd)
+  }
+
+  @Test
+  def broker_add_volume: Unit = {
+    exec("broker add 0 --cpus=1 --mem=128 --container-image=test " +
+      "--container-type=mesos " +
+      "--container-mounts=/a:/b:ro " +
+      "--java-cmd=/usr/bin/java")
+
+    assertEquals(1, registry.cluster.getBrokers.size())
+    val broker = registry.cluster.getBroker(0)
+    assertEquals(
+      Some(Container(
+        ctype = ContainerType.Mesos,
+        name = "test",
+        mounts = Seq(Mount("/a", "/b", MountMode.ReadOnly))
+      )), broker.executionOptions.container)
+    assertEquals("/usr/bin/java", broker.executionOptions.javaCmd)
   }
 
   @Test

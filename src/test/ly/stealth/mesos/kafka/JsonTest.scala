@@ -20,7 +20,7 @@ package ly.stealth.mesos.kafka
 import org.junit.Test
 import org.junit.Assert._
 import net.elodina.mesos.util.{Constraint, Period, Range}
-import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, Stickiness, Task}
+import ly.stealth.mesos.kafka.Broker.{Endpoint, ExecutionOptions, Failover, Stickiness, Task}
 import scala.io.Source
 
 class JsonTest {
@@ -62,7 +62,7 @@ class JsonTest {
     b.port = new Range(9092)
     b.constraints = Map("dedicated" -> new Constraint("like:kafka/general"))
     b.mem = 56320
-    b.jvmOptions = "-server"
+    b.executionOptions = ExecutionOptions(jvmOptions = "-server")
     b.cpus = 7
     b.heap = 5120
     b.failover = new Failover(new Period("1m"), new Period("10m"))

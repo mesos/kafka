@@ -26,6 +26,7 @@ import net.elodina.mesos.util.{IO, Period, Version}
 import net.elodina.mesos.util.Strings.{formatMap, parseMap}
 import ly.stealth.mesos.kafka.cli.Cli.{sendRequest, sendRequestObj}
 import java.util.Properties
+import ly.stealth.mesos.kafka.Broker.{Container, ContainerType, Mount, MountMode}
 import ly.stealth.mesos.kafka.cli.Cli
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.{AdminUtilsWrapper, Quota, Quotas}
@@ -60,7 +61,92 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertEquals(0.1, broker.cpus, 0.001)
     assertEquals(128, broker.mem)
 
-    BrokerTest.assertBrokerEquals(broker, brokers.brokers(0))
+    BrokerTest.assertBrokerEquals(broker, brokers.brokers.head)
+  }
+
+  @Test
+  def broker_add_docker_image: Unit = {
+    val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add",
+      parseMap("broker=0,cpus=1,mem=128,containerImage=test,javaCmd=/usr/bin/java"))
+    assertEquals(1, brokers.brokers.size)
+    val broker = registry.cluster.getBroker(0)
+    assertEquals(Some(Container(
+      ctype = ContainerType.Docker,
+      name = "test"
+    )), broker.executionOptions.container)
+    assertEquals("/usr/bin/java", broker.executionOptions.javaCmd)
+    BrokerTest.assertBrokerEquals(broker, brokers.brokers.head)
+  }
+
+  @Test
+  def broker_add_mesos_image = {
+    val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add",
+      parseMap("broker=0,cpus=1,mem=128,containerImage=test,containerType=mesos,javaCmd=/usr/bin/java"))
+    assertEquals(1, brokers.brokers.size)
+    val broker = registry.cluster.getBroker(0)
+    assertEquals(Some(Container(
+      ctype = ContainerType.Mesos,
+      name = "test"
+    )), broker.executionOptions.container)
+    assertEquals("/usr/bin/java", broker.executionOptions.javaCmd)
+    BrokerTest.assertBrokerEquals(broker, brokers.brokers.head)
+  }
+
+  @Test
+  def broker_update_image: Unit = {
+    val brokers = sendRequestObj[BrokerStatusResponse]("/broker/add",
+      parseMap("broker=0,cpus=1,mem=128,containerImage=test,javaCmd=/usr/bin/java"))
+    assertEquals(1, brokers.brokers.size)
+    val broker = registry.cluster.getBroker(0)
+    assertEquals("test", broker.executionOptions.container.map(_.name).orNull)
+    assertEquals("/usr/bin/java", broker.executionOptions.javaCmd)
+    BrokerTest.assertBrokerEquals(broker, brokers.brokers.head)
+
+    // No key doesn't remove the image
+    sendRequestObj[BrokerStatusResponse]("/broker/update",
+      parseMap("broker=0,cpus=1,mem=128,javaCmd=/usr/bin/java"))
+    assertEquals("test", broker.executionOptions.container.map(_.name).orNull)
+
+    // Empty key does
+    sendRequestObj[BrokerStatusResponse]("/broker/update",
+      Map("broker" -> "0", "containerImage" -> ""))
+    assertEquals(None, broker.executionOptions.container)
+
+    sendRequestObj[BrokerStatusResponse]("/broker/update",
+      Map(
+        "broker" -> "0",
+        "containerImage" -> "test",
+        "containerMounts" -> "/a:/b,/c:/d:R"))
+
+    // Add mount points
+    assertEquals(Some(Container(
+      ctype = ContainerType.Docker,
+      name = "test",
+      mounts = Seq(
+        Mount("/a", "/b", MountMode.ReadWrite),
+        Mount("/c", "/d", MountMode.ReadOnly)
+      )
+    )), registry.cluster.getBroker(0).executionOptions.container)
+
+    // Remove them but keep the image
+    sendRequestObj[BrokerStatusResponse]("/broker/update",
+      Map(
+        "broker" -> "0",
+        "containerImage" -> "test",
+        "containerMounts" -> ""))
+    assertEquals(Some(Container(
+      ctype = ContainerType.Docker,
+      name = "test",
+      mounts = Seq()
+    )), registry.cluster.getBroker(0).executionOptions.container)
+
+    // Switch the image type
+    sendRequestObj[BrokerStatusResponse]("/broker/update", parseMap("broker=0,containerType=mesos"))
+    assertEquals(Some(Container(
+      ctype = ContainerType.Mesos,
+      name = "test",
+      mounts = Seq()
+    )), registry.cluster.getBroker(0).executionOptions.container)
   }
 
   @Test

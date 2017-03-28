@@ -17,10 +17,7 @@
 
 package ly.stealth.mesos.kafka
 
-import com.google.protobuf.Descriptors
-import org.apache.mesos.Protos.Resource.DiskInfo
-import org.apache.mesos.Protos.Resource.DiskInfo.{Persistence, Source}
-import org.apache.mesos.Protos.Resource.DiskInfo.Source.{Mount, Type}
+import org.apache.mesos.Protos.Resource.DiskInfo.Source
 import org.junit.{Before, Test}
 import org.junit.Assert._
 import ly.stealth.mesos.kafka.Util.BindAddress
@@ -28,12 +25,12 @@ import net.elodina.mesos.util.{Constraint, Period, Range}
 import net.elodina.mesos.util.Strings.parseMap
 import java.util.{Collections, Date}
 import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, State, Stickiness, Task}
+import ly.stealth.mesos.kafka.Broker._
 import java.util
 import ly.stealth.mesos.kafka.executor.LaunchConfig
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
-import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
+import org.apache.mesos.Protos.{Offer, Resource}
 
 class BrokerTest extends KafkaMesosTestCase {
 
@@ -457,10 +454,18 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.constraints = parseMap("a=like:1").mapValues(new Constraint(_)).toMap
     broker.options = parseMap("a=1").toMap
     broker.log4jOptions = parseMap("b=2").toMap
-    broker.jvmOptions = "-Xms512m"
-
     broker.failover.registerFailure(new Date())
-    broker.task = new Task("1", "slave", "executor", "host")
+    broker.task = Task("1", "slave", "executor", "host")
+
+    broker.executionOptions = ExecutionOptions(
+      container = Some(Container(
+        ctype = ContainerType.Docker,
+        name = "test",
+        mounts = Seq(Mount("/a", "/b", MountMode.ReadWrite))
+      )),
+      javaCmd = "/usr/bin/java",
+      jvmOptions = "-Xms512m"
+    )
 
     val read = JsonUtil.fromJson[Broker](JsonUtil.toJson(broker))
 
@@ -696,12 +701,12 @@ object BrokerTest {
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.options, actual.options)
     assertEquals(expected.log4jOptions, actual.log4jOptions)
-    assertEquals(expected.jvmOptions, actual.jvmOptions)
 
     assertFailoverEquals(expected.failover, actual.failover)
     assertTaskEquals(expected.task, actual.task)
 
     assertEquals(expected.needsRestart, actual.needsRestart)
+    assertEquals(expected.executionOptions, actual.executionOptions)
   }
 
   def assertFailoverEquals(expected: Failover, actual: Failover) {

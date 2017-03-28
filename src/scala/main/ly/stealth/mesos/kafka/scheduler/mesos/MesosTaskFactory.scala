@@ -17,14 +17,17 @@
 package ly.stealth.mesos.kafka.scheduler.mesos
 
 import com.google.protobuf.ByteString
+import ly.stealth.mesos.kafka.Broker.{Container, ContainerType, MountMode}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.executor.LaunchConfig
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.KafkaDistributionComponent
 import net.elodina.mesos.util.Version
+import org.apache.mesos.Protos.ContainerInfo.{DockerInfo, MesosInfo}
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.Protos._
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 
 trait MesosTaskFactoryComponent {
   val taskFactory: MesosTaskFactory
@@ -42,9 +45,13 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
   class MesosTaskFactoryImpl extends MesosTaskFactory {
     private[kafka] def newExecutor(broker: Broker): ExecutorInfo = {
       val distInfo = kafkaDistribution.distInfo
-      var cmd = "java -cp " + distInfo.jar.getName
-      cmd += " -Xmx" + broker.heap + "m"
-      if (broker.jvmOptions != null) cmd += " " + broker.jvmOptions.replace("$id", broker.id.toString)
+      var cmd = ""
+      if (broker.executionOptions.container.isDefined) {
+        cmd += "cd $MESOS_SANDBOX && "
+      }
+      cmd += s"${broker.executionOptions.javaCmd} -cp ${distInfo.jar.getName} -Xmx${broker.heap}m"
+      if (broker.executionOptions.jvmOptions != null)
+        cmd += " " + broker.executionOptions.jvmOptions.replace("$id", broker.id.toString)
 
       if (Config.debug) cmd += " -Ddebug"
       cmd += " ly.stealth.mesos.kafka.executor.Executor"
@@ -72,10 +79,50 @@ trait MesosTaskFactoryComponentImpl extends MesosTaskFactoryComponent {
           .setValue(Config.api + "/kafka/" + distInfo.kafkaDist.getName))
         .setValue(cmd)
 
-      ExecutorInfo.newBuilder()
+      val executor = ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder.setValue(Broker.nextExecutorId(broker)))
         .setCommand(commandBuilder)
         .setName("broker-" + broker.id)
+
+      broker.executionOptions.container.foreach { c =>
+        executor.setContainer(createContainerInfo(c, broker.id))
+
+      }
+      executor.build()
+    }
+
+    private def createContainerInfo(c: Container, brokerId: Int): ContainerInfo = {
+      val containerName = c.name.replace("$id", brokerId.toString)
+      val containerInfo =
+        if (c.ctype == ContainerType.Docker) {
+          ContainerInfo.newBuilder()
+            .setDocker(DockerInfo.newBuilder()
+              .setImage(containerName)
+              .setNetwork(DockerInfo.Network.HOST))
+            .setType(ContainerInfo.Type.DOCKER)
+        } else if (c.ctype == ContainerType.Mesos) {
+          ContainerInfo.newBuilder()
+            .setMesos(MesosInfo.newBuilder()
+                .setImage(Image.newBuilder()
+                  .setDocker(Image.Docker.newBuilder().setName(containerName))
+                  .setType(Image.Type.DOCKER)))
+            .setType(ContainerInfo.Type.MESOS)
+        } else {
+          throw new IllegalArgumentException("unsupported type")
+        }
+
+      containerInfo
+        .addAllVolumes(
+          c.mounts.map(m =>
+            Volume.newBuilder()
+              .setHostPath(m.hostPath.replace("$id", brokerId.toString))
+              .setContainerPath(m.containerPath.replace("$id", brokerId.toString))
+              .setMode(m.mode match {
+                case MountMode.ReadWrite => Volume.Mode.RW
+                case MountMode.ReadOnly => Volume.Mode.RO
+              })
+              .build()
+          ))
         .build()
     }
 

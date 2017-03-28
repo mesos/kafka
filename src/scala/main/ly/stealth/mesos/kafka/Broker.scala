@@ -24,7 +24,7 @@ import org.apache.mesos.Protos.Resource.DiskInfo.{Persistence, Source}
 import org.apache.mesos.Protos.Volume.Mode
 import scala.collection.JavaConversions._
 import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
-import ly.stealth.mesos.kafka.Broker.{Failover, Metrics, Stickiness}
+import ly.stealth.mesos.kafka.Broker.{ExecutionOptions, Failover, Metrics, Stickiness}
 import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
@@ -44,7 +44,6 @@ class Broker(val id: Int = 0) {
   var constraints: Map[String, Constraint] = Map()
   var options: Map[String, String] = Map()
   var log4jOptions: Map[String, String] = Map()
-  var jvmOptions: String = null
 
   var stickiness: Stickiness = new Stickiness()
   var failover: Failover = new Failover()
@@ -53,6 +52,8 @@ class Broker(val id: Int = 0) {
 
   // broker has been modified while being in non stopped state, once stopped or before task launch becomes false
   var needsRestart: Boolean = false
+
+  var executionOptions: ExecutionOptions = ExecutionOptions()
 
   @volatile var task: Broker.Task = _
   @volatile var lastTask: Broker.Task = _
@@ -261,10 +262,10 @@ class Broker(val id: Int = 0) {
     nb.constraints = Map() ++ constraints
     nb.options = Map() ++ options
     nb.log4jOptions = Map() ++ log4jOptions
-    nb.jvmOptions = jvmOptions
     nb.failover.delay = failover.delay
     nb.failover.maxDelay = failover.maxDelay
     nb.failover.maxTries = failover.maxTries
+    nb.executionOptions = executionOptions.copy()
 
     nb
   }
@@ -320,6 +321,56 @@ object Broker {
       period == other.period && stopTime == other.stopTime && hostname == other.hostname
     }
   }
+
+  abstract class ContainerType
+  object ContainerType {
+    object Mesos extends ContainerType {
+      override def toString: String = "mesos"
+    }
+    object Docker extends ContainerType {
+      override def toString: String = "docker"
+    }
+
+    def valueOf(s: String): ContainerType = {
+      s match {
+        case "mesos" => ContainerType.Mesos
+        case "docker" => ContainerType.Docker
+      }
+    }
+  }
+
+  case class Container(ctype: ContainerType, name: String, mounts: Seq[Mount] = Seq())
+
+  abstract class MountMode
+  object MountMode {
+    object ReadWrite extends MountMode {
+      override def toString: String = "rw"
+    }
+    object ReadOnly extends MountMode {
+      override def toString: String = "ro"
+    }
+  }
+  case class Mount(hostPath: String, containerPath: String, mode: MountMode)
+
+  object Mount {
+    def parse(v: String): Mount = {
+      v.split(':') match {
+        case Array(host, container) => Mount(host, container, MountMode.ReadWrite)
+        case Array(host, container, mode) =>
+          Mount(host, container, mode.toLowerCase() match {
+            case "rw" => MountMode.ReadWrite
+            case "r" | "ro" => MountMode.ReadOnly
+            case _ => throw new IllegalArgumentException("invalid mount mode " + mode)
+          })
+        case _ => throw new IllegalArgumentException("invalid mount " + v)
+      }
+    }
+  }
+  case class ExecutionOptions(
+    container: Option[Container] = None,
+    jvmOptions: String = "",
+    javaCmd: String = "exec java"
+  )
 
   class Failover(_delay: Period = new Period("1m"), _maxDelay: Period = new Period("10m")) {
     var delay: Period = _delay

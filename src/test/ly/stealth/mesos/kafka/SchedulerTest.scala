@@ -19,9 +19,10 @@ package ly.stealth.mesos.kafka
 
 import org.junit.Test
 import org.junit.Assert._
-import org.apache.mesos.Protos.{Offer, TaskID, TaskState, TaskStatus}
+import org.apache.mesos.Protos.{ContainerInfo, Offer, TaskID, TaskState, TaskStatus, Volume}
 import java.util.{Date, UUID}
 import java.util.concurrent.TimeUnit
+import ly.stealth.mesos.kafka.Broker.{Container, ContainerType, ExecutionOptions, Mount, MountMode}
 import ly.stealth.mesos.kafka.executor.{Executor, LaunchConfig}
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.BrokerState
@@ -29,6 +30,7 @@ import ly.stealth.mesos.kafka.scheduler.mesos.{OfferManager, OfferResult}
 import net.elodina.mesos.util.Period
 import net.elodina.mesos.util.Strings.parseMap
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 
 class SchedulerTest extends KafkaMesosTestCase {
@@ -40,7 +42,7 @@ class SchedulerTest extends KafkaMesosTestCase {
     broker.cpus = 0.5
     broker.mem = 256
     broker.heap = 512
-    broker.jvmOptions = "-Xms64m"
+    broker.executionOptions = ExecutionOptions(jvmOptions = "-Xms64m")
 
     val offer = this.offer("id", "fw-id", "slave", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "")
     val reservation = broker.getReservation(offer)
@@ -55,7 +57,7 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     val cmd: String = command.getValue
     assertTrue(cmd, cmd.contains("-Xmx" + broker.heap + "m"))
-    assertTrue(cmd, cmd.contains(broker.jvmOptions))
+    assertTrue(cmd, cmd.contains(broker.executionOptions.jvmOptions))
     assertTrue(cmd, cmd.contains(Executor.getClass.getName.replace("$", "")))
 
     // resources
@@ -75,6 +77,72 @@ class SchedulerTest extends KafkaMesosTestCase {
 
     assertEquals("kafka-logs", defaults("log.dirs"))
     assertEquals(offer.getHostname, defaults("host.name"))
+  }
+
+  private def volume(host: String, container: String, mode: MountMode) =
+    Volume.newBuilder()
+      .setHostPath(host)
+      .setContainerPath(container)
+      .setMode(mode match {
+        case MountMode.ReadWrite => Volume.Mode.RW
+        case MountMode.ReadOnly => Volume.Mode.RO
+      })
+      .build()
+
+  @Test
+  def newDockerTask: Unit = {
+    val broker = new Broker(1)
+    broker.options = parseMap("a=1").toMap
+    broker.log4jOptions = parseMap("b=2").toMap
+    broker.cpus = 0.5
+    broker.mem = 256
+    broker.heap = 512
+    broker.executionOptions = ExecutionOptions(
+      container = Some(Container(
+        ctype = ContainerType.Docker,
+        name = "test",
+        mounts = Seq(Mount("/a", "/b", MountMode.ReadWrite))
+      )),
+      jvmOptions = "-Xms64m"
+    )
+
+    val offer = this.offer("id", "fw-id", "slave", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "")
+    val reservation = broker.getReservation(offer)
+
+    val task = registry.taskFactory.newTask(broker, offer, reservation)
+    assertEquals("test", task.getExecutor.getContainer.getDocker.getImage)
+    assertEquals(ContainerInfo.Type.DOCKER, task.getExecutor.getContainer.getType)
+    assertEquals(
+      Seq(volume("/a", "/b", MountMode.ReadWrite)).asJava,
+      task.getExecutor.getContainer.getVolumesList)
+  }
+
+  @Test
+  def newMesosImageTask: Unit = {
+    val broker = new Broker(1)
+    broker.options = parseMap("a=1").toMap
+    broker.log4jOptions = parseMap("b=2").toMap
+    broker.cpus = 0.5
+    broker.mem = 256
+    broker.heap = 512
+    broker.executionOptions = ExecutionOptions(
+      container = Some(Container(
+        ctype = ContainerType.Mesos,
+        name = "test",
+        mounts = Seq(Mount("/a", "/b", MountMode.ReadWrite))
+      )),
+      jvmOptions = "-Xms64m"
+    )
+
+    val offer = this.offer("id", "fw-id", "slave", "host", s"cpus:${broker.cpus}; mem:${broker.mem}; ports:1000", "")
+    val reservation = broker.getReservation(offer)
+
+    val task = registry.taskFactory.newTask(broker, offer, reservation)
+    assertEquals(ContainerInfo.Type.MESOS, task.getExecutor.getContainer.getType)
+    assertEquals("test", task.getExecutor.getContainer.getMesos.getImage.getDocker.getName)
+    assertEquals(
+      Seq(volume("/a", "/b", MountMode.ReadWrite)).asJava,
+      task.getExecutor.getContainer.getVolumesList)
   }
 
   @Test

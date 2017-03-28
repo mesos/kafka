@@ -193,6 +193,10 @@ trait BrokerCli {
       parser.accepts("failover-delay", "failover delay (10s, 5m, 3h)").withRequiredArg().ofType(classOf[String])
       parser.accepts("failover-max-delay", "max failover delay. See failoverDelay.").withRequiredArg().ofType(classOf[String])
       parser.accepts("failover-max-tries", "max failover tries. Default - none").withRequiredArg().ofType(classOf[String])
+      val javaCmdArg = parser.accepts("java-cmd", "command to launch java.  Default - java").withRequiredArg().ofType(classOf[String])
+      val containerTypeArg = parser.accepts("container-type", "the type of container the broker should be launched in. \nMaybe be either mesos or docker").withRequiredArg().ofType(classOf[String])
+      val containerImageArg = parser.accepts("container-image", "the container image to launch the broker in (if any)" ).withRequiredArg().ofType(classOf[String])
+      val containerMountArg = parser.accepts("container-mounts", "a comma separated list of host:container[:mode][,...] tuples to mount into the launched container.").withRequiredArg().ofType(classOf[String])
 
       if (help) {
         val cmd = if (add) "add" else "update"
@@ -231,6 +235,11 @@ trait BrokerCli {
       val failoverMaxDelay = options.valueOf("failover-max-delay").asInstanceOf[String]
       val failoverMaxTries = options.valueOf("failover-max-tries").asInstanceOf[String]
 
+      val javaCmd = options.valueOf(javaCmdArg)
+      val containerType = options.valueOf(containerTypeArg)
+      val containerImage = options.valueOf(containerImageArg)
+      val containerMounts = options.valueOf(containerMountArg)
+
       val params = new util.LinkedHashMap[String, String]
       params.put("broker", expr)
 
@@ -251,6 +260,11 @@ trait BrokerCli {
       if (failoverDelay != null) params.put("failoverDelay", failoverDelay)
       if (failoverMaxDelay != null) params.put("failoverMaxDelay", failoverMaxDelay)
       if (failoverMaxTries != null) params.put("failoverMaxTries", failoverMaxTries)
+
+      if (javaCmdArg != null) params.put("javaCmd", javaCmd)
+      if (containerType != null) params.put("containerType", containerType)
+      if (containerImage != null) params.put("containerImage", containerImage)
+      if (containerMounts != null) params.put("containerMounts", containerMounts)
 
       val brokers =
         try { sendRequestObj[BrokerStatusResponse]("/broker/" + (if (add) "add" else "update"), params).brokers }
@@ -474,11 +488,20 @@ trait BrokerCli {
 
       if (broker.bindAddress != null) printLine("bind-address: " + broker.bindAddress, indent)
       if (broker.syslog) printLine("syslog: " + broker.syslog, indent)
-      if (!broker.constraints.isEmpty) printLine("constraints: " + Strings.formatMap(broker.constraints), indent)
+      if (broker.constraints.nonEmpty) printLine("constraints: " + Strings.formatMap(broker.constraints), indent)
+      if (broker.executionOptions.javaCmd != "exec java") printLine("java-cmd: " + broker.executionOptions.javaCmd, indent)
+      broker.executionOptions.container.foreach { i =>
+        printLine(s"image: ${i.name} [${i.ctype.toString}]", indent)
+        printLine("mounts:", indent)
+        i.mounts.foreach { m =>
+          printLine(s"${m.hostPath} => ${m.containerPath} [${m.mode}]", indent + 1)
+        }
+      }
+
       if (!quiet) {
-        if (!broker.options.isEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
-        if (!broker.log4jOptions.isEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)
-        if (broker.jvmOptions != null) printLine("jvm-options: " + broker.jvmOptions, indent)
+        if (broker.options.nonEmpty) printLine("options: " + Strings.formatMap(broker.options), indent)
+        if (broker.log4jOptions.nonEmpty) printLine("log4j-options: " + Strings.formatMap(broker.log4jOptions), indent)
+        if (broker.executionOptions.jvmOptions != null) printLine("jvm-options: " + broker.executionOptions.jvmOptions, indent)
       }
       var failover = "failover:"
       failover += " delay:" + broker.failover.delay
@@ -498,7 +521,7 @@ trait BrokerCli {
         printLine("id: " + broker.task.id, indent + 1)
         printLine("state: " + task.state, indent + 1)
         if (task.endpoint != null) printLine("endpoint: " + task.endpoint + (if (broker.bindAddress != null) " (" + task.hostname + ")" else ""), indent + 1)
-        if (!task.attributes.isEmpty) printLine("attributes: " + Strings.formatMap(task.attributes), indent + 1)
+        if (task.attributes.nonEmpty) printLine("attributes: " + Strings.formatMap(task.attributes), indent + 1)
       }
 
       val metrics = broker.metrics

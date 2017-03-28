@@ -51,7 +51,7 @@ case class BrokerModel(
                         constraints: String,
                         options: String, log4jOptions: String, jvmOptions: String,
                         stickiness: Stickiness, failover: Failover, task: Task,
-                        metrics: Metrics, needsRestart: Boolean
+                        metrics: Metrics, needsRestart: Boolean, executionOptions: ExecutionOptions
                       )
 
 class BrokerSerializer extends StdSerializer[Broker](classOf[Broker]) {
@@ -66,7 +66,8 @@ class BrokerSerializer extends StdSerializer[Broker](classOf[Broker]) {
     provider.defaultSerializeValue(BrokerModel(
       b.id.toString, b.active, b.cpus, b.mem, b.heap, b.port, b.volume, b.bindAddress, b.syslog,
       Strings.formatMap(b.constraints), Strings.formatMap(b.options), Strings.formatMap(b.log4jOptions),
-      b.jvmOptions, b.stickiness, b.failover, b.task, metrics, b.needsRestart
+      b.executionOptions.jvmOptions, b.stickiness, b.failover, b.task, metrics, b.needsRestart,
+      b.executionOptions
     ), gen)
   }
 }
@@ -87,7 +88,6 @@ class BrokerDeserializer extends StdDeserializer[Broker](classOf[Broker]) {
     b.constraints = Strings.parseMap(model.constraints).mapValues(new Constraint(_)).toMap
     b.options = Strings.parseMap(model.options).toMap
     b.log4jOptions = Strings.parseMap(model.log4jOptions).toMap
-    b.jvmOptions = model.jvmOptions
 
     b.stickiness = if (model.stickiness != null) model.stickiness else new Stickiness()
     b.failover = model.failover
@@ -95,10 +95,25 @@ class BrokerDeserializer extends StdDeserializer[Broker](classOf[Broker]) {
     b.needsRestart = model.needsRestart
 
     b.task = model.task
+    if (model.executionOptions != null)
+      b.executionOptions = model.executionOptions
+    if (model.jvmOptions != null)
+      b.executionOptions = b.executionOptions.copy(jvmOptions = model.jvmOptions)
 
     b
   }
 }
+
+class ContainerTypeSerializer extends StdSerializer[ContainerType](classOf[ContainerType]) {
+  override def serialize(value: ContainerType, gen: JsonGenerator, provider: SerializerProvider): Unit =
+    gen.writeString(value.toString)
+}
+
+class ContainerTypeDeserializer extends StdDeserializer[ContainerType](classOf[ContainerType]) {
+  override def deserialize(p: JsonParser, ctxt: DeserializationContext): ContainerType =
+    ContainerType.valueOf(p.readValueAs(classOf[String]))
+}
+
 
 class EndpointSerializer extends StdSerializer[Endpoint](classOf[Endpoint]) {
   override def serialize(value: Endpoint, gen: JsonGenerator, provider: SerializerProvider): Unit = {
@@ -155,6 +170,20 @@ class MetricsDeserializer extends StdDeserializer[Metrics](classOf[Metrics]) {
     val timestamp = node("timestamp").longValue()
     Metrics(data, timestamp)
   }
+}
+
+
+class MountModeSerializer extends StdSerializer[MountMode](classOf[MountMode]) {
+  override def serialize(value: MountMode, gen: JsonGenerator, provider: SerializerProvider): Unit =
+    gen.writeString(value.toString)
+}
+
+class MountModeDeserializer extends StdDeserializer[MountMode](classOf[Mount]) {
+  override def deserialize(p: JsonParser, ctxt: DeserializationContext): MountMode =
+    p.readValueAs(classOf[String]) match {
+      case "rw" => MountMode.ReadWrite
+      case "r" | "ro" => MountMode.ReadOnly
+    }
 }
 
 class PeriodSerializer extends StdSerializer[Period](classOf[Period]) {
@@ -258,6 +287,9 @@ object KafkaObjectModel extends SimpleModule {
     this.addSerializer(classOf[Broker], new BrokerSerializer())
     this.addDeserializer(classOf[Broker], new BrokerDeserializer())
 
+    this.addSerializer(classOf[ContainerType], new ContainerTypeSerializer())
+    this.addDeserializer(classOf[ContainerType], new ContainerTypeDeserializer())
+
     this.addSerializer(classOf[Cluster], new ClusterSerializer())
     this.addDeserializer(classOf[Cluster], new ClusterDeserializer())
 
@@ -269,6 +301,9 @@ object KafkaObjectModel extends SimpleModule {
 
     this.addSerializer(classOf[Metrics], new MetricsSerializer())
     this.addDeserializer(classOf[Metrics], new MetricsDeserializer())
+
+    this.addSerializer(classOf[MountMode], new MountModeSerializer())
+    this.addDeserializer(classOf[MountMode], new MountModeDeserializer())
 
     this.addSerializer(classOf[Period], new PeriodSerializer())
 

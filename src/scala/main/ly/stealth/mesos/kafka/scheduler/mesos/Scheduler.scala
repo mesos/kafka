@@ -120,8 +120,14 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
           offers.foreach(o => offerManager.declineOffer(o.getId))
         }
         else {
-          if (tryLaunchBrokers(offers)) {
-            cluster.save()
+          try {
+            if (tryLaunchBrokers(offers)) {
+              cluster.save()
+            }
+          } catch {
+            case e: Exception =>
+              logger.error("Error accepting offers, declining", e)
+              offers.foreach(o => offerManager.declineOffer(o.getId))
           }
         })
     }

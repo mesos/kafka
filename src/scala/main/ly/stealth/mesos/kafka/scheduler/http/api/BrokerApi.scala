@@ -20,7 +20,7 @@ import java.lang.{Boolean => JBool, Double => JDouble, Integer => JInt, Long => 
 import java.util.concurrent.{TimeUnit, TimeoutException}
 import javax.ws.rs.core.{MediaType, Response}
 import javax.ws.rs.{Produces, _}
-import ly.stealth.mesos.kafka.Broker.State
+import ly.stealth.mesos.kafka.Broker.{Container, ContainerType, ExecutionOptions, Mount, State}
 import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
@@ -44,10 +44,6 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
     with BrokerLifecycleManagerComponent
     with SchedulerComponent
     with EventLoopComponent =>
-
-  private object AddOrUpdate extends Enumeration {
-    val Add, Update = Value
-  }
 
   val brokerApi: BrokerApi = new BrokerApiImpl
 
@@ -97,13 +93,34 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
       @BothParam("constraints") constraints: ConstraintMap,
       @BothParam("failoverDelay") failoverDelay: Period,
       @BothParam("failoverMaxDelay") failoverMaxDelay: Period,
-      @BothParam("failoverMaxTries") failoverMaxTries: JInt
+      @BothParam("failoverMaxTries") failoverMaxTries: JInt,
+      @BothParam("javaCmd") javaCmd: String,
+      @BothParam("containerType") containerTypeStr: String,
+      @BothParam("containerImage") containerImage: String,
+      @BothParam("containerMounts") containerMounts: String
     ): Response = {
       val add = operation == "add"
       val errors = mutable.Buffer[String]()
       if (broker == null) {
         errors.append("broker required")
       }
+
+      val mounts = try {
+        containerMounts match {
+          case "" => Some(Seq())
+          case null => None
+          case m => Some(m.split(',').map(Mount.parse).toSeq)
+        }
+      } catch {
+        case e: IllegalArgumentException =>
+          errors.append(e.getMessage)
+          None
+      }
+      val containerType =
+        if (containerTypeStr != null)
+          Some(ContainerType.valueOf(containerTypeStr))
+        else
+          None
 
       val ids = Expr.expandBrokers(cluster, broker)
       val brokers = mutable.Buffer[Broker]()
@@ -136,11 +153,42 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
         if (constraints != null) broker.constraints = constraints.toMap
         if (options != null) broker.options = options.toMap
         if (log4jOptions != null) broker.log4jOptions = log4jOptions.toMap
-        if (jvmOptions != null) broker.jvmOptions = jvmOptions
+        if (jvmOptions != null)
+          broker.executionOptions = broker.executionOptions.copy(jvmOptions = jvmOptions)
 
         if (failoverDelay != null) broker.failover.delay = failoverDelay
         if (failoverMaxDelay != null) broker.failover.maxDelay = failoverMaxDelay
         if (failoverMaxTries != null) broker.failover.maxTries = failoverMaxTries
+        if (javaCmd != null)
+          broker.executionOptions = broker.executionOptions.copy(javaCmd = javaCmd)
+
+        if (containerImage == "" || containerImage == "none") {
+          broker.executionOptions = broker.executionOptions.copy(container = None)
+        } else if (containerImage != null) {
+          broker.executionOptions = broker.executionOptions.copy(
+            container =
+              broker.executionOptions.container
+                .map(_.copy(name = containerImage))
+                .orElse(
+                  Some(Container(ctype = ContainerType.Docker, name = containerImage))))
+        }
+        containerType.zip(broker.executionOptions.container).foreach {
+          case (ct, c) => broker.executionOptions = broker.executionOptions.copy(
+            container = Some(c.copy(ctype = ct))
+          )
+        }
+
+        val newMounts = (broker.executionOptions.container.map(_.mounts), mounts) match {
+          // New list set, overwrite
+          case (_, Some(n)) => n
+          // No new list set, but existing one is, use the old one
+          case (Some(o), None) => o
+          // Neither old nor new set one, initialize to empty list.
+          case (None, None) => Seq()
+        }
+        broker.executionOptions = broker.executionOptions.copy(
+          container = broker.executionOptions.container.map(_.copy(mounts = newMounts))
+        )
 
         if (add) cluster.addBroker(broker)
         else if (broker.active || broker.task != null) broker.needsRestart = true
