@@ -56,7 +56,7 @@ Clone and build the project
     # git clone https://github.com/mesos/kafka
     # cd kafka
     # ./gradlew jar
-    # wget https://archive.apache.org/dist/kafka/0.8.2.2/kafka_2.10-0.8.2.2.tgz
+    # wget https://archive.apache.org/dist/kafka/0.8.2.2/kafka_2.11-0.8.2.2.tgz
 
 Environment Configuration
 --------------------------
