@@ -121,6 +121,21 @@ api=http://master:7000
 Now if running scheduler via `./kafka-mesos.sh scheduler` (no options specified) the scheduler will read values for options
 from the above file. You could also specify alternative config file by using `config` argument of the scheduler.
 
+Another example of `kafka-mesos.properties`:
+```
+storage=zk:/kafka-mesos
+master=zk://master:2181/mesos
+zk=zookeep1:2181,zookeep2:2181,zookeep3:2181/KafkaCluster
+api=http://master:7000
+```
+
+The second example creates /KafkaCluster chroot in zookeeper quorum (consisting of zookeep1,zookeep2,zookeep3 servers). Cluster data (--storage) is saved in
+zookeeper quorum, /KafkaCluster/kafka-mesos. Example creating topics using tools that come with kafka  would be
+```
+kafka-topics.sh --zookeeper zookeep1:2181,zookeep2:2181,zookeep3:2181/KafkaCluster  --create --config min.insync.replicas=3 --config max.message.bytes=47185920 --config unclean.leader.election.enable=false --topic tw_spam --partitions 15 --replication-factor 3
+```
+
+
 Run the scheduler
 -----------------
 
