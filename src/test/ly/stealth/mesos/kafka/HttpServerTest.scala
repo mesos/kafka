@@ -437,7 +437,22 @@ class HttpServerTest extends KafkaMesosTestCase {
     assertEquals("t0", t0Node.name)
     assertEquals(Seq(0), t0Node.partitions(0))
   }
-  
+
+  @Test
+  def topic_delete {
+    registry.cluster.topics.addTopic("t0")
+    registry.cluster.topics.addTopic("t1")
+
+    val json = sendRequestObj[ListTopicsResponse]("/topic/delete", parseMap("topic=t*"))
+    val topicNodes = json.topics
+    assertEquals(2, topicNodes.size)
+
+    val t0Node = topicNodes.head
+    val t1Node = topicNodes.tail.head
+    assertEquals("t0", t0Node.name)
+    assertEquals("t1", t1Node.name)
+  }
+
   @Test
   def topic_add {
     val topics = registry.cluster.topics

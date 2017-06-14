@@ -53,6 +53,7 @@ trait TopicCli {
       cmd match {
         case "list" => handleList(arg, args)
         case "add" | "update" => handleAddUpdate(arg, args, cmd == "add")
+        case "delete" => handleDelete(arg, args)
         case "rebalance" => handleRebalance(arg, args)
         case "realign" => handleRealign(arg, args)
         case "partitions" => handlePartitions(arg)
@@ -72,6 +73,8 @@ trait TopicCli {
           handleList(null, null, help = true)
         case "add" | "update" =>
           handleAddUpdate(null, null, cmd == "add", help = true)
+        case "delete" =>
+          handleDelete(null, null, help = true)
         case "rebalance" =>
           handleRebalance(null, null, help = true)
         case "realign" =>
@@ -133,6 +136,40 @@ trait TopicCli {
           printTopic(topic, 1)
           printLine()
         }
+      }
+    }
+
+    def handleDelete(expr: String, args: Array[String], help: Boolean = false): Unit = {
+      val parser = newParser()
+
+      if (help) {
+        printLine("Delete topics\nUsage: topic delete [<topic-expr>]\n")
+        handleGenericOptions(null, help = true)
+
+        printLine()
+        printTopicExprExamples()
+
+        return
+      }
+
+      val params = new util.LinkedHashMap[String, String]
+      if (expr != null) params.put("topic", expr)
+
+      val json =
+        try {
+          sendRequestObj[ListTopicsResponse]("/topic/delete", params)
+        }
+        catch {
+          case e: IOException => throw new Error("" + e)
+        }
+
+      val topics = json.topics
+      val title = s"topic${if (topics.size > 1) "s" else ""} deleted:"
+      printLine(title)
+
+      topics.foreach { topic =>
+        printTopic(topic, 1)
+        printLine()
       }
     }
 
@@ -362,6 +399,7 @@ trait TopicCli {
       printLine("Commands:")
       printLine("list       - list topics", 1)
       printLine("add        - add topic", 1)
+      printLine("delete     - delete topic", 1)
       printLine("update     - update topic", 1)
       printLine("rebalance  - rebalance topics", 1)
       printLine("realign    - realign topics, keeping existing broker assignments where possible", 1)

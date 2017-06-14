@@ -896,6 +896,26 @@ topic-expr examples:
   t*        - topics starting with 't'
 ```
 
+Deleting Topics
+--------------
+Note: needs to be supported and enabled in the broker configuration (i.e.: `delete.topic.enable=true`).
+```
+#./kafka-mesos.sh help topic delete
+Delete topics
+Usage: topic delete [<topic-expr>]
+
+Generic Options
+Option  Description
+------  -----------
+--api   Api url. Example: http://master:7000
+
+topic-expr examples:
+  t0        - topic t0
+  t0,t1     - topics t0, t1
+  *         - any topic
+  t*        - topics starting with 't'
+```
+
 Listing topic partition details
 -------------------------------
 ```

@@ -59,6 +59,24 @@ class TopicsTest extends KafkaMesosTestCase {
   }
 
   @Test
+  def deleteTopics {
+    assertEquals(0, topics.getTopics.size)
+
+    topics.addTopic("t0")
+    topics.addTopic("t1")
+
+    assertEquals(2, topics.getTopics.size)
+
+    topics.deleteTopic("t0")
+    topics.deleteTopic("t1")
+
+    // delete is done asynchronously
+    delay("500ms") {
+      assertEquals(0, topics.getTopics.size)
+    }
+  }
+
+  @Test
   def fairAssignment {
     val assignment = topics.fairAssignment(3, 2, Seq(0, 1, 2), 0, 0)
     assertEquals(3, assignment.size)

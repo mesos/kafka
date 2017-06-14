@@ -35,6 +35,8 @@ trait AdminUtilsProxy {
 
   def changeTopicConfig(topic: String, configs: Properties)
 
+  def deleteTopic(topic: String)
+
   def fetchEntityConfig(entityType: String, entity: String): Properties
 
   def changeClientIdConfig(clientId: String, configs: Properties)

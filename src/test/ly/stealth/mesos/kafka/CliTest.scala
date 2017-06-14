@@ -346,6 +346,37 @@ class CliTest extends KafkaMesosTestCase {
   }
 
   @Test
+  def topic_delete {
+    registry.cluster.topics.addTopic("t0")
+    registry.cluster.topics.addTopic("t1")
+    registry.cluster.topics.addTopic("x")
+    registry.cluster.topics.addTopic("z")
+
+    // delete single topic
+    exec("topic delete z")
+    assertOutContains("topic deleted:")
+    assertOutContains("z")
+    assertOutNotContains("t0")
+    assertOutNotContains("t1")
+    assertOutNotContains("x")
+
+    // delete pattern
+    exec("topic delete t*")
+    assertOutContains("topics deleted:")
+    assertOutContains("t0")
+    assertOutContains("t1")
+    assertOutNotContains("x")
+
+    // delete is done asynchronously
+    delay("500ms") {
+      // delete all
+      exec("topic delete *")
+      assertOutContains("topic deleted:")
+      assertOutContains("x")
+    }
+  }
+
+  @Test
   def topic_add {
     exec("topic add t0")
     assertOutContains("topic added:")

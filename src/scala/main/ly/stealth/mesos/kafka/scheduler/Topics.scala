@@ -83,6 +83,12 @@ class Topics {
     AdminUtilsWrapper().assignReplicasToBrokers(brokers_, partitions, replicas, fixedStartIndex, startPartitionId)
   }
 
+  def deleteTopic(name: String): Topic = {
+    val topicToDelete = getTopic(name)
+    if(topicToDelete != null) AdminUtilsWrapper().deleteTopic(topicToDelete.name)
+    topicToDelete
+  }
+
   def addTopic(name: String, assignment: Map[Int, Seq[Int]] = null, options: Map[String, String] = null): Topic = {
     val config = new Properties()
     if (options != null)

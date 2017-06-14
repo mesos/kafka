@@ -41,6 +41,9 @@ class AdminUtils(zkUrl: String) extends AdminUtilsProxy {
     configs: Properties
   ): Unit = KafkaAdminUtils.changeTopicConfig(zkUtils, topic, configs)
 
+  override def deleteTopic(topicToDelete: String): Unit =
+    KafkaAdminUtils.deleteTopic(zkUtils, topicToDelete)
+
   override def fetchEntityConfig(
     entityType: String,
     entity: String
