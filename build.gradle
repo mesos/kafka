@@ -2,7 +2,7 @@ plugins {
     id 'scala'
     id 'idea'
     id 'distribution'
-    id 'de.undercouch.download' version '2.1.0'
+    id 'de.undercouch.download' version '3.2.0'
     id "com.github.hierynomus.license" version "0.13.1"
 }
 
@@ -93,20 +93,20 @@ dependencies {
 jar {
     dependsOn 'test'
 
-    doFirst {
-        from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
-            exclude "*"
-            exclude "about_files/*"
-            exclude "META-INF/*.SF"
-            exclude "META-INF/*.DSA"
-            exclude "META-INF/*.RSA"
-        }
+    
+    from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude "*"
+        exclude "about_files/*"
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
     }
+    
     manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.cli.Cli")
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.8'
+    gradleVersion = '4.1'
 }
 
 distributions.main {
