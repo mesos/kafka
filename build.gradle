@@ -8,7 +8,7 @@ plugins {
 
 def scalaVersion = "2.11.8"
 def mesosVersion = "0.28.0"
-ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "0.10.2.0"
+ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "0.11.0.0"
 def kafkaMajorVersion="${kafkaVersion.split("\\.").take(2).join("_")}"
 def kafkaScalaVersion=scalaVersion.split("\\.").take(2).join(".")
 def jettyVersion = "9.0.4.v20130625"
