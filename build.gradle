@@ -8,12 +8,12 @@ plugins {
 
 def scalaVersion = "2.11.8"
 def mesosVersion = "0.28.0"
-ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "0.11.0.0"
+ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "1.1.0"
 def kafkaMajorVersion="${kafkaVersion.split("\\.").take(2).join("_")}"
 def kafkaScalaVersion=scalaVersion.split("\\.").take(2).join(".")
 def jettyVersion = "9.0.4.v20130625"
 def jerseyVersion = "2.24"
-def jacksonVersion = "2.8.2"
+def jacksonVersion = "2.9.5"
 
 version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala')
         .readLines()

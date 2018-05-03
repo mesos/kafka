@@ -5,8 +5,8 @@ base_dir=../..
 tmp_dir=.docker
 mkdir -p $tmp_dir
 
-kafka_version=0.8.2.2
-scala_version=2.10
+kafka_version=1.1.0
+scala_version=2.11
 docker_tag=`whoami`/kafka-mesos
 
 print_help() {
